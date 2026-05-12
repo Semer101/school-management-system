@@ -1,0 +1,2151 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "School Management System — Go + Gin + PostgreSQL\n\n## Authentication\nThis API uses JWT Bearer tokens. Login via `POST /api/login` to receive an access token (1 hour) and a refresh token (7 days).\nClick the **Authorize** button above and enter: `Bearer \u003cyour_token\u003e`\n\n## Roles\n| Role    | Access                                              |\n|---------|-----------------------------------------------------|\n| Admin   | Full access to all endpoints                        |\n| Teacher | Attendance, grades, locker (read public)             |\n| Student | Own grades, report card, locker, finance             |\n| Parent  | Children's data, report cards, finance               |",
+        "title": "SMS Backend API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "host": "localhost:8080",
+    "basePath": "/",
+    "paths": {
+        "/api/academics/attendance": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Records or updates attendance for a student in a subject on a given date. Teacher only.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "attendance"
+                ],
+                "summary": "Record attendance",
+                "parameters": [
+                    {
+                        "description": "Attendance data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.AttendanceInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Attendance updated (if record exists)",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "201": {
+                        "description": "Attendance recorded",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Validation error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/academics/attendance/class/{classID}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns all attendance records for a class on a specific date. Teacher only.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "attendance"
+                ],
+                "summary": "Get class attendance for a date",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Class ID",
+                        "name": "classID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Date in YYYY-MM-DD format",
+                        "name": "date",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Attendance records",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Missing or invalid date",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/academics/attendance/{studentID}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns overall and per-subject attendance stats for a student. Accessible by Teacher, Student (own), Admin, Parent (own child).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "attendance"
+                ],
+                "summary": "Get student attendance percentage",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Student ID",
+                        "name": "studentID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Attendance summary",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/academics/grades/bulk": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Saves grades for multiple students for a subject and term in one request. Teacher only.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "grades"
+                ],
+                "summary": "Bulk enter grades",
+                "parameters": [
+                    {
+                        "description": "Grades data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.BulkGradeInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Grades recorded",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Validation error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/academics/grades/student/{studentID}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns all grades for a student, optionally filtered by term and academic year. Accessible by Teacher, Student (own), Admin.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "grades"
+                ],
+                "summary": "Get a student's grades",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Student ID",
+                        "name": "studentID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Term: Term1 | Term2 | Term3",
+                        "name": "term",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Academic year e.g. 2025",
+                        "name": "year",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Grade list",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/academics/grades/subject/{subjectID}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns all grades for a subject, optionally filtered by type and term. Teacher only.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "grades"
+                ],
+                "summary": "Get grades for a subject",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Subject ID",
+                        "name": "subjectID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Grade type: Midterm | Final | Quiz | Assignment",
+                        "name": "type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Term: Term1 | Term2 | Term3",
+                        "name": "term",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Grade list",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/academics/reportcard/{studentID}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns a full report card with per-subject averages and letter grades. Accessible by Teacher, Student (own), Admin, Parent (own child).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "report-card"
+                ],
+                "summary": "Get report card",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Student ID",
+                        "name": "studentID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Report card",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Student not found",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/academics/reportcard/{studentID}/pdf": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Generates and downloads a PDF report card for a student. Accessible by Teacher, Student (own), Admin, Parent (own child).",
+                "produces": [
+                    "application/pdf"
+                ],
+                "tags": [
+                    "report-card"
+                ],
+                "summary": "Download report card as PDF",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Student ID",
+                        "name": "studentID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "PDF file",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "404": {
+                        "description": "Student not found",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "PDF generation failed",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/attendance/summary": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns attendance percentage for every student across all classes. Admin only.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "attendance"
+                ],
+                "summary": "School-wide attendance summary",
+                "responses": {
+                    "200": {
+                        "description": "Attendance summary",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/classes": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns all classes with teacher and student info. Admin only.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "classes"
+                ],
+                "summary": "List all classes",
+                "responses": {
+                    "200": {
+                        "description": "List of classes",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates a new class and optionally assigns a teacher. Admin only.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "classes"
+                ],
+                "summary": "Create a class",
+                "parameters": [
+                    {
+                        "description": "Class data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.CreateClassInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Class created",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Validation error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/enroll": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Enrolls a student into a subject. Prevents duplicate enrollments. Admin only.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "enrollment"
+                ],
+                "summary": "Enroll student in a subject",
+                "parameters": [
+                    {
+                        "description": "Enrollment data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.EnrollStudentInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Student enrolled",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Validation error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Already enrolled",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/finance/payroll": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates a payroll record for a teacher for a specific month and year. Admin only. Prevents duplicates.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "finance"
+                ],
+                "summary": "Create a payroll entry",
+                "parameters": [
+                    {
+                        "description": "Payroll data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.CreatePayrollRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Payroll created",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Validation error or teacher not found",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden — Admin only",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Payroll already exists for this month",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/finance/payroll/{id}/pay": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Sets a payroll record's status to Paid and records the payment timestamp. Admin only.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "finance"
+                ],
+                "summary": "Mark payroll as paid",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Payroll ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Payroll updated",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Already paid",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden — Admin only",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Payroll not found",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/finance/receipt/{id}/verify": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Admin marks a pending receipt as Verified or Rejected. Can only be done once per receipt.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "finance"
+                ],
+                "summary": "Verify or reject a bank receipt",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Transaction ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Verification data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.VerifyReceiptRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Receipt processed",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Already processed or validation error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden — Admin only",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Transaction not found",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/notify/absences": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Looks up all absences for the given date (or today if omitted) and sends an email to each student's parent. Admin only.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "notifications"
+                ],
+                "summary": "Notify parents of absent students",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Date to check absences for (YYYY-MM-DD). Defaults to today.",
+                        "name": "date",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Notifications sent",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid date format",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden — Admin only",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/notify/broadcast": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Sends an email announcement to all active users, or to a specific set of roles. Admin only.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "notifications"
+                ],
+                "summary": "Broadcast an announcement",
+                "parameters": [
+                    {
+                        "description": "Announcement data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.BroadcastInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Announcement sent",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Validation error or invalid role",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden — Admin only",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/students": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns all students with their user and class information. Admin only.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "students"
+                ],
+                "summary": "List all students",
+                "responses": {
+                    "200": {
+                        "description": "List of students",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden — Admin only",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates a new student account with a linked user login. Admin only.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "students"
+                ],
+                "summary": "Create a student",
+                "parameters": [
+                    {
+                        "description": "Student data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.CreateStudentInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Student created",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Validation error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Email or student code already exists",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/students/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns a single student record. Admin only.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "students"
+                ],
+                "summary": "Get a student by ID",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Student ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Student record",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Student not found",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Updates class, parent info, or date of birth for a student. Admin only.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "students"
+                ],
+                "summary": "Update a student",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Student ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Fields to update",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.UpdateStudentInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Student updated",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Validation error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Student not found",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Deactivates the student's user account and soft-deletes the student record. Admin only.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "students"
+                ],
+                "summary": "Archive (soft-delete) a student",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Student ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Student archived",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Student not found",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/subjects": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns all subjects with their assigned teacher. Admin only.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "subjects"
+                ],
+                "summary": "List all subjects",
+                "responses": {
+                    "200": {
+                        "description": "List of subjects",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates a new subject and optionally assigns a teacher. Admin only.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "subjects"
+                ],
+                "summary": "Create a subject",
+                "parameters": [
+                    {
+                        "description": "Subject data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.CreateSubjectInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Subject created",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Validation error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Subject code already exists",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/teachers": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns all teachers with their user information. Admin only.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "teachers"
+                ],
+                "summary": "List all teachers",
+                "responses": {
+                    "200": {
+                        "description": "List of teachers",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden — Admin only",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Creates a new teacher account with a linked user login. Admin only.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "teachers"
+                ],
+                "summary": "Create a teacher",
+                "parameters": [
+                    {
+                        "description": "Teacher data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.CreateTeacherInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Teacher created",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Validation error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Email or teacher code already exists",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/finance/receipt": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Student or Parent submits proof of payment. Duplicate receipt IDs are rejected.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "finance"
+                ],
+                "summary": "Submit a bank receipt",
+                "parameters": [
+                    {
+                        "description": "Receipt data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.SubmitReceiptRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Receipt submitted",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Validation error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden — Student/Parent only",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Receipt ID already exists",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/finance/transactions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Admin sees all transactions. Students see only their own. Parents see transactions for all their linked children.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "finance"
+                ],
+                "summary": "List transactions",
+                "responses": {
+                    "200": {
+                        "description": "Transaction list",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Student/user profile not found",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/locker/files/{fileID}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Students can only delete their own files. Admins can delete any file. Removes from disk and database.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "locker"
+                ],
+                "summary": "Delete a locker file",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "File ID",
+                        "name": "fileID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "File deleted",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden — Not your file",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "File not found",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/locker/files/{fileID}/visibility": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Toggles a locker file between private (teacher cannot see) and public (teacher can see). Student must own the file.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "locker"
+                ],
+                "summary": "Toggle file visibility",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "File ID",
+                        "name": "fileID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Visibility updated",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden — Not your file",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "File not found",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/locker/student/{studentID}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Students see all their own files. Teachers see only public files. Admins see all files.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "locker"
+                ],
+                "summary": "List files in a student's locker",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Student ID",
+                        "name": "studentID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "File list",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden — Cannot view another student's files",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Student profile not found",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/locker/upload": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Students can upload files (max 5MB) of allowed types: pdf, jpg, jpeg, png, doc, docx, txt. Each file is stored under the student's locker directory.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "locker"
+                ],
+                "summary": "Upload a file to the digital locker",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "File to upload (max 5MB)",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Category: Certificate | Assignment | Portfolio | Material",
+                        "name": "category",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "File uploaded",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "File missing, too large, or invalid type",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden — Students only",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Student profile not found",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/login": {
+            "post": {
+                "description": "Authenticates a user and returns an access token (1 hour) and a refresh token (7 days)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Login and get JWT tokens",
+                "parameters": [
+                    {
+                        "description": "Login credentials",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.LoginInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Tokens returned",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid credentials",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/me": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns the profile of the currently authenticated user",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Get current user profile",
+                "responses": {
+                    "200": {
+                        "description": "User profile",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/me/password": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Updates the authenticated user's password. Requires the current password.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Change password",
+                "parameters": [
+                    {
+                        "description": "Password change data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.ChangePasswordInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Password updated",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Validation error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Current password incorrect",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/parent/children": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns all students linked to the authenticated parent's account. Parent only.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "parent"
+                ],
+                "summary": "Get my children",
+                "responses": {
+                    "200": {
+                        "description": "List of children",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/register": {
+            "post": {
+                "description": "Creates a new user account. Available roles: Admin, Teacher, Student, Parent",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Register a new user",
+                "parameters": [
+                    {
+                        "description": "Registration data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.RegisterInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "User created",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Validation error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Email already registered",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "controllers.AttendanceInput": {
+            "type": "object",
+            "required": [
+                "date",
+                "status",
+                "student_id",
+                "subject_id"
+            ],
+            "properties": {
+                "date": {
+                    "type": "string",
+                    "example": "2025-05-01"
+                },
+                "notes": {
+                    "type": "string",
+                    "example": "Arrived 5 mins late"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "Present",
+                        "Absent",
+                        "Late"
+                    ],
+                    "example": "Present"
+                },
+                "student_id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "subject_id": {
+                    "type": "integer",
+                    "example": 2
+                }
+            }
+        },
+        "controllers.BroadcastInput": {
+            "type": "object",
+            "required": [
+                "body",
+                "title"
+            ],
+            "properties": {
+                "body": {
+                    "type": "string",
+                    "minLength": 10,
+                    "example": "Please collect report cards by Friday."
+                },
+                "roles": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "[\"Student\"",
+                        "\"Parent\"]"
+                    ]
+                },
+                "title": {
+                    "type": "string",
+                    "minLength": 5,
+                    "example": "End of Term Reminder"
+                }
+            }
+        },
+        "controllers.BulkGradeInput": {
+            "type": "object",
+            "required": [
+                "academic_year",
+                "grades",
+                "max_score",
+                "subject_id",
+                "term",
+                "type"
+            ],
+            "properties": {
+                "academic_year": {
+                    "type": "integer",
+                    "example": 2025
+                },
+                "grades": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "$ref": "#/definitions/controllers.GradeEntry"
+                    }
+                },
+                "max_score": {
+                    "type": "number",
+                    "example": 100
+                },
+                "subject_id": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "term": {
+                    "type": "string",
+                    "enum": [
+                        "Term1",
+                        "Term2",
+                        "Term3"
+                    ],
+                    "example": "Term1"
+                },
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "Midterm",
+                        "Final",
+                        "Quiz",
+                        "Assignment"
+                    ],
+                    "example": "Midterm"
+                }
+            }
+        },
+        "controllers.ChangePasswordInput": {
+            "type": "object",
+            "required": [
+                "current_password",
+                "new_password"
+            ],
+            "properties": {
+                "current_password": {
+                    "type": "string",
+                    "example": "oldpass123"
+                },
+                "new_password": {
+                    "type": "string",
+                    "minLength": 8,
+                    "example": "newpass456"
+                }
+            }
+        },
+        "controllers.CreateClassInput": {
+            "type": "object",
+            "required": [
+                "name",
+                "year"
+            ],
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "example": "Grade 10A"
+                },
+                "teacher_id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "year": {
+                    "type": "integer",
+                    "example": 2025
+                }
+            }
+        },
+        "controllers.CreatePayrollRequest": {
+            "type": "object",
+            "required": [
+                "amount",
+                "month",
+                "teacher_id",
+                "year"
+            ],
+            "properties": {
+                "amount": {
+                    "type": "number",
+                    "minimum": 1,
+                    "example": 15000
+                },
+                "month": {
+                    "type": "integer",
+                    "maximum": 12,
+                    "minimum": 1,
+                    "example": 5
+                },
+                "teacher_id": {
+                    "type": "integer",
+                    "example": 2
+                },
+                "year": {
+                    "type": "integer",
+                    "example": 2025
+                }
+            }
+        },
+        "controllers.CreateStudentInput": {
+            "type": "object",
+            "required": [
+                "email",
+                "name",
+                "parent_id",
+                "password",
+                "student_code"
+            ],
+            "properties": {
+                "class_id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "date_of_birth": {
+                    "type": "string",
+                    "example": "2010-05-15"
+                },
+                "email": {
+                    "type": "string",
+                    "example": "alice@school.com"
+                },
+                "name": {
+                    "type": "string",
+                    "minLength": 2,
+                    "example": "Alice Bekele"
+                },
+                "parent_email": {
+                    "type": "string",
+                    "example": "parent@email.com"
+                },
+                "parent_id": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "parent_name": {
+                    "type": "string",
+                    "example": "Mr. Bekele"
+                },
+                "parent_phone": {
+                    "type": "string",
+                    "example": "+251911000000"
+                },
+                "password": {
+                    "type": "string",
+                    "minLength": 8,
+                    "example": "password123"
+                },
+                "student_code": {
+                    "type": "string",
+                    "example": "STU-001"
+                }
+            }
+        },
+        "controllers.CreateSubjectInput": {
+            "type": "object",
+            "required": [
+                "code",
+                "name"
+            ],
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "example": "MATH-101"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Mathematics"
+                },
+                "teacher_id": {
+                    "type": "integer",
+                    "example": 1
+                }
+            }
+        },
+        "controllers.CreateTeacherInput": {
+            "type": "object",
+            "required": [
+                "email",
+                "name",
+                "password",
+                "teacher_code"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "example": "tadesse@school.com"
+                },
+                "name": {
+                    "type": "string",
+                    "minLength": 2,
+                    "example": "Mr. Tadesse"
+                },
+                "password": {
+                    "type": "string",
+                    "minLength": 8,
+                    "example": "teacher123"
+                },
+                "qualification": {
+                    "type": "string",
+                    "example": "MSc Mathematics"
+                },
+                "teacher_code": {
+                    "type": "string",
+                    "example": "TCH-001"
+                }
+            }
+        },
+        "controllers.EnrollStudentInput": {
+            "type": "object",
+            "required": [
+                "student_id",
+                "subject_id"
+            ],
+            "properties": {
+                "student_id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "subject_id": {
+                    "type": "integer",
+                    "example": 2
+                }
+            }
+        },
+        "controllers.GradeEntry": {
+            "type": "object",
+            "required": [
+                "score",
+                "student_id"
+            ],
+            "properties": {
+                "remarks": {
+                    "type": "string",
+                    "example": "Good improvement"
+                },
+                "score": {
+                    "type": "number",
+                    "maximum": 100,
+                    "minimum": 0,
+                    "example": 87.5
+                },
+                "student_id": {
+                    "type": "integer",
+                    "example": 1
+                }
+            }
+        },
+        "controllers.LoginInput": {
+            "type": "object",
+            "required": [
+                "email",
+                "password"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "example": "john@school.com"
+                },
+                "password": {
+                    "type": "string",
+                    "example": "secret123"
+                }
+            }
+        },
+        "controllers.RegisterInput": {
+            "type": "object",
+            "required": [
+                "email",
+                "name",
+                "password",
+                "role"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "example": "john@school.com"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "minLength": 2,
+                    "example": "John Doe"
+                },
+                "password": {
+                    "type": "string",
+                    "minLength": 8,
+                    "example": "secret123"
+                },
+                "role": {
+                    "type": "string",
+                    "enum": [
+                        "Admin",
+                        "Teacher",
+                        "Student",
+                        "Parent"
+                    ],
+                    "example": "Student"
+                }
+            }
+        },
+        "controllers.SubmitReceiptRequest": {
+            "type": "object",
+            "required": [
+                "amount",
+                "receipt_id",
+                "student_id"
+            ],
+            "properties": {
+                "amount": {
+                    "type": "number",
+                    "minimum": 1,
+                    "example": 5000
+                },
+                "description": {
+                    "type": "string",
+                    "example": "Term 1 tuition fee"
+                },
+                "receipt_id": {
+                    "type": "string",
+                    "maxLength": 50,
+                    "minLength": 5,
+                    "example": "CBE-TXN-20250501"
+                },
+                "student_id": {
+                    "type": "integer",
+                    "example": 1
+                }
+            }
+        },
+        "controllers.UpdateStudentInput": {
+            "type": "object",
+            "properties": {
+                "class_id": {
+                    "type": "integer",
+                    "example": 2
+                },
+                "date_of_birth": {
+                    "type": "string",
+                    "example": "2010-05-15"
+                },
+                "parent_email": {
+                    "type": "string",
+                    "example": "new@email.com"
+                },
+                "parent_name": {
+                    "type": "string",
+                    "example": "Mr. Updated"
+                },
+                "parent_phone": {
+                    "type": "string",
+                    "example": "+251922000000"
+                }
+            }
+        },
+        "controllers.VerifyReceiptRequest": {
+            "type": "object",
+            "required": [
+                "status"
+            ],
+            "properties": {
+                "remarks": {
+                    "type": "string",
+                    "example": "Confirmed with bank"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "Verified",
+                        "Rejected"
+                    ],
+                    "example": "Verified"
+                }
+            }
+        },
+        "helpers.APIResponse": {
+            "type": "object",
+            "properties": {
+                "data": {},
+                "error": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "description": "Type \"Bearer\" followed by a space and your JWT token. Example: **Bearer eyJhbGci...**",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    }
+}

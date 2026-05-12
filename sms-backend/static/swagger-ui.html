@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SMS Backend API — Swagger UI</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #ffffff;
+    --bg2: #f8f9fa;
+    --bg3: #f1f3f5;
+    --border: #dee2e6;
+    --text: #212529;
+    --text2: #6c757d;
+    --text3: #adb5bd;
+    --get: #0d6efd;    --get-bg: #e7f0ff;
+    --post: #198754;   --post-bg: #e6f4ec;
+    --put: #e67e00;    --put-bg: #fff3e0;
+    --patch: #6f42c1;  --patch-bg: #f0eaff;
+    --delete: #dc3545; --delete-bg: #fde8ea;
+    --badge-bg: #e9ecef;
+    --code-bg: #f6f8fa;
+    --lock: #fd7e14;
+  }
+
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg2); color: var(--text); font-size: 14px; line-height: 1.5; }
+
+  header { background: var(--bg); border-bottom: 1px solid var(--border); padding: 0 24px; position: sticky; top: 0; z-index: 100; display: flex; align-items: center; gap: 16px; height: 56px; }
+  header h1 { font-size: 17px; font-weight: 600; }
+  .version-badge { background: var(--badge-bg); border-radius: 4px; padding: 2px 8px; font-size: 12px; color: var(--text2); }
+  .server-url { margin-left: auto; font-size: 12px; color: var(--text2); font-family: monospace; background: var(--bg3); padding: 4px 10px; border-radius: 4px; border: 1px solid var(--border); }
+
+  .auth-bar { background: #fff8e1; border-bottom: 1px solid #ffe082; padding: 8px 24px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .auth-bar label { font-size: 12px; font-weight: 600; color: #7a5c00; }
+  .auth-bar input { flex: 1; min-width: 260px; max-width: 480px; font-family: monospace; font-size: 12px; padding: 5px 10px; border: 1px solid #ffe082; border-radius: 4px; background: #fffde7; color: #333; outline: none; }
+  .auth-bar input:focus { border-color: #ffc107; }
+  .auth-bar button { padding: 5px 16px; background: #f9a825; border: none; border-radius: 4px; font-size: 12px; font-weight: 600; color: #fff; cursor: pointer; }
+  .auth-bar button:hover { background: #f57f17; }
+  .auth-status { font-size: 12px; color: #7a5c00; }
+
+  main { max-width: 900px; margin: 24px auto; padding: 0 16px; }
+
+  .tag-section { margin-bottom: 24px; }
+  .tag-header { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px 6px 0 0; cursor: pointer; user-select: none; }
+  .tag-header:hover { background: var(--bg3); }
+  .tag-title { font-size: 15px; font-weight: 600; }
+  .tag-desc { font-size: 12px; color: var(--text2); }
+  .chevron { margin-left: auto; font-size: 16px; transition: transform 0.2s; color: var(--text2); }
+  .tag-section.open .chevron { transform: rotate(180deg); }
+  .endpoint-list { border: 1px solid var(--border); border-top: none; border-radius: 0 0 6px 6px; overflow: hidden; }
+
+  .endpoint { border-bottom: 1px solid var(--border); }
+  .endpoint:last-child { border-bottom: none; }
+  .endpoint-header { display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; background: var(--bg); }
+  .endpoint-header:hover { background: var(--bg3); }
+  .method { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px; min-width: 58px; text-align: center; text-transform: uppercase; letter-spacing: 0.5px; }
+  .method.get    { color: var(--get);    background: var(--get-bg); }
+  .method.post   { color: var(--post);   background: var(--post-bg); }
+  .method.put    { color: var(--put);    background: var(--put-bg); }
+  .method.patch  { color: var(--patch);  background: var(--patch-bg); }
+  .method.delete { color: var(--delete); background: var(--delete-bg); }
+  .path { font-family: monospace; font-size: 13px; color: var(--text); flex: 1; }
+  .summary { font-size: 13px; color: var(--text2); margin-left: 4px; }
+  .lock-icon { font-size: 13px; color: var(--lock); margin-left: auto; }
+  .role-badge { font-size: 10px; padding: 2px 6px; border-radius: 3px; background: var(--badge-bg); color: var(--text2); font-weight: 600; }
+
+  .endpoint-body { display: none; padding: 16px 20px; background: var(--bg2); border-top: 1px solid var(--border); }
+  .endpoint.open .endpoint-body { display: block; }
+
+  .section-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text3); margin: 12px 0 6px; }
+  .section-label:first-child { margin-top: 0; }
+
+  .params-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .params-table th { text-align: left; padding: 6px 10px; background: var(--bg3); color: var(--text2); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .params-table td { padding: 6px 10px; border-top: 1px solid var(--border); vertical-align: top; }
+  .params-table tr:first-child td { border-top: none; }
+  .param-name { font-family: monospace; font-size: 12px; font-weight: 600; }
+  .required-star { color: var(--delete); }
+  .param-in { font-size: 11px; color: var(--text2); }
+
+  .responses-list { display: flex; flex-direction: column; gap: 6px; }
+  .response-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 12px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg); }
+  .status-code { font-family: monospace; font-weight: 700; font-size: 13px; min-width: 40px; }
+  .status-2xx { color: var(--post); }
+  .status-4xx { color: var(--delete); }
+  .status-desc { font-size: 13px; color: var(--text2); }
+
+  pre.schema { background: var(--code-bg); border: 1px solid var(--border); border-radius: 4px; padding: 10px 12px; font-family: monospace; font-size: 12px; line-height: 1.6; overflow-x: auto; white-space: pre-wrap; word-break: break-word; }
+
+  .try-btn { margin-top: 14px; padding: 6px 18px; background: var(--get); color: #fff; border: none; border-radius: 4px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .try-btn:hover { opacity: 0.88; }
+
+  .try-panel { display: none; margin-top: 14px; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .try-panel.open { display: block; }
+  .try-panel-header { background: var(--bg3); padding: 8px 14px; font-size: 12px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; }
+  .try-panel-body { padding: 14px; background: var(--bg); display: flex; flex-direction: column; gap: 10px; }
+  .try-field label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+  .try-field input, .try-field textarea, .try-field select { width: 100%; padding: 6px 10px; border: 1px solid var(--border); border-radius: 4px; font-size: 13px; font-family: monospace; outline: none; background: var(--bg); color: var(--text); }
+  .try-field input:focus, .try-field textarea:focus { border-color: var(--get); }
+  .try-field textarea { min-height: 80px; resize: vertical; }
+  .execute-btn { padding: 7px 20px; background: var(--post); color: #fff; border: none; border-radius: 4px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .execute-btn:hover { opacity: 0.88; }
+  .response-output { background: var(--code-bg); border: 1px solid var(--border); border-radius: 4px; padding: 10px 12px; font-family: monospace; font-size: 12px; white-space: pre-wrap; word-break: break-word; max-height: 300px; overflow-y: auto; margin-top: 6px; display: none; }
+
+  .info-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin-bottom: 24px; }
+  .info-card h2 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .info-card p { color: var(--text2); font-size: 13px; margin-bottom: 10px; }
+  .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 12px; }
+  .info-stat { background: var(--bg3); border-radius: 6px; padding: 10px 14px; }
+  .info-stat-val { font-size: 20px; font-weight: 700; }
+  .info-stat-lbl { font-size: 11px; color: var(--text2); margin-top: 2px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>SMS Backend API</h1>
+  <span class="version-badge">v1.0</span>
+  <span style="font-size:12px;color:var(--text2);">Go · Gin · PostgreSQL</span>
+  <span class="server-url">http://localhost:8080</span>
+</header>
+
+<div class="auth-bar">
+  <label>🔐 Bearer Token (JWT)</label>
+  <input type="text" id="jwt-input" placeholder="Paste your JWT access token here…" />
+  <button onclick="saveToken()">Authorize</button>
+  <span class="auth-status" id="auth-status"></span>
+</div>
+
+<main>
+
+<div class="info-card">
+  <h2>School Management System</h2>
+  <p>REST API for the SMS backend — authentication, academics, finance, digital locker, and notifications.</p>
+  <div class="info-grid">
+    <div class="info-stat"><div class="info-stat-val">38</div><div class="info-stat-lbl">Endpoints</div></div>
+    <div class="info-stat"><div class="info-stat-val">6</div><div class="info-stat-lbl">Tag groups</div></div>
+    <div class="info-stat"><div class="info-stat-val">4</div><div class="info-stat-lbl">Roles</div></div>
+    <div class="info-stat"><div class="info-stat-val">1 hr</div><div class="info-stat-lbl">Token lifetime</div></div>
+  </div>
+</div>
+
+<div id="api-docs"></div>
+
+</main>
+
+<script>
+const BASE = 'http://localhost:8080';
+let jwtToken = '';
+
+function saveToken() {
+  jwtToken = document.getElementById('jwt-input').value.trim();
+  document.getElementById('auth-status').textContent = jwtToken ? '✓ Token set' : '✗ Cleared';
+}
+
+const ENDPOINTS = [
+  {
+    tag: 'auth', tagLabel: 'Authentication', tagDesc: 'Register, login, and profile',
+    routes: [
+      { method:'POST', path:'/api/register', summary:'Register a new user', auth:false, roles:[],
+        params:[],
+        body: { schema:'{\n  "name": "string (2–100 chars)",\n  "email": "string",\n  "password": "string (min 8 chars)",\n  "role": "Admin | Teacher | Student | Parent"\n}' },
+        responses:[{code:'201',desc:'User created'},{code:'400',desc:'Validation error'}]
+      },
+      { method:'POST', path:'/api/login', summary:'Login and receive tokens', auth:false, roles:[],
+        params:[],
+        body: { schema:'{\n  "email": "string",\n  "password": "string"\n}' },
+        responses:[{code:'200',desc:'Returns access_token + refresh_token'},{code:'401',desc:'Invalid credentials'}]
+      },
+      { method:'GET', path:'/api/me', summary:'Get current user profile', auth:true, roles:['All'],
+        params:[], body:null,
+        responses:[{code:'200',desc:'User object'}]
+      },
+      { method:'PUT', path:'/api/me/password', summary:'Change password', auth:true, roles:['All'],
+        params:[],
+        body:{ schema:'{\n  "old_password": "string",\n  "new_password": "string"\n}' },
+        responses:[{code:'200',desc:'Password updated'},{code:'400',desc:'Wrong old password'}]
+      },
+    ]
+  },
+  {
+    tag: 'admin-users', tagLabel: 'Admin — Users', tagDesc: 'Student & teacher management (Admin only)',
+    routes: [
+      { method:'POST', path:'/api/admin/students', summary:'Create student', auth:true, roles:['Admin'],
+        params:[],
+        body:{ schema:'{\n  "user_id": "uint",\n  "parent_id": "uint (optional)",\n  "class_id": "uint"\n}' },
+        responses:[{code:'201',desc:'Student created'}]
+      },
+      { method:'GET', path:'/api/admin/students', summary:'List all students', auth:true, roles:['Admin'],
+        params:[], body:null, responses:[{code:'200',desc:'Array of student records'}]
+      },
+      { method:'GET', path:'/api/admin/students/:id', summary:'Get student by ID', auth:true, roles:['Admin'],
+        params:[{name:'id',in:'path',required:true,desc:'Student ID'}], body:null,
+        responses:[{code:'200',desc:'Student record'},{code:'404',desc:'Not found'}]
+      },
+      { method:'PUT', path:'/api/admin/students/:id', summary:'Update student', auth:true, roles:['Admin'],
+        params:[{name:'id',in:'path',required:true,desc:'Student ID'}],
+        body:{ schema:'{\n  "class_id": "uint",\n  "parent_id": "uint"\n}' },
+        responses:[{code:'200',desc:'Updated'}]
+      },
+      { method:'DELETE', path:'/api/admin/students/:id', summary:'Archive (soft-delete) student', auth:true, roles:['Admin'],
+        params:[{name:'id',in:'path',required:true,desc:'Student ID'}], body:null,
+        responses:[{code:'200',desc:'Archived'}]
+      },
+      { method:'POST', path:'/api/admin/teachers', summary:'Create teacher', auth:true, roles:['Admin'],
+        params:[],
+        body:{ schema:'{\n  "user_id": "uint",\n  "subject_ids": [1, 2]\n}' },
+        responses:[{code:'201',desc:'Teacher created'}]
+      },
+      { method:'GET', path:'/api/admin/teachers', summary:'List all teachers', auth:true, roles:['Admin'],
+        params:[], body:null, responses:[{code:'200',desc:'Array of teachers'}]
+      },
+    ]
+  },
+  {
+    tag: 'admin-academic', tagLabel: 'Admin — Academic Setup', tagDesc: 'Classes, subjects, enrollment',
+    routes: [
+      { method:'POST', path:'/api/admin/classes', summary:'Create class', auth:true, roles:['Admin'],
+        params:[],
+        body:{ schema:'{\n  "name": "string",\n  "grade_level": "string",\n  "teacher_id": "uint"\n}' },
+        responses:[{code:'201',desc:'Class created'}]
+      },
+      { method:'GET', path:'/api/admin/classes', summary:'List classes', auth:true, roles:['Admin'],
+        params:[], body:null, responses:[{code:'200',desc:'Array of classes'}]
+      },
+      { method:'POST', path:'/api/admin/subjects', summary:'Create subject', auth:true, roles:['Admin'],
+        params:[],
+        body:{ schema:'{\n  "name": "string",\n  "code": "string"\n}' },
+        responses:[{code:'201',desc:'Subject created'}]
+      },
+      { method:'GET', path:'/api/admin/subjects', summary:'List subjects', auth:true, roles:['Admin'],
+        params:[], body:null, responses:[{code:'200',desc:'Array of subjects'}]
+      },
+      { method:'POST', path:'/api/admin/enroll', summary:'Enroll student in class', auth:true, roles:['Admin'],
+        params:[],
+        body:{ schema:'{\n  "student_id": "uint",\n  "class_id": "uint",\n  "subject_ids": [1, 2, 3]\n}' },
+        responses:[{code:'200',desc:'Enrolled'}]
+      },
+    ]
+  },
+  {
+    tag: 'academics', tagLabel: 'Academics', tagDesc: 'Attendance, grades, report cards',
+    routes: [
+      { method:'POST', path:'/api/academics/attendance', summary:'Record attendance', auth:true, roles:['Teacher'],
+        params:[],
+        body:{ schema:'{\n  "class_id": "uint",\n  "date": "2025-05-01",\n  "records": [\n    {"student_id": 1, "status": "Present|Absent|Late"}\n  ]\n}' },
+        responses:[{code:'200',desc:'Attendance saved'}]
+      },
+      { method:'GET', path:'/api/academics/attendance/class/:classID', summary:'Class attendance list', auth:true, roles:['Teacher'],
+        params:[{name:'classID',in:'path',required:true,desc:'Class ID'}], body:null,
+        responses:[{code:'200',desc:'Attendance records'}]
+      },
+      { method:'GET', path:'/api/academics/attendance/:studentID', summary:'Student attendance %', auth:true, roles:['Teacher'],
+        params:[{name:'studentID',in:'path',required:true,desc:'Student ID'}], body:null,
+        responses:[{code:'200',desc:'Attendance percentage'}]
+      },
+      { method:'POST', path:'/api/academics/grades/bulk', summary:'Bulk grade entry', auth:true, roles:['Teacher'],
+        params:[],
+        body:{ schema:'{\n  "subject_id": "uint",\n  "grades": [\n    {"student_id": 1, "score": 87.5, "term": "Term1"}\n  ]\n}' },
+        responses:[{code:'200',desc:'Grades saved'}]
+      },
+      { method:'GET', path:'/api/academics/grades/subject/:subjectID', summary:'Grades for a subject', auth:true, roles:['Teacher'],
+        params:[{name:'subjectID',in:'path',required:true,desc:'Subject ID'}], body:null,
+        responses:[{code:'200',desc:'Grade list'}]
+      },
+      { method:'GET', path:'/api/academics/grades/student/:studentID', summary:"Student's grades", auth:true, roles:['Teacher','Student','Admin'],
+        params:[{name:'studentID',in:'path',required:true,desc:'Student ID'}], body:null,
+        responses:[{code:'200',desc:'Grade records'}]
+      },
+      { method:'GET', path:'/api/academics/reportcard/:studentID', summary:'Get report card', auth:true, roles:['Teacher','Student','Admin'],
+        params:[{name:'studentID',in:'path',required:true,desc:'Student ID'}], body:null,
+        responses:[{code:'200',desc:'Report card JSON'}]
+      },
+      { method:'GET', path:'/api/academics/reportcard/:studentID/pdf', summary:'Download report card PDF', auth:true, roles:['Teacher','Student','Admin'],
+        params:[{name:'studentID',in:'path',required:true,desc:'Student ID'}], body:null,
+        responses:[{code:'200',desc:'PDF file download'}]
+      },
+      { method:'GET', path:'/api/admin/attendance/summary', summary:'Attendance summary dashboard', auth:true, roles:['Admin'],
+        params:[], body:null,
+        responses:[{code:'200',desc:'School-wide attendance stats'}]
+      },
+    ]
+  },
+  {
+    tag: 'finance', tagLabel: 'Finance', tagDesc: 'Payments, receipts, payroll',
+    routes: [
+      { method:'POST', path:'/api/finance/receipt', summary:'Submit bank receipt', auth:true, roles:['Student','Parent'],
+        params:[],
+        body:{ schema:'{\n  "amount": 1000.00,\n  "bank_ref": "string",\n  "receipt_url": "string (optional)"\n}' },
+        responses:[{code:'201',desc:'Receipt submitted'}]
+      },
+      { method:'GET', path:'/api/finance/transactions', summary:'List transactions', auth:true, roles:['Student','Admin','Parent'],
+        params:[], body:null, responses:[{code:'200',desc:'Transaction list'}]
+      },
+      { method:'PATCH', path:'/api/admin/finance/receipt/:id/verify', summary:'Verify bank receipt', auth:true, roles:['Admin'],
+        params:[{name:'id',in:'path',required:true,desc:'Transaction ID'}], body:null,
+        responses:[{code:'200',desc:'Receipt verified'}]
+      },
+      { method:'POST', path:'/api/admin/finance/payroll', summary:'Create payroll entry', auth:true, roles:['Admin'],
+        params:[],
+        body:{ schema:'{\n  "teacher_id": "uint",\n  "amount": 5000.00,\n  "month": "2025-05"\n}' },
+        responses:[{code:'201',desc:'Payroll created'}]
+      },
+      { method:'PATCH', path:'/api/admin/finance/payroll/:id/pay', summary:'Mark payroll as paid', auth:true, roles:['Admin'],
+        params:[{name:'id',in:'path',required:true,desc:'Payroll ID'}], body:null,
+        responses:[{code:'200',desc:'Marked paid'}]
+      },
+      { method:'GET', path:'/api/admin/finance/summary', summary:'Finance summary', auth:true, roles:['Admin'],
+        params:[], body:null, responses:[{code:'200',desc:'Financial overview'}]
+      },
+    ]
+  },
+  {
+    tag: 'locker', tagLabel: 'Digital Locker', tagDesc: 'File storage per student',
+    routes: [
+      { method:'POST', path:'/api/locker/upload', summary:'Upload file to locker', auth:true, roles:['Student','Teacher','Admin'],
+        params:[{name:'file',in:'formData',required:true,desc:'File (multipart)'},{name:'category',in:'formData',required:true,desc:'Certificate | Assignment | Portfolio | Material'}],
+        body:null, responses:[{code:'201',desc:'File uploaded'}]
+      },
+      { method:'GET', path:'/api/locker/student/:studentID', summary:'List locker files', auth:true, roles:['Student','Teacher','Admin'],
+        params:[{name:'studentID',in:'path',required:true,desc:'Student ID'}], body:null,
+        responses:[{code:'200',desc:'File list'}]
+      },
+      { method:'DELETE', path:'/api/locker/files/:fileID', summary:'Delete locker file', auth:true, roles:['Student','Teacher','Admin'],
+        params:[{name:'fileID',in:'path',required:true,desc:'File ID'}], body:null,
+        responses:[{code:'200',desc:'Deleted'}]
+      },
+      { method:'PATCH', path:'/api/locker/files/:fileID/visibility', summary:'Toggle file visibility', auth:true, roles:['Student','Teacher','Admin'],
+        params:[{name:'fileID',in:'path',required:true,desc:'File ID'}],
+        body:{ schema:'{\n  "public": true\n}' },
+        responses:[{code:'200',desc:'Visibility updated'}]
+      },
+    ]
+  },
+  {
+    tag: 'notifications', tagLabel: 'Notifications', tagDesc: 'Broadcasts and parent alerts',
+    routes: [
+      { method:'POST', path:'/api/admin/notify/broadcast', summary:'Broadcast announcement', auth:true, roles:['Admin'],
+        params:[],
+        body:{ schema:'{\n  "title": "string",\n  "message": "string",\n  "roles": ["Student","Teacher","Parent"]\n}' },
+        responses:[{code:'200',desc:'Broadcast sent'}]
+      },
+      { method:'POST', path:'/api/admin/notify/absences', summary:'Notify parents of absent students', auth:true, roles:['Admin'],
+        params:[],
+        body:{ schema:'{\n  "date": "2025-05-01"\n}' },
+        responses:[{code:'200',desc:'Emails sent to parents'}]
+      },
+    ]
+  },
+  {
+    tag: 'parent', tagLabel: 'Parent Portal', tagDesc: 'View children, attendance, grades',
+    routes: [
+      { method:'GET', path:'/api/parent/children', summary:'My linked children', auth:true, roles:['Parent'],
+        params:[], body:null, responses:[{code:'200',desc:'List of children'}]
+      },
+      { method:'GET', path:'/api/parent/attendance/:studentID', summary:"Child's attendance", auth:true, roles:['Parent'],
+        params:[{name:'studentID',in:'path',required:true,desc:'Child student ID'}], body:null,
+        responses:[{code:'200',desc:'Attendance percentage'}]
+      },
+      { method:'GET', path:'/api/parent/grades/:studentID', summary:"Child's grades", auth:true, roles:['Parent'],
+        params:[{name:'studentID',in:'path',required:true,desc:'Child student ID'}], body:null,
+        responses:[{code:'200',desc:'Grade list'}]
+      },
+      { method:'GET', path:'/api/parent/reportcard/:studentID', summary:"Child's report card", auth:true, roles:['Parent'],
+        params:[{name:'studentID',in:'path',required:true,desc:'Child student ID'}], body:null,
+        responses:[{code:'200',desc:'Report card'}]
+      },
+      { method:'GET', path:'/api/parent/reportcard/:studentID/pdf', summary:'Download report card PDF', auth:true, roles:['Parent'],
+        params:[{name:'studentID',in:'path',required:true,desc:'Child student ID'}], body:null,
+        responses:[{code:'200',desc:'PDF download'}]
+      },
+      { method:'POST', path:'/api/parent/finance/receipt', summary:'Submit payment receipt', auth:true, roles:['Parent'],
+        params:[],
+        body:{ schema:'{\n  "amount": 1000.00,\n  "bank_ref": "string"\n}' },
+        responses:[{code:'201',desc:'Receipt submitted'}]
+      },
+      { method:'GET', path:'/api/parent/finance/transactions', summary:'Payment history', auth:true, roles:['Parent'],
+        params:[], body:null, responses:[{code:'200',desc:'Transaction list'}]
+      },
+    ]
+  },
+];
+
+const METHOD_COLORS = {GET:'get',POST:'post',PUT:'put',PATCH:'patch',DELETE:'delete'};
+
+function buildUI() {
+  const container = document.getElementById('api-docs');
+  ENDPOINTS.forEach((section, si) => {
+    const div = document.createElement('div');
+    div.className = 'tag-section open';
+    div.innerHTML = `
+      <div class="tag-header" onclick="toggleSection(${si})">
+        <span class="tag-title">${section.tagLabel}</span>
+        <span class="tag-desc">${section.tagDesc}</span>
+        <span class="chevron">▾</span>
+      </div>
+      <div class="endpoint-list">
+        ${section.routes.map((r,ri) => buildEndpoint(r, si, ri)).join('')}
+      </div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function buildEndpoint(r, si, ri) {
+  const id = `ep-${si}-${ri}`;
+  const roleHtml = r.roles.map(role => `<span class="role-badge">${role}</span>`).join(' ');
+  const paramRows = (r.params||[]).map(p => `
+    <tr>
+      <td><span class="param-name">${p.name}</span>${p.required ? '<span class="required-star">*</span>':''}</td>
+      <td><span class="param-in">${p.in}</span></td>
+      <td>${p.desc}</td>
+    </tr>
+  `).join('');
+
+  const paramsSection = r.params && r.params.length ? `
+    <div class="section-label">Parameters</div>
+    <table class="params-table">
+      <thead><tr><th>Name</th><th>In</th><th>Description</th></tr></thead>
+      <tbody>${paramRows}</tbody>
+    </table>
+  ` : '';
+
+  const bodySection = r.body ? `
+    <div class="section-label">Request body</div>
+    <pre class="schema">${r.body.schema}</pre>
+  ` : '';
+
+  const responseRows = (r.responses||[]).map(res => `
+    <div class="response-row">
+      <span class="status-code ${res.code.startsWith('2') ? 'status-2xx':'status-4xx'}">${res.code}</span>
+      <span class="status-desc">${res.desc}</span>
+    </div>
+  `).join('');
+
+  const tryFields = buildTryFields(r, id);
+
+  return `
+    <div class="endpoint" id="${id}">
+      <div class="endpoint-header" onclick="toggleEndpoint('${id}')">
+        <span class="method ${METHOD_COLORS[r.method]||'get'}">${r.method}</span>
+        <span class="path">${r.path}</span>
+        <span class="summary">${r.summary}</span>
+        ${r.auth ? `<span class="lock-icon" title="Requires authentication">🔒</span>` : ''}
+        ${roleHtml}
+      </div>
+      <div class="endpoint-body">
+        ${paramsSection}
+        ${bodySection}
+        <div class="section-label">Responses</div>
+        <div class="responses-list">${responseRows}</div>
+        <button class="try-btn" onclick="toggleTry('${id}-try')">▶ Try it out</button>
+        <div class="try-panel" id="${id}-try">
+          <div class="try-panel-header">Execute request</div>
+          <div class="try-panel-body">
+            ${tryFields}
+            <div><button class="execute-btn" onclick="execute('${id}', '${r.method}', '${r.path}', ${r.auth})">Execute</button></div>
+            <div id="${id}-resp" class="response-output"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function buildTryFields(r, id) {
+  let fields = '';
+  (r.params||[]).forEach(p => {
+    fields += `<div class="try-field"><label>${p.name} (${p.in})${p.required?' *':''}</label><input type="text" id="${id}-param-${p.name}" placeholder="${p.desc}" /></div>`;
+  });
+  if (r.body) {
+    fields += `<div class="try-field"><label>Request body</label><textarea id="${id}-body">${r.body.schema}</textarea></div>`;
+  }
+  return fields || '<p style="font-size:13px;color:var(--text2)">No parameters required.</p>';
+}
+
+function toggleSection(si) {
+  const sections = document.querySelectorAll('.tag-section');
+  sections[si].classList.toggle('open');
+}
+
+function toggleEndpoint(id) {
+  const el = document.getElementById(id);
+  el.classList.toggle('open');
+}
+
+function toggleTry(id) {
+  document.getElementById(id).classList.toggle('open');
+}
+
+async function execute(id, method, pathTemplate, needsAuth) {
+  const respEl = document.getElementById(id + '-resp');
+  respEl.style.display = 'block';
+  respEl.textContent = 'Sending request…';
+
+  if (needsAuth && !jwtToken) {
+    respEl.textContent = '⚠ No JWT token set. Please authorize above first.';
+    return;
+  }
+
+  let url = BASE + pathTemplate;
+  const inputs = document.querySelectorAll(`[id^="${id}-param-"]`);
+  inputs.forEach(inp => {
+    const paramName = inp.id.replace(`${id}-param-`, '');
+    const encoded = encodeURIComponent(inp.value || paramName);
+    // FIX: Handle both OpenAPI {param} style and Gin :param style
+    url = url.replace(`{${paramName}}`, encoded);
+    url = url.replace(`:${paramName}`, encoded);
+  });
+
+  const bodyEl = document.getElementById(id + '-body');
+  const headers = { 'Content-Type': 'application/json' };
+  if (needsAuth && jwtToken) headers['Authorization'] = 'Bearer ' + jwtToken;
+
+  let body = undefined;
+  if (bodyEl && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
+    try { JSON.parse(bodyEl.value); body = bodyEl.value; }
+    catch(e) { respEl.textContent = '⚠ Invalid JSON in request body.'; return; }
+  }
+
+  try {
+    const res = await fetch(url, { method, headers, body });
+    const text = await res.text();
+    let pretty;
+    try { pretty = JSON.stringify(JSON.parse(text), null, 2); } catch { pretty = text; }
+    respEl.textContent = `HTTP ${res.status} ${res.statusText}\n\n${pretty}`;
+  } catch (err) {
+    respEl.textContent = `⚠ Request failed (is the server running at ${BASE}?)\n${err.message}`;
+  }
+}
+
+buildUI();
+</script>
+</body>
+</html>
