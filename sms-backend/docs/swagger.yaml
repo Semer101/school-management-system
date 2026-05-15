@@ -60,6 +60,7 @@ definitions:
         type: array
       max_score:
         example: 100
+        minimum: 1
         type: number
       subject_id:
         example: 3
@@ -131,6 +132,8 @@ definitions:
         type: integer
       year:
         example: 2025
+        maximum: 2100
+        minimum: 2000
         type: integer
     required:
     - amount
@@ -260,6 +263,20 @@ definitions:
     - email
     - password
     type: object
+  controllers.NotifyAbsencesInput:
+    properties:
+      date:
+        example: "2025-05-01"
+        type: string
+    type: object
+  controllers.RefreshTokenInput:
+    properties:
+      refresh_token:
+        example: eyJhbGci...
+        type: string
+    required:
+    - refresh_token
+    type: object
   controllers.RegisterInput:
     properties:
       email:
@@ -275,6 +292,7 @@ definitions:
         minLength: 8
         type: string
       role:
+        description: 'Valid roles: Admin, Teacher, Student, Parent'
         enum:
         - Admin
         - Teacher
@@ -298,7 +316,7 @@ definitions:
         example: Term 1 tuition fee
         type: string
       receipt_id:
-        example: CBE-TXN-20250501
+        example: CBE-TXN-20250501-001
         maxLength: 50
         minLength: 5
         type: string
@@ -309,6 +327,30 @@ definitions:
     - amount
     - receipt_id
     - student_id
+    type: object
+  controllers.UnenrollStudentInput:
+    properties:
+      student_id:
+        example: 1
+        type: integer
+      subject_id:
+        example: 2
+        type: integer
+    required:
+    - student_id
+    - subject_id
+    type: object
+  controllers.UpdateClassInput:
+    properties:
+      name:
+        example: Grade 10B
+        type: string
+      teacher_id:
+        example: 2
+        type: integer
+      year:
+        example: 2026
+        type: integer
     type: object
   controllers.UpdateStudentInput:
     properties:
@@ -321,12 +363,35 @@ definitions:
       parent_email:
         example: new@email.com
         type: string
+      parent_id:
+        example: 6
+        type: integer
       parent_name:
         example: Mr. Updated
         type: string
       parent_phone:
         example: "+251922000000"
         type: string
+    type: object
+  controllers.UpdateSubjectInput:
+    properties:
+      code:
+        example: MATH-201
+        type: string
+      name:
+        example: Advanced Mathematics
+        type: string
+      teacher_id:
+        example: 3
+        type: integer
+    type: object
+  controllers.UpdateTeacherInput:
+    properties:
+      qualification:
+        example: PhD Mathematics
+        type: string
+    required:
+    - qualification
     type: object
   controllers.VerifyReceiptRequest:
     properties:
@@ -370,14 +435,16 @@ info:
     | Student | Own grades, report card, locker, finance             |
     | Parent  | Children's data, report cards, finance               |
   title: SMS Backend API
-  version: "1.0"
+  version: "1.1"
 paths:
   /api/academics/attendance:
     post:
       consumes:
       - application/json
-      description: Records or updates attendance for a student in a subject on a given
-        date. Teacher only.
+      description: |-
+        Records or updates attendance for a student in a subject on a given date.
+        The teacher must be assigned to the subject being marked.
+        FIX #3a: The student must be enrolled in the subject — phantom attendance records are now rejected.
       parameters:
       - description: Attendance data
         in: body
@@ -389,7 +456,7 @@ paths:
       - application/json
       responses:
         "200":
-          description: Attendance updated (if record exists)
+          description: Attendance updated (same-day override)
           schema:
             $ref: '#/definitions/helpers.APIResponse'
         "201":
@@ -397,18 +464,23 @@ paths:
           schema:
             $ref: '#/definitions/helpers.APIResponse'
         "400":
-          description: Validation error
+          description: Validation error or student not enrolled in subject
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+        "403":
+          description: Forbidden — not your subject
           schema:
             $ref: '#/definitions/helpers.APIResponse'
       security:
       - BearerAuth: []
-      summary: Record attendance
+      summary: Record attendance (Teacher only)
       tags:
       - attendance
   /api/academics/attendance/{studentID}:
     get:
-      description: Returns overall and per-subject attendance stats for a student.
-        Accessible by Teacher, Student (own), Admin, Parent (own child).
+      description: |-
+        Returns overall and per-subject attendance stats for a student.
+        Accessible by: Teacher (any student), Student (own only), Admin, Parent (own child via ParentOwnsStudent middleware).
       parameters:
       - description: Student ID
         in: path
@@ -422,6 +494,14 @@ paths:
           description: Attendance summary
           schema:
             $ref: '#/definitions/helpers.APIResponse'
+        "403":
+          description: Forbidden — Students may only view their own attendance
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+        "404":
+          description: Student profile not found
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
       security:
       - BearerAuth: []
       summary: Get student attendance percentage
@@ -429,8 +509,6 @@ paths:
       - attendance
   /api/academics/attendance/class/{classID}:
     get:
-      description: Returns all attendance records for a class on a specific date.
-        Teacher only.
       parameters:
       - description: Class ID
         in: path
@@ -455,17 +533,21 @@ paths:
             $ref: '#/definitions/helpers.APIResponse'
       security:
       - BearerAuth: []
-      summary: Get class attendance for a date
+      summary: Get class attendance for a date (Teacher only)
       tags:
       - attendance
   /api/academics/grades/bulk:
     post:
       consumes:
       - application/json
-      description: Saves grades for multiple students for a subject and term in one
-        request. Teacher only.
+      description: |-
+        Records grades for multiple students in one call. Uses upsert — if a grade for the same
+        (student, subject, type, term, academic_year) already exists it is updated, not duplicated.
+        FIX #2: The upsert requires a DB-level unique constraint on (student_id, subject_id, type, term, academic_year).
+        Run migration.sql before deploying — without it the upsert silently creates duplicate rows.
+        FIX #3b: Each student_id in the grades array is now validated to be enrolled in the subject.
       parameters:
-      - description: Grades data
+      - description: Grade data
         in: body
         name: body
         required: true
@@ -479,18 +561,23 @@ paths:
           schema:
             $ref: '#/definitions/helpers.APIResponse'
         "400":
-          description: Validation error
+          description: Validation error or student not enrolled
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+        "403":
+          description: Forbidden — not your subject
           schema:
             $ref: '#/definitions/helpers.APIResponse'
       security:
       - BearerAuth: []
-      summary: Bulk enter grades
+      summary: Bulk grade entry (Teacher only)
       tags:
       - grades
   /api/academics/grades/student/{studentID}:
     get:
-      description: Returns all grades for a student, optionally filtered by term and
-        academic year. Accessible by Teacher, Student (own), Admin.
+      description: |-
+        Returns grades for a student filtered by term and/or academic year.
+        Accessible by: Teacher, Student (own only), Admin, Parent (own child).
       parameters:
       - description: Student ID
         in: path
@@ -512,6 +599,14 @@ paths:
           description: Grade list
           schema:
             $ref: '#/definitions/helpers.APIResponse'
+        "403":
+          description: Forbidden — Students may only view their own grades
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+        "404":
+          description: Student profile not found
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
       security:
       - BearerAuth: []
       summary: Get a student's grades
@@ -519,8 +614,6 @@ paths:
       - grades
   /api/academics/grades/subject/{subjectID}:
     get:
-      description: Returns all grades for a subject, optionally filtered by type and
-        term. Teacher only.
       parameters:
       - description: Subject ID
         in: path
@@ -544,24 +637,39 @@ paths:
             $ref: '#/definitions/helpers.APIResponse'
       security:
       - BearerAuth: []
-      summary: Get grades for a subject
+      summary: Get grades for a subject (Teacher only)
       tags:
       - grades
   /api/academics/reportcard/{studentID}:
     get:
-      description: Returns a full report card with per-subject averages and letter
-        grades. Accessible by Teacher, Student (own), Admin, Parent (own child).
+      description: |-
+        Returns a full report card with per-subject averages and letter grades.
+        FIX: now requires academic_year query param (defaults to current year).
+        Optionally filtered by term. Without these filters, cross-year averages were meaningless.
+        Accessible by: Teacher, Student (own only), Admin, Parent (own child via ParentOwnsStudent middleware).
       parameters:
       - description: Student ID
         in: path
         name: studentID
         required: true
         type: integer
+      - description: 'Academic year (default: current year)'
+        in: query
+        name: academic_year
+        type: integer
+      - description: 'Term filter: Term1 | Term2 | Term3 (omit for full year average)'
+        in: query
+        name: term
+        type: string
       produces:
       - application/json
       responses:
         "200":
           description: Report card
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+        "403":
+          description: Forbidden — Students may only view their own report card
           schema:
             $ref: '#/definitions/helpers.APIResponse'
         "404":
@@ -570,26 +678,38 @@ paths:
             $ref: '#/definitions/helpers.APIResponse'
       security:
       - BearerAuth: []
-      summary: Get report card
+      summary: Get report card (JSON)
       tags:
       - report-card
   /api/academics/reportcard/{studentID}/pdf:
     get:
-      description: Generates and downloads a PDF report card for a student. Accessible
-        by Teacher, Student (own), Admin, Parent (own child).
+      description: Generates and streams a PDF report card. Accepts academic_year
+        and term query params.
       parameters:
       - description: Student ID
         in: path
         name: studentID
         required: true
         type: integer
+      - description: 'Academic year (default: current year)'
+        in: query
+        name: academic_year
+        type: integer
+      - description: 'Term filter: Term1 | Term2 | Term3'
+        in: query
+        name: term
+        type: string
       produces:
       - application/pdf
       responses:
         "200":
-          description: PDF file
+          description: PDF download
           schema:
             type: file
+        "403":
+          description: Forbidden — Students may only download their own report card
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
         "404":
           description: Student not found
           schema:
@@ -605,8 +725,9 @@ paths:
       - report-card
   /api/admin/attendance/summary:
     get:
-      description: Returns attendance percentage for every student across all classes.
-        Admin only.
+      description: |-
+        FIX #5: SQL now uses NULLIF(COUNT, 0) and HAVING COUNT > 0 to prevent division-by-zero
+        for students who have no attendance records at all.
       produces:
       - application/json
       responses:
@@ -616,12 +737,11 @@ paths:
             $ref: '#/definitions/helpers.APIResponse'
       security:
       - BearerAuth: []
-      summary: School-wide attendance summary
+      summary: School-wide attendance summary (Admin only)
       tags:
       - attendance
   /api/admin/classes:
     get:
-      description: Returns all classes with teacher and student info. Admin only.
       produces:
       - application/json
       responses:
@@ -631,13 +751,12 @@ paths:
             $ref: '#/definitions/helpers.APIResponse'
       security:
       - BearerAuth: []
-      summary: List all classes
+      summary: List all classes (Admin only)
       tags:
       - classes
     post:
       consumes:
       - application/json
-      description: Creates a new class and optionally assigns a teacher. Admin only.
       parameters:
       - description: Class data
         in: body
@@ -656,17 +775,90 @@ paths:
           description: Validation error
           schema:
             $ref: '#/definitions/helpers.APIResponse'
+        "500":
+          description: Database error
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
       security:
       - BearerAuth: []
-      summary: Create a class
+      summary: Create a class (Admin only)
+      tags:
+      - classes
+  /api/admin/classes/{id}:
+    delete:
+      description: Blocked if any active students are still assigned to it.
+      parameters:
+      - description: Class ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Class archived
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+        "404":
+          description: Class not found
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+        "409":
+          description: Class still has active students
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+        "500":
+          description: Database error
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Archive (soft-delete) a class (Admin only)
+      tags:
+      - classes
+    put:
+      consumes:
+      - application/json
+      description: |-
+        Updates the homeroom teacher, year, or name of a class.
+        FIX: new endpoint — previously classes could only be created or archived.
+      parameters:
+      - description: Class ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.UpdateClassInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Class updated
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+        "400":
+          description: Validation error
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+        "404":
+          description: Class not found
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Update a class (Admin only)
       tags:
       - classes
   /api/admin/enroll:
     post:
       consumes:
       - application/json
-      description: Enrolls a student into a subject. Prevents duplicate enrollments.
-        Admin only.
       parameters:
       - description: Enrollment data
         in: body
@@ -682,7 +874,7 @@ paths:
           schema:
             $ref: '#/definitions/helpers.APIResponse'
         "400":
-          description: Validation error
+          description: Validation error, student not found, or subject not found
           schema:
             $ref: '#/definitions/helpers.APIResponse'
         "409":
@@ -691,15 +883,16 @@ paths:
             $ref: '#/definitions/helpers.APIResponse'
       security:
       - BearerAuth: []
-      summary: Enroll student in a subject
+      summary: Enroll student in a subject (Admin only)
       tags:
       - enrollment
   /api/admin/finance/payroll:
     post:
       consumes:
       - application/json
-      description: Creates a payroll record for a teacher for a specific month and
-        year. Admin only. Prevents duplicates.
+      description: |-
+        Creates a payroll record for a teacher for a specific month and year.
+        FIX: Year is now validated with min=2000 — previously 0 or 1 were accepted.
       parameters:
       - description: Payroll data
         in: body
@@ -715,7 +908,7 @@ paths:
           schema:
             $ref: '#/definitions/helpers.APIResponse'
         "400":
-          description: Validation error or teacher not found
+          description: Validation error (including invalid year) or teacher not found
           schema:
             $ref: '#/definitions/helpers.APIResponse'
         "403":
@@ -723,18 +916,18 @@ paths:
           schema:
             $ref: '#/definitions/helpers.APIResponse'
         "409":
-          description: Payroll already exists for this month
+          description: Payroll already exists for this month/year
           schema:
             $ref: '#/definitions/helpers.APIResponse'
       security:
       - BearerAuth: []
-      summary: Create a payroll entry
+      summary: Create a payroll entry (Admin only)
       tags:
       - finance
   /api/admin/finance/payroll/{id}/pay:
     patch:
       description: Sets a payroll record's status to Paid and records the payment
-        timestamp. Admin only.
+        timestamp.
       parameters:
       - description: Payroll ID
         in: path
@@ -760,17 +953,22 @@ paths:
           description: Payroll not found
           schema:
             $ref: '#/definitions/helpers.APIResponse'
+        "500":
+          description: Database error
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
       security:
       - BearerAuth: []
-      summary: Mark payroll as paid
+      summary: Mark payroll as paid (Admin only)
       tags:
       - finance
   /api/admin/finance/receipt/{id}/verify:
     patch:
       consumes:
       - application/json
-      description: Admin marks a pending receipt as Verified or Rejected. Can only
-        be done once per receipt.
+      description: |-
+        Marks a pending receipt as Verified or Rejected. Can only be done once per receipt.
+        FIX #6: Admin note is only appended to the description when remarks is non-empty.
       parameters:
       - description: Transaction ID
         in: path
@@ -802,25 +1000,84 @@ paths:
           description: Transaction not found
           schema:
             $ref: '#/definitions/helpers.APIResponse'
+        "500":
+          description: Database error
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
       security:
       - BearerAuth: []
-      summary: Verify or reject a bank receipt
+      summary: Verify or reject a bank receipt (Admin only)
       tags:
       - finance
-  /api/admin/notify/absences:
-    post:
-      description: Looks up all absences for the given date (or today if omitted)
-        and sends an email to each student's parent. Admin only.
+  /api/admin/finance/summary:
+    get:
       parameters:
-      - description: Date to check absences for (YYYY-MM-DD). Defaults to today.
+      - description: Page number (default 1)
         in: query
-        name: date
-        type: string
+        name: page
+        type: integer
+      - description: Page size (default 50, max 200)
+        in: query
+        name: page_size
+        type: integer
       produces:
       - application/json
       responses:
         "200":
-          description: Notifications sent
+          description: All transactions
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+        "403":
+          description: Forbidden — Admin only
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: List all transactions (Admin only)
+      tags:
+      - finance
+  /api/admin/locker/student/{studentID}:
+    get:
+      description: Returns all files (public and private) for compliance or support
+        review.
+      parameters:
+      - description: Student ID
+        in: path
+        name: studentID
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: All files for student
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: List all locker files for a student (Admin only)
+      tags:
+      - locker
+  /api/admin/notify/absences:
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Looks up all absences for a date (defaults to today) and sends ONE aggregated email per parent.
+        FIX #4: Parents with multiple absent children now receive correct per-child emails.
+        Previously the parent bundle only stored the last child's name — if two children were absent,
+        only one child's name appeared in the email. Now each child is tracked separately.
+      parameters:
+      - description: Date to check (defaults to today)
+        in: body
+        name: body
+        schema:
+          $ref: '#/definitions/controllers.NotifyAbsencesInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Emails sent
           schema:
             $ref: '#/definitions/helpers.APIResponse'
         "400":
@@ -833,15 +1090,15 @@ paths:
             $ref: '#/definitions/helpers.APIResponse'
       security:
       - BearerAuth: []
-      summary: Notify parents of absent students
+      summary: Notify parents of absent students (Admin only)
       tags:
       - notifications
   /api/admin/notify/broadcast:
     post:
       consumes:
       - application/json
-      description: Sends an email announcement to all active users, or to a specific
-        set of roles. Admin only.
+      description: Saves the notification, creates receipts for all targeted users,
+        pushes live via SSE, and sends emails.
       parameters:
       - description: Announcement data
         in: body
@@ -866,18 +1123,32 @@ paths:
             $ref: '#/definitions/helpers.APIResponse'
       security:
       - BearerAuth: []
-      summary: Broadcast an announcement
+      summary: Broadcast an announcement (Admin only)
       tags:
       - notifications
-  /api/admin/students:
-    get:
-      description: Returns all students with their user and class information. Admin
-        only.
+  /api/admin/register:
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Creates a new user account. Requires Admin JWT.
+        Valid roles: Admin, Teacher, Student, Parent.
+      parameters:
+      - description: Registration data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.RegisterInput'
       produces:
       - application/json
       responses:
-        "200":
-          description: List of students
+        "201":
+          description: User created
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+        "400":
+          description: Validation error
           schema:
             $ref: '#/definitions/helpers.APIResponse'
         "401":
@@ -888,15 +1159,56 @@ paths:
           description: Forbidden — Admin only
           schema:
             $ref: '#/definitions/helpers.APIResponse'
+        "409":
+          description: Email already registered
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
       security:
       - BearerAuth: []
-      summary: List all students
+      summary: Register a new user (Admin only)
+      tags:
+      - auth
+  /api/admin/students:
+    get:
+      description: Returns a paginated list of all students. Use ?page=1&page_size=50.
+      parameters:
+      - description: Page number (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Page size (default 50, max 200)
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Paginated student list
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+        "403":
+          description: Forbidden — Admin only
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+        "500":
+          description: Database error
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: List all students (Admin only)
       tags:
       - students
     post:
       consumes:
       - application/json
-      description: Creates a new student account with a linked user login. Admin only.
+      description: Creates a new student account with a linked user login. The parent_id
+        must be the ID of an existing User with role=Parent.
       parameters:
       - description: Student data
         in: body
@@ -912,7 +1224,16 @@ paths:
           schema:
             $ref: '#/definitions/helpers.APIResponse'
         "400":
-          description: Validation error
+          description: Validation error, invalid parent_id, or parent user is not
+            role=Parent
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+        "403":
+          description: Forbidden — Admin only
           schema:
             $ref: '#/definitions/helpers.APIResponse'
         "409":
@@ -921,13 +1242,14 @@ paths:
             $ref: '#/definitions/helpers.APIResponse'
       security:
       - BearerAuth: []
-      summary: Create a student
+      summary: Create a student (Admin only)
       tags:
       - students
   /api/admin/students/{id}:
     delete:
-      description: Deactivates the student's user account and soft-deletes the student
-        record. Admin only.
+      description: |-
+        Deactivates the student's user account, soft-deletes the student record,
+        and removes all subject enrollments. Attendance, grade, and finance records are preserved.
       parameters:
       - description: Student ID
         in: path
@@ -945,13 +1267,17 @@ paths:
           description: Student not found
           schema:
             $ref: '#/definitions/helpers.APIResponse'
+        "500":
+          description: Database error
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
       security:
       - BearerAuth: []
-      summary: Archive (soft-delete) a student
+      summary: Archive (soft-delete) a student (Admin only)
       tags:
       - students
     get:
-      description: Returns a single student record. Admin only.
+      description: Returns a single student with user and class details.
       parameters:
       - description: Student ID
         in: path
@@ -971,14 +1297,13 @@ paths:
             $ref: '#/definitions/helpers.APIResponse'
       security:
       - BearerAuth: []
-      summary: Get a student by ID
+      summary: Get a student by ID (Admin only)
       tags:
       - students
     put:
       consumes:
       - application/json
-      description: Updates class, parent info, or date of birth for a student. Admin
-        only.
+      description: Updates class, parent info, date of birth, or parent_id for a student.
       parameters:
       - description: Student ID
         in: path
@@ -1008,12 +1333,11 @@ paths:
             $ref: '#/definitions/helpers.APIResponse'
       security:
       - BearerAuth: []
-      summary: Update a student
+      summary: Update a student (Admin only)
       tags:
       - students
   /api/admin/subjects:
     get:
-      description: Returns all subjects with their assigned teacher. Admin only.
       produces:
       - application/json
       responses:
@@ -1023,13 +1347,12 @@ paths:
             $ref: '#/definitions/helpers.APIResponse'
       security:
       - BearerAuth: []
-      summary: List all subjects
+      summary: List all subjects (Admin only)
       tags:
       - subjects
     post:
       consumes:
       - application/json
-      description: Creates a new subject and optionally assigns a teacher. Admin only.
       parameters:
       - description: Subject data
         in: body
@@ -1052,38 +1375,117 @@ paths:
           description: Subject code already exists
           schema:
             $ref: '#/definitions/helpers.APIResponse'
+        "500":
+          description: Database error
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
       security:
       - BearerAuth: []
-      summary: Create a subject
+      summary: Create a subject (Admin only)
       tags:
       - subjects
-  /api/admin/teachers:
-    get:
-      description: Returns all teachers with their user information. Admin only.
+  /api/admin/subjects/{id}:
+    delete:
+      description: Blocked if grades or attendance records reference it.
+      parameters:
+      - description: Subject ID
+        in: path
+        name: id
+        required: true
+        type: integer
       produces:
       - application/json
       responses:
         "200":
-          description: List of teachers
+          description: Subject archived
           schema:
             $ref: '#/definitions/helpers.APIResponse'
-        "401":
-          description: Unauthorized
+        "404":
+          description: Subject not found
           schema:
             $ref: '#/definitions/helpers.APIResponse'
-        "403":
-          description: Forbidden — Admin only
+        "409":
+          description: Subject has existing grades or attendance records
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+        "500":
+          description: Database error
           schema:
             $ref: '#/definitions/helpers.APIResponse'
       security:
       - BearerAuth: []
-      summary: List all teachers
+      summary: Archive (soft-delete) a subject (Admin only)
+      tags:
+      - subjects
+    put:
+      consumes:
+      - application/json
+      description: |-
+        Updates a subject's name, code, or assigned teacher.
+        FIX: new endpoint — previously subjects could only be created or archived, leaving
+        orphaned teacher references after ArchiveTeacher with no way to reassign via the API.
+      parameters:
+      - description: Subject ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.UpdateSubjectInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Subject updated
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+        "400":
+          description: Validation error or code conflict
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+        "404":
+          description: Subject not found
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Update a subject (Admin only)
+      tags:
+      - subjects
+  /api/admin/teachers:
+    get:
+      parameters:
+      - description: Page number (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Page size (default 50, max 200)
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Paginated teacher list
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+        "500":
+          description: Database error
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: List all teachers (Admin only)
       tags:
       - teachers
     post:
       consumes:
       - application/json
-      description: Creates a new teacher account with a linked user login. Admin only.
       parameters:
       - description: Teacher data
         in: body
@@ -1108,15 +1510,142 @@ paths:
             $ref: '#/definitions/helpers.APIResponse'
       security:
       - BearerAuth: []
-      summary: Create a teacher
+      summary: Create a teacher (Admin only)
       tags:
       - teachers
+  /api/admin/teachers/{id}:
+    delete:
+      description: |-
+        Deactivates the teacher's user account and soft-deletes the teacher record.
+        NOTE: subjects assigned to this teacher are NOT automatically reassigned.
+        Use PUT /api/admin/subjects/:id to reassign them before or after archiving.
+      parameters:
+      - description: Teacher ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Teacher archived
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+        "404":
+          description: Teacher not found
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+        "500":
+          description: Database error
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Archive (soft-delete) a teacher (Admin only)
+      tags:
+      - teachers
+    get:
+      parameters:
+      - description: Teacher ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Teacher record
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+        "404":
+          description: Teacher not found
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a teacher by ID (Admin only)
+      tags:
+      - teachers
+    put:
+      consumes:
+      - application/json
+      description: Updates the qualification of a teacher and reloads the record before
+        returning.
+      parameters:
+      - description: Teacher ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.UpdateTeacherInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Teacher updated
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+        "400":
+          description: Validation error
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+        "404":
+          description: Teacher not found
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Update a teacher (Admin only)
+      tags:
+      - teachers
+  /api/admin/unenroll:
+    delete:
+      consumes:
+      - application/json
+      description: |-
+        Deletes the enrollment record. Attendance and grade records for this student/subject are preserved.
+        FIX: new endpoint — previously enrollments could only be created, never removed.
+      parameters:
+      - description: Unenrollment data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/controllers.UnenrollStudentInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Student unenrolled
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+        "400":
+          description: Validation error
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+        "404":
+          description: Enrollment not found
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Remove a student from a subject (Admin only)
+      tags:
+      - enrollment
   /api/finance/receipt:
     post:
       consumes:
       - application/json
-      description: Student or Parent submits proof of payment. Duplicate receipt IDs
-        are rejected.
+      description: |-
+        Submits proof of payment via an Ethiopian bank receipt transaction ID.
+        Student can only submit for themselves. Parent can submit for any of their linked children.
       parameters:
       - description: Receipt data
         in: body
@@ -1136,7 +1665,7 @@ paths:
           schema:
             $ref: '#/definitions/helpers.APIResponse'
         "403":
-          description: Forbidden — Student/Parent only
+          description: Forbidden — Student/Parent only, or submitting for wrong student
           schema:
             $ref: '#/definitions/helpers.APIResponse'
         "409":
@@ -1145,13 +1674,22 @@ paths:
             $ref: '#/definitions/helpers.APIResponse'
       security:
       - BearerAuth: []
-      summary: Submit a bank receipt
+      summary: Submit a bank receipt (Student or Parent only)
       tags:
       - finance
   /api/finance/transactions:
     get:
-      description: Admin sees all transactions. Students see only their own. Parents
-        see transactions for all their linked children.
+      description: Students see their own transactions. Parents see transactions for
+        all their linked children.
+      parameters:
+      - description: Page number (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Page size (default 50, max 200)
+        in: query
+        name: page_size
+        type: integer
       produces:
       - application/json
       responses:
@@ -1159,23 +1697,23 @@ paths:
           description: Transaction list
           schema:
             $ref: '#/definitions/helpers.APIResponse'
-        "401":
-          description: Unauthorized
+        "404":
+          description: Student profile not found
           schema:
             $ref: '#/definitions/helpers.APIResponse'
-        "404":
-          description: Student/user profile not found
+        "500":
+          description: Database error
           schema:
             $ref: '#/definitions/helpers.APIResponse'
       security:
       - BearerAuth: []
-      summary: List transactions
+      summary: List my transactions (Student or Parent)
       tags:
       - finance
   /api/locker/files/{fileID}:
     delete:
-      description: Students can only delete their own files. Admins can delete any
-        file. Removes from disk and database.
+      description: Removes the file from disk and the database. Student must own the
+        file.
       parameters:
       - description: File ID
         in: path
@@ -1190,7 +1728,7 @@ paths:
           schema:
             $ref: '#/definitions/helpers.APIResponse'
         "403":
-          description: Forbidden — Not your file
+          description: Forbidden — not your file
           schema:
             $ref: '#/definitions/helpers.APIResponse'
         "404":
@@ -1199,13 +1737,13 @@ paths:
             $ref: '#/definitions/helpers.APIResponse'
       security:
       - BearerAuth: []
-      summary: Delete a locker file
+      summary: Delete a locker file (Student only)
       tags:
       - locker
   /api/locker/files/{fileID}/visibility:
     patch:
-      description: Toggles a locker file between private (teacher cannot see) and
-        public (teacher can see). Student must own the file.
+      description: Flips is_public on a locker file. When is_public=true, the student's
+        teachers can read it.
       parameters:
       - description: File ID
         in: path
@@ -1216,11 +1754,11 @@ paths:
       - application/json
       responses:
         "200":
-          description: Visibility updated
+          description: Visibility toggled
           schema:
             $ref: '#/definitions/helpers.APIResponse'
         "403":
-          description: Forbidden — Not your file
+          description: Forbidden — not your file
           schema:
             $ref: '#/definitions/helpers.APIResponse'
         "404":
@@ -1229,13 +1767,32 @@ paths:
             $ref: '#/definitions/helpers.APIResponse'
       security:
       - BearerAuth: []
-      summary: Toggle file visibility
+      summary: Toggle file visibility (Student only)
       tags:
       - locker
-  /api/locker/student/{studentID}:
+  /api/locker/my-files:
     get:
-      description: Students see all their own files. Teachers see only public files.
-        Admins see all files.
+      description: Returns all files in the authenticated student's own locker (both
+        public and private).
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: File list
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+        "404":
+          description: Student profile not found
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: List my locker files (Student only)
+      tags:
+      - locker
+  /api/locker/student/{studentID}/public:
+    get:
+      description: Returns only files the student has toggled to is_public=true.
       parameters:
       - description: Student ID
         in: path
@@ -1246,31 +1803,26 @@ paths:
       - application/json
       responses:
         "200":
-          description: File list
-          schema:
-            $ref: '#/definitions/helpers.APIResponse'
-        "403":
-          description: Forbidden — Cannot view another student's files
-          schema:
-            $ref: '#/definitions/helpers.APIResponse'
-        "404":
-          description: Student profile not found
+          description: Public file list
           schema:
             $ref: '#/definitions/helpers.APIResponse'
       security:
       - BearerAuth: []
-      summary: List files in a student's locker
+      summary: List a student's public locker files (Teacher only)
       tags:
       - locker
   /api/locker/upload:
     post:
       consumes:
       - multipart/form-data
-      description: 'Students can upload files (max 5MB) of allowed types: pdf, jpg,
-        jpeg, png, doc, docx, txt. Each file is stored under the student''s locker
-        directory.'
+      description: |-
+        Students upload files (max 5 MB) to their private digital locker.
+        Allowed types: pdf, jpg, jpeg, png, doc, docx, txt.
+        FIX #14: Both the file extension AND the actual file content (MIME sniffing) are validated.
+        A file with a renamed extension (e.g. shell.pdf containing PHP) is rejected.
+        FIX #15: Upload directory is configurable via UPLOAD_DIR env variable (defaults to ./uploads/locker).
       parameters:
-      - description: File to upload (max 5MB)
+      - description: File to upload (max 5 MB)
         in: formData
         name: file
         required: true
@@ -1278,7 +1830,6 @@ paths:
       - description: 'Category: Certificate | Assignment | Portfolio | Material'
         in: formData
         name: category
-        required: true
         type: string
       produces:
       - application/json
@@ -1288,11 +1839,11 @@ paths:
           schema:
             $ref: '#/definitions/helpers.APIResponse'
         "400":
-          description: File missing, too large, or invalid type
+          description: File missing, too large, invalid extension, or MIME type mismatch
           schema:
             $ref: '#/definitions/helpers.APIResponse'
         "403":
-          description: Forbidden — Students only
+          description: Forbidden — Student only
           schema:
             $ref: '#/definitions/helpers.APIResponse'
         "404":
@@ -1301,15 +1852,18 @@ paths:
             $ref: '#/definitions/helpers.APIResponse'
       security:
       - BearerAuth: []
-      summary: Upload a file to the digital locker
+      summary: Upload a file to the locker (Student only)
       tags:
       - locker
   /api/login:
     post:
       consumes:
       - application/json
-      description: Authenticates a user and returns an access token (1 hour) and a
-        refresh token (7 days)
+      description: |-
+        Authenticates a user and returns an access token (1 hour) and a rotated refresh token (7 days).
+        Use the access_token in the Authorization header: `Bearer <token>`.
+        The refresh token is also set as an HttpOnly cookie (`sms_refresh`) for browser clients.
+        When the access_token expires, call POST /api/token/refresh.
       parameters:
       - description: Login credentials
         in: body
@@ -1324,6 +1878,10 @@ paths:
           description: Tokens returned
           schema:
             $ref: '#/definitions/helpers.APIResponse'
+        "400":
+          description: Validation error
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
         "401":
           description: Invalid credentials
           schema:
@@ -1331,9 +1889,30 @@ paths:
       summary: Login and get JWT tokens
       tags:
       - auth
+  /api/logout:
+    post:
+      description: |-
+        Deletes the stored refresh token for this user and clears the sms_refresh cookie.
+        After logout, the access token remains valid until it expires (max 1 hour).
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Logged out
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Logout — revoke refresh token
+      tags:
+      - auth
   /api/me:
     get:
-      description: Returns the profile of the currently authenticated user
+      description: Returns the profile of the currently authenticated user.
       produces:
       - application/json
       responses:
@@ -1358,8 +1937,9 @@ paths:
     put:
       consumes:
       - application/json
-      description: Updates the authenticated user's password. Requires the current
-        password.
+      description: |-
+        Updates the authenticated user's password. Requires the current password for verification.
+        Also revokes all existing refresh tokens (forces re-login on other devices).
       parameters:
       - description: Password change data
         in: body
@@ -1391,10 +1971,106 @@ paths:
       summary: Change password
       tags:
       - auth
+  /api/notifications:
+    get:
+      description: Returns all notifications targeted at the current user, most recent
+        first.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Notification list
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Get my notifications
+      tags:
+      - notifications
+  /api/notifications/{id}/read:
+    patch:
+      description: Marks the notification receipt as read for the current user.
+      parameters:
+      - description: Receipt ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Marked as read
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+        "403":
+          description: Forbidden — not your receipt
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+        "404":
+          description: Receipt not found
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Mark a notification as read
+      tags:
+      - notifications
+  /api/notifications/sse-token:
+    post:
+      description: |-
+        Returns a 60-second token for use in the EventSource URL (?sse_token=...).
+        This avoids passing the long-lived access JWT in the query string (which would appear in logs).
+        The token is signed with a separate SSE secret and only valid for the /notifications/stream endpoint.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: SSE token
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: Issue a short-lived SSE token
+      tags:
+      - auth
+  /api/notifications/stream:
+    get:
+      description: |-
+        Opens a Server-Sent Events stream. Receives a "notification" event for every broadcast targeting the caller's role.
+        FIX: This endpoint now uses SSEAuthMiddleware. Call POST /api/notifications/sse-token first to get a
+        short-lived 60-second token, then connect with ?sse_token=<token>.
+        The full access JWT must NOT be passed in the URL — it would be permanently logged by every proxy.
+      parameters:
+      - description: Short-lived SSE token (from POST /api/notifications/sse-token)
+        in: query
+        name: sse_token
+        required: true
+        type: string
+      produces:
+      - text/event-stream
+      responses:
+        "200":
+          description: SSE stream open
+          schema:
+            type: string
+        "401":
+          description: Invalid or expired SSE token
+          schema:
+            $ref: '#/definitions/helpers.APIResponse'
+      summary: SSE stream for live notifications
+      tags:
+      - notifications
   /api/parent/children:
     get:
-      description: Returns all students linked to the authenticated parent's account.
-        Parent only.
       produces:
       - application/json
       responses:
@@ -1402,44 +2078,42 @@ paths:
           description: List of children
           schema:
             $ref: '#/definitions/helpers.APIResponse'
-        "404":
-          description: User not found
-          schema:
-            $ref: '#/definitions/helpers.APIResponse'
       security:
       - BearerAuth: []
-      summary: Get my children
+      summary: Get parent's children (Parent only)
       tags:
       - parent
-  /api/register:
+  /api/token/refresh:
     post:
       consumes:
       - application/json
-      description: 'Creates a new user account. Available roles: Admin, Teacher, Student,
-        Parent'
+      description: |-
+        Exchanges a valid refresh token for a new access token AND a new refresh token (rotation).
+        The old refresh token is invalidated on use (prevents replay attacks).
+        Token is read from the `sms_refresh` HttpOnly cookie (browser) or the JSON body (API clients).
+        The new refresh token is returned in both the response body and a new cookie.
       parameters:
-      - description: Registration data
+      - description: Refresh token (API clients only — browser uses cookie)
         in: body
         name: body
-        required: true
         schema:
-          $ref: '#/definitions/controllers.RegisterInput'
+          $ref: '#/definitions/controllers.RefreshTokenInput'
       produces:
       - application/json
       responses:
-        "201":
-          description: User created
+        "200":
+          description: New tokens issued
           schema:
             $ref: '#/definitions/helpers.APIResponse'
         "400":
           description: Validation error
           schema:
             $ref: '#/definitions/helpers.APIResponse'
-        "409":
-          description: Email already registered
+        "401":
+          description: Invalid or expired refresh token
           schema:
             $ref: '#/definitions/helpers.APIResponse'
-      summary: Register a new user
+      summary: Refresh access token
       tags:
       - auth
 securityDefinitions:

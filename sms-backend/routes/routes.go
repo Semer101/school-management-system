@@ -11,7 +11,6 @@ import (
 	"sms-backend/models"
 )
 
-// SetupRoutes wires ALL routes
 func SetupRoutes(r *gin.Engine) {
 
 	// ── Global middleware ──────────────────────────────
@@ -19,86 +18,134 @@ func SetupRoutes(r *gin.Engine) {
 	r.Use(middlewares.CORSMiddleware())
 	r.Use(middlewares.RequestLogger())
 	r.Use(middlewares.RateLimitAPI())
-	r.Use(gin.Recovery()) // catches panics, returns 500
+	r.Use(gin.Recovery())
 
-	// ── Swagger ────────────────────────────────────────
+	// ── Swagger UI ────────────────────────────────────
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	r.StaticFile("/docs", "./static/swagger-ui.html")
 
-	// ── Health check ──────────────────────────────────
+	// ── Static pages ──────────────────────────────────
+	r.StaticFile("/notifications", "./static/notifications.html")
+
+	// ── Health check ─────────────────────────────────
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok", "service": "SMS Backend"})
 	})
 
 	api := r.Group("/api")
 
-	// ── Public routes ──────────────────────────────────
-	api.POST("/register", controllers.Register)
+	// ── Public routes — NO auth required ──────────────
 	api.POST("/login", middlewares.RateLimitLogin(), controllers.Login)
 
-	// ── Protected routes ──────────────────────────────
+	// token/refresh accepts both the sms_refresh HttpOnly cookie (browser)
+	// and a refresh_token in the JSON body (API/mobile clients). No auth header needed.
+	api.POST("/token/refresh", controllers.RefreshToken)
+
+	// SSE stream is protected ONLY by SSEAuthMiddleware.
+	// It must NOT be inside the auth group (which requires a valid access JWT),
+	// because the whole point of the SSE token is to allow the stream to stay open
+	// even after the short-lived access JWT expires. Putting it in the auth group
+	// caused AuthMiddleware to reject the connection as soon as the access token
+	// expired, making the SSE token mechanism non-functional for browser clients.
+	api.GET("/notifications/stream",
+		middlewares.SSEAuthMiddleware(),
+		controllers.StreamNotifications,
+	)
+
+	// ── All routes below require a valid JWT ──────────
 	auth := api.Group("/")
 	auth.Use(middlewares.AuthMiddleware())
 	{
-		// Any logged-in user
+		auth.POST("/logout", controllers.Logout)
+
+		// Profile — any authenticated user
 		auth.GET("/me", controllers.GetMe)
 		auth.PUT("/me/password", controllers.ChangePassword)
 
-		// ── Admin only ─────────────────────────────────
+		// Notifications — any authenticated user
+		auth.GET("/notifications", controllers.GetMyNotifications)
+		auth.PATCH("/notifications/:id/read", controllers.MarkAsRead)
+
+		// Issue a short-lived SSE token. Browser clients call this first,
+		// then open EventSource with ?sse_token=<token>. The full access JWT is
+		// never passed in a URL (would be permanently logged by proxies).
+		auth.POST("/notifications/sse-token", controllers.IssueSSEToken)
+
+		// ════════════════════════════════════════════
+		//  ADMIN ONLY
+		// ════════════════════════════════════════════
 		admin := auth.Group("/admin")
 		admin.Use(middlewares.RoleMiddleware(models.RoleAdmin))
 		{
-			// Student management (FE-04)
+			admin.POST("/register", controllers.Register)
+
+			// Student management
 			admin.POST("/students", controllers.CreateStudent)
 			admin.GET("/students", controllers.GetStudents)
 			admin.GET("/students/:id", controllers.GetStudent)
 			admin.PUT("/students/:id", controllers.UpdateStudent)
 			admin.DELETE("/students/:id", controllers.ArchiveStudent)
 
-			// Teacher management (FE-04)
+			// Teacher management
 			admin.POST("/teachers", controllers.CreateTeacher)
 			admin.GET("/teachers", controllers.GetTeachers)
+			admin.GET("/teachers/:id", controllers.GetTeacher)
+			admin.PUT("/teachers/:id", controllers.UpdateTeacher)
+			admin.DELETE("/teachers/:id", controllers.ArchiveTeacher)
 
 			// Class management
+			// added PUT /classes/:id so homeroom teacher and year can be updated
+			// without needing direct DB access.
 			admin.POST("/classes", controllers.CreateClass)
 			admin.GET("/classes", controllers.GetClasses)
+			admin.PUT("/classes/:id", controllers.UpdateClass)
+			admin.DELETE("/classes/:id", controllers.ArchiveClass)
 
 			// Subject management
+			// added PUT /subjects/:id so subject name, code, and teacher
+			// can be updated — critical after archiving a teacher (prevents orphaned subjects).
 			admin.POST("/subjects", controllers.CreateSubject)
 			admin.GET("/subjects", controllers.GetSubjects)
+			admin.PUT("/subjects/:id", controllers.UpdateSubject)
+			admin.DELETE("/subjects/:id", controllers.ArchiveSubject)
 
-			// Enrollment (FE-05)
+			// Enrollment
 			admin.POST("/enroll", controllers.EnrollStudent)
+			// new endpoint — previously enrollments could only be created, never removed.
+			admin.DELETE("/unenroll", controllers.UnenrollStudent)
 
-			// Finance admin actions
-			admin.GET("/finance/summary", controllers.GetTransactions)
+			// Finance — admin actions
+			admin.GET("/finance/summary", controllers.GetAllTransactions)
 			admin.PATCH("/finance/receipt/:id/verify", controllers.VerifyReceipt)
 			admin.POST("/finance/payroll", controllers.CreatePayroll)
 			admin.PATCH("/finance/payroll/:id/pay", controllers.MarkPayrollPaid)
 
-			// Notifications (FE-19)
+			// Notifications
 			admin.POST("/notify/broadcast", controllers.BroadcastAnnouncement)
 			admin.POST("/notify/absences", controllers.NotifyParentsAbsentStudents)
 
-			// Attendance summary dashboard
+			// Attendance dashboard
 			admin.GET("/attendance/summary", controllers.GetAttendanceSummary)
+
+			// Locker — admin read-only view for compliance/support
+			admin.GET("/locker/student/:studentID", controllers.AdminGetLockerFiles)
 		}
 
-		// ── Teacher routes ─────────────────────────────
+		// ════════════════════════════════════════════
+		//  TEACHER ONLY
+		// ════════════════════════════════════════════
 		teacher := auth.Group("/academics")
 		teacher.Use(middlewares.RoleMiddleware(models.RoleTeacher))
 		{
-			// Attendance (FE-06, FE-07)
 			teacher.POST("/attendance", controllers.RecordAttendance)
 			teacher.GET("/attendance/class/:classID", controllers.GetClassAttendance)
 			teacher.GET("/attendance/:studentID", controllers.GetAttendancePercentage)
 
-			// Grades (FE-09, FE-10, FE-11)
 			teacher.POST("/grades/bulk", controllers.BulkGradeEntry)
 			teacher.GET("/grades/subject/:subjectID", controllers.GetSubjectGrades)
 		}
 
-		// ── Shared: Teacher + Student + Admin can view grades/reports ──
+		// Shared academic reads — Teacher + Student + Admin
 		shared := auth.Group("/academics")
 		shared.Use(middlewares.RoleMiddleware(models.RoleTeacher, models.RoleStudent, models.RoleAdmin))
 		{
@@ -107,60 +154,61 @@ func SetupRoutes(r *gin.Engine) {
 			shared.GET("/reportcard/:studentID/pdf", controllers.DownloadReportCard)
 		}
 
-		// ── Digital Locker (FE-12, FE-13, FE-14) ──────
-		locker := auth.Group("/locker")
-		locker.Use(middlewares.RoleMiddleware(models.RoleStudent, models.RoleTeacher, models.RoleAdmin))
+		// ════════════════════════════════════════════
+		//  DIGITAL LOCKER
+		// ════════════════════════════════════════════
+		studentLocker := auth.Group("/locker")
+		studentLocker.Use(middlewares.RoleMiddleware(models.RoleStudent))
 		{
-			locker.POST("/upload", controllers.UploadLockerFile)
-			locker.GET("/student/:studentID", controllers.GetLockerFiles)
-			locker.DELETE("/files/:fileID", controllers.DeleteLockerFile)
-			locker.PATCH("/files/:fileID/visibility", controllers.ToggleFileVisibility)
+			studentLocker.POST("/upload", controllers.UploadLockerFile)
+			studentLocker.GET("/my-files", controllers.GetMyLockerFiles)
+			studentLocker.DELETE("/files/:fileID", controllers.DeleteLockerFile)
+			studentLocker.PATCH("/files/:fileID/visibility", controllers.ToggleFileVisibility)
 		}
 
-		// ── Parent routes (FE-03, FE-07, FE-11) ────────────
+		teacherLocker := auth.Group("/locker")
+		teacherLocker.Use(middlewares.RoleMiddleware(models.RoleTeacher))
+		{
+			teacherLocker.GET("/student/:studentID/public", controllers.TeacherGetPublicFiles)
+		}
+
+		// ════════════════════════════════════════════
+		//  PARENT ONLY
+		// ════════════════════════════════════════════
 		parent := auth.Group("/parent")
 		parent.Use(middlewares.RoleMiddleware(models.RoleParent))
 		{
-			// See which children are linked to this account
 			parent.GET("/children", controllers.GetMyChildren)
 
-			// View child's attendance (with ownership check)
 			parent.GET("/attendance/:studentID",
 				middlewares.ParentOwnsStudent(),
 				controllers.GetAttendancePercentage,
 			)
-
-			// View child's grades
 			parent.GET("/grades/:studentID",
 				middlewares.ParentOwnsStudent(),
 				controllers.GetStudentGrades,
 			)
-
-			// View child's report card
 			parent.GET("/reportcard/:studentID",
 				middlewares.ParentOwnsStudent(),
 				controllers.GetReportCard,
 			)
-
-			// Download PDF report card
 			parent.GET("/reportcard/:studentID/pdf",
 				middlewares.ParentOwnsStudent(),
 				controllers.DownloadReportCard,
 			)
 
 			parent.POST("/finance/receipt", controllers.SubmitBankReceipt)
-
-			// View payment history
-			parent.GET("/finance/transactions", controllers.GetTransactions)
+			parent.GET("/finance/transactions", controllers.GetMyTransactions)
 		}
 
-		// ── Finance (FE-20, FE-21) ─────────────────────
-		// Student and Admin access.
-		finance := auth.Group("/finance")
-		finance.Use(middlewares.RoleMiddleware(models.RoleStudent, models.RoleAdmin))
+		// ════════════════════════════════════════════
+		//  STUDENT FINANCE
+		// ════════════════════════════════════════════
+		studentFinance := auth.Group("/finance")
+		studentFinance.Use(middlewares.RoleMiddleware(models.RoleStudent))
 		{
-			finance.POST("/receipt", controllers.SubmitBankReceipt)
-			finance.GET("/transactions", controllers.GetTransactions)
+			studentFinance.POST("/receipt", controllers.SubmitBankReceipt)
+			studentFinance.GET("/transactions", controllers.GetMyTransactions)
 		}
 	}
 }

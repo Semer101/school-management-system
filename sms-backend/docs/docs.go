@@ -22,7 +22,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Records or updates attendance for a student in a subject on a given date. Teacher only.",
+                "description": "Records or updates attendance for a student in a subject on a given date.\nThe teacher must be assigned to the subject being marked.\nFIX #3a: The student must be enrolled in the subject — phantom attendance records are now rejected.",
                 "consumes": [
                     "application/json"
                 ],
@@ -32,7 +32,7 @@ const docTemplate = `{
                 "tags": [
                     "attendance"
                 ],
-                "summary": "Record attendance",
+                "summary": "Record attendance (Teacher only)",
                 "parameters": [
                     {
                         "description": "Attendance data",
@@ -46,7 +46,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Attendance updated (if record exists)",
+                        "description": "Attendance updated (same-day override)",
                         "schema": {
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
@@ -58,7 +58,13 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Validation error",
+                        "description": "Validation error or student not enrolled in subject",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden — not your subject",
                         "schema": {
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
@@ -73,14 +79,13 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns all attendance records for a class on a specific date. Teacher only.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "attendance"
                 ],
-                "summary": "Get class attendance for a date",
+                "summary": "Get class attendance for a date (Teacher only)",
                 "parameters": [
                     {
                         "type": "integer",
@@ -120,7 +125,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns overall and per-subject attendance stats for a student. Accessible by Teacher, Student (own), Admin, Parent (own child).",
+                "description": "Returns overall and per-subject attendance stats for a student.\nAccessible by: Teacher (any student), Student (own only), Admin, Parent (own child via ParentOwnsStudent middleware).",
                 "produces": [
                     "application/json"
                 ],
@@ -143,6 +148,18 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
+                    },
+                    "403": {
+                        "description": "Forbidden — Students may only view their own attendance",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Student profile not found",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
                     }
                 }
             }
@@ -154,7 +171,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Saves grades for multiple students for a subject and term in one request. Teacher only.",
+                "description": "Records grades for multiple students in one call. Uses upsert — if a grade for the same\n(student, subject, type, term, academic_year) already exists it is updated, not duplicated.\nFIX #2: The upsert requires a DB-level unique constraint on (student_id, subject_id, type, term, academic_year).\nRun migration.sql before deploying — without it the upsert silently creates duplicate rows.\nFIX #3b: Each student_id in the grades array is now validated to be enrolled in the subject.",
                 "consumes": [
                     "application/json"
                 ],
@@ -164,10 +181,10 @@ const docTemplate = `{
                 "tags": [
                     "grades"
                 ],
-                "summary": "Bulk enter grades",
+                "summary": "Bulk grade entry (Teacher only)",
                 "parameters": [
                     {
-                        "description": "Grades data",
+                        "description": "Grade data",
                         "name": "body",
                         "in": "body",
                         "required": true,
@@ -184,7 +201,13 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Validation error",
+                        "description": "Validation error or student not enrolled",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden — not your subject",
                         "schema": {
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
@@ -199,7 +222,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns all grades for a student, optionally filtered by term and academic year. Accessible by Teacher, Student (own), Admin.",
+                "description": "Returns grades for a student filtered by term and/or academic year.\nAccessible by: Teacher, Student (own only), Admin, Parent (own child).",
                 "produces": [
                     "application/json"
                 ],
@@ -234,6 +257,18 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
+                    },
+                    "403": {
+                        "description": "Forbidden — Students may only view their own grades",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Student profile not found",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
                     }
                 }
             }
@@ -245,14 +280,13 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns all grades for a subject, optionally filtered by type and term. Teacher only.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "grades"
                 ],
-                "summary": "Get grades for a subject",
+                "summary": "Get grades for a subject (Teacher only)",
                 "parameters": [
                     {
                         "type": "integer",
@@ -291,14 +325,14 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns a full report card with per-subject averages and letter grades. Accessible by Teacher, Student (own), Admin, Parent (own child).",
+                "description": "Returns a full report card with per-subject averages and letter grades.\nFIX: now requires academic_year query param (defaults to current year).\nOptionally filtered by term. Without these filters, cross-year averages were meaningless.\nAccessible by: Teacher, Student (own only), Admin, Parent (own child via ParentOwnsStudent middleware).",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "report-card"
                 ],
-                "summary": "Get report card",
+                "summary": "Get report card (JSON)",
                 "parameters": [
                     {
                         "type": "integer",
@@ -306,11 +340,29 @@ const docTemplate = `{
                         "name": "studentID",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Academic year (default: current year)",
+                        "name": "academic_year",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Term filter: Term1 | Term2 | Term3 (omit for full year average)",
+                        "name": "term",
+                        "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "Report card",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden — Students may only view their own report card",
                         "schema": {
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
@@ -331,7 +383,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Generates and downloads a PDF report card for a student. Accessible by Teacher, Student (own), Admin, Parent (own child).",
+                "description": "Generates and streams a PDF report card. Accepts academic_year and term query params.",
                 "produces": [
                     "application/pdf"
                 ],
@@ -346,13 +398,31 @@ const docTemplate = `{
                         "name": "studentID",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Academic year (default: current year)",
+                        "name": "academic_year",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Term filter: Term1 | Term2 | Term3",
+                        "name": "term",
+                        "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "PDF file",
+                        "description": "PDF download",
                         "schema": {
                             "type": "file"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden — Students may only download their own report card",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
                         }
                     },
                     "404": {
@@ -377,14 +447,14 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns attendance percentage for every student across all classes. Admin only.",
+                "description": "FIX #5: SQL now uses NULLIF(COUNT, 0) and HAVING COUNT \u003e 0 to prevent division-by-zero\nfor students who have no attendance records at all.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "attendance"
                 ],
-                "summary": "School-wide attendance summary",
+                "summary": "School-wide attendance summary (Admin only)",
                 "responses": {
                     "200": {
                         "description": "Attendance summary",
@@ -402,14 +472,13 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns all classes with teacher and student info. Admin only.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "classes"
                 ],
-                "summary": "List all classes",
+                "summary": "List all classes (Admin only)",
                 "responses": {
                     "200": {
                         "description": "List of classes",
@@ -425,7 +494,6 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Creates a new class and optionally assigns a teacher. Admin only.",
                 "consumes": [
                     "application/json"
                 ],
@@ -435,7 +503,7 @@ const docTemplate = `{
                 "tags": [
                     "classes"
                 ],
-                "summary": "Create a class",
+                "summary": "Create a class (Admin only)",
                 "parameters": [
                     {
                         "description": "Class data",
@@ -459,6 +527,120 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
+                    },
+                    "500": {
+                        "description": "Database error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/classes/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Updates the homeroom teacher, year, or name of a class.\nFIX: new endpoint — previously classes could only be created or archived.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "classes"
+                ],
+                "summary": "Update a class (Admin only)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Class ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Fields to update",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.UpdateClassInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Class updated",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Validation error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Class not found",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Blocked if any active students are still assigned to it.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "classes"
+                ],
+                "summary": "Archive (soft-delete) a class (Admin only)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Class ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Class archived",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Class not found",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Class still has active students",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Database error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
                     }
                 }
             }
@@ -470,7 +652,6 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Enrolls a student into a subject. Prevents duplicate enrollments. Admin only.",
                 "consumes": [
                     "application/json"
                 ],
@@ -480,7 +661,7 @@ const docTemplate = `{
                 "tags": [
                     "enrollment"
                 ],
-                "summary": "Enroll student in a subject",
+                "summary": "Enroll student in a subject (Admin only)",
                 "parameters": [
                     {
                         "description": "Enrollment data",
@@ -500,7 +681,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Validation error",
+                        "description": "Validation error, student not found, or subject not found",
                         "schema": {
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
@@ -521,7 +702,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Creates a payroll record for a teacher for a specific month and year. Admin only. Prevents duplicates.",
+                "description": "Creates a payroll record for a teacher for a specific month and year.\nFIX: Year is now validated with min=2000 — previously 0 or 1 were accepted.",
                 "consumes": [
                     "application/json"
                 ],
@@ -531,7 +712,7 @@ const docTemplate = `{
                 "tags": [
                     "finance"
                 ],
-                "summary": "Create a payroll entry",
+                "summary": "Create a payroll entry (Admin only)",
                 "parameters": [
                     {
                         "description": "Payroll data",
@@ -551,7 +732,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Validation error or teacher not found",
+                        "description": "Validation error (including invalid year) or teacher not found",
                         "schema": {
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
@@ -563,7 +744,7 @@ const docTemplate = `{
                         }
                     },
                     "409": {
-                        "description": "Payroll already exists for this month",
+                        "description": "Payroll already exists for this month/year",
                         "schema": {
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
@@ -578,14 +759,14 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Sets a payroll record's status to Paid and records the payment timestamp. Admin only.",
+                "description": "Sets a payroll record's status to Paid and records the payment timestamp.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "finance"
                 ],
-                "summary": "Mark payroll as paid",
+                "summary": "Mark payroll as paid (Admin only)",
                 "parameters": [
                     {
                         "type": "integer",
@@ -619,6 +800,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
+                    },
+                    "500": {
+                        "description": "Database error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
                     }
                 }
             }
@@ -630,7 +817,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Admin marks a pending receipt as Verified or Rejected. Can only be done once per receipt.",
+                "description": "Marks a pending receipt as Verified or Rejected. Can only be done once per receipt.\nFIX #6: Admin note is only appended to the description when remarks is non-empty.",
                 "consumes": [
                     "application/json"
                 ],
@@ -640,7 +827,7 @@ const docTemplate = `{
                 "tags": [
                     "finance"
                 ],
-                "summary": "Verify or reject a bank receipt",
+                "summary": "Verify or reject a bank receipt (Admin only)",
                 "parameters": [
                     {
                         "type": "integer",
@@ -683,6 +870,90 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
+                    },
+                    "500": {
+                        "description": "Database error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/finance/summary": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "finance"
+                ],
+                "summary": "List all transactions (Admin only)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page number (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (default 50, max 200)",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "All transactions",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden — Admin only",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/locker/student/{studentID}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns all files (public and private) for compliance or support review.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "locker"
+                ],
+                "summary": "List all locker files for a student (Admin only)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Student ID",
+                        "name": "studentID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "All files for student",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
                     }
                 }
             }
@@ -694,25 +965,30 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Looks up all absences for the given date (or today if omitted) and sends an email to each student's parent. Admin only.",
+                "description": "Looks up all absences for a date (defaults to today) and sends ONE aggregated email per parent.\nFIX #4: Parents with multiple absent children now receive correct per-child emails.\nPreviously the parent bundle only stored the last child's name — if two children were absent,\nonly one child's name appeared in the email. Now each child is tracked separately.",
+                "consumes": [
+                    "application/json"
+                ],
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "notifications"
                 ],
-                "summary": "Notify parents of absent students",
+                "summary": "Notify parents of absent students (Admin only)",
                 "parameters": [
                     {
-                        "type": "string",
-                        "description": "Date to check absences for (YYYY-MM-DD). Defaults to today.",
-                        "name": "date",
-                        "in": "query"
+                        "description": "Date to check (defaults to today)",
+                        "name": "body",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.NotifyAbsencesInput"
+                        }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Notifications sent",
+                        "description": "Emails sent",
                         "schema": {
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
@@ -739,7 +1015,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Sends an email announcement to all active users, or to a specific set of roles. Admin only.",
+                "description": "Saves the notification, creates receipts for all targeted users, pushes live via SSE, and sends emails.",
                 "consumes": [
                     "application/json"
                 ],
@@ -749,7 +1025,7 @@ const docTemplate = `{
                 "tags": [
                     "notifications"
                 ],
-                "summary": "Broadcast an announcement",
+                "summary": "Broadcast an announcement (Admin only)",
                 "parameters": [
                     {
                         "description": "Announcement data",
@@ -783,24 +1059,44 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/admin/students": {
-            "get": {
+        "/api/admin/register": {
+            "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns all students with their user and class information. Admin only.",
+                "description": "Creates a new user account. Requires Admin JWT.\nValid roles: Admin, Teacher, Student, Parent.",
+                "consumes": [
+                    "application/json"
+                ],
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "students"
+                    "auth"
                 ],
-                "summary": "List all students",
+                "summary": "Register a new user (Admin only)",
+                "parameters": [
+                    {
+                        "description": "Registration data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.RegisterInput"
+                        }
+                    }
+                ],
                 "responses": {
-                    "200": {
-                        "description": "List of students",
+                    "201": {
+                        "description": "User created",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Validation error",
                         "schema": {
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
@@ -816,6 +1112,69 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
+                    },
+                    "409": {
+                        "description": "Email already registered",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/students": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns a paginated list of all students. Use ?page=1\u0026page_size=50.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "students"
+                ],
+                "summary": "List all students (Admin only)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page number (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (default 50, max 200)",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated student list",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden — Admin only",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Database error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
                     }
                 }
             },
@@ -825,7 +1184,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Creates a new student account with a linked user login. Admin only.",
+                "description": "Creates a new student account with a linked user login. The parent_id must be the ID of an existing User with role=Parent.",
                 "consumes": [
                     "application/json"
                 ],
@@ -835,7 +1194,7 @@ const docTemplate = `{
                 "tags": [
                     "students"
                 ],
-                "summary": "Create a student",
+                "summary": "Create a student (Admin only)",
                 "parameters": [
                     {
                         "description": "Student data",
@@ -855,7 +1214,19 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Validation error",
+                        "description": "Validation error, invalid parent_id, or parent user is not role=Parent",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden — Admin only",
                         "schema": {
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
@@ -876,14 +1247,14 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns a single student record. Admin only.",
+                "description": "Returns a single student with user and class details.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "students"
                 ],
-                "summary": "Get a student by ID",
+                "summary": "Get a student by ID (Admin only)",
                 "parameters": [
                     {
                         "type": "integer",
@@ -914,7 +1285,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Updates class, parent info, or date of birth for a student. Admin only.",
+                "description": "Updates class, parent info, date of birth, or parent_id for a student.",
                 "consumes": [
                     "application/json"
                 ],
@@ -924,7 +1295,7 @@ const docTemplate = `{
                 "tags": [
                     "students"
                 ],
-                "summary": "Update a student",
+                "summary": "Update a student (Admin only)",
                 "parameters": [
                     {
                         "type": "integer",
@@ -970,14 +1341,14 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Deactivates the student's user account and soft-deletes the student record. Admin only.",
+                "description": "Deactivates the student's user account, soft-deletes the student record,\nand removes all subject enrollments. Attendance, grade, and finance records are preserved.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "students"
                 ],
-                "summary": "Archive (soft-delete) a student",
+                "summary": "Archive (soft-delete) a student (Admin only)",
                 "parameters": [
                     {
                         "type": "integer",
@@ -999,6 +1370,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
+                    },
+                    "500": {
+                        "description": "Database error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
                     }
                 }
             }
@@ -1010,14 +1387,13 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns all subjects with their assigned teacher. Admin only.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "subjects"
                 ],
-                "summary": "List all subjects",
+                "summary": "List all subjects (Admin only)",
                 "responses": {
                     "200": {
                         "description": "List of subjects",
@@ -1033,7 +1409,6 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Creates a new subject and optionally assigns a teacher. Admin only.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1043,7 +1418,7 @@ const docTemplate = `{
                 "tags": [
                     "subjects"
                 ],
-                "summary": "Create a subject",
+                "summary": "Create a subject (Admin only)",
                 "parameters": [
                     {
                         "description": "Subject data",
@@ -1073,6 +1448,120 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
+                    },
+                    "500": {
+                        "description": "Database error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/subjects/{id}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Updates a subject's name, code, or assigned teacher.\nFIX: new endpoint — previously subjects could only be created or archived, leaving\norphaned teacher references after ArchiveTeacher with no way to reassign via the API.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "subjects"
+                ],
+                "summary": "Update a subject (Admin only)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Subject ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Fields to update",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.UpdateSubjectInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Subject updated",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Validation error or code conflict",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Subject not found",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Blocked if grades or attendance records reference it.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "subjects"
+                ],
+                "summary": "Archive (soft-delete) a subject (Admin only)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Subject ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Subject archived",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Subject not found",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Subject has existing grades or attendance records",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Database error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
                     }
                 }
             }
@@ -1084,29 +1573,36 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns all teachers with their user information. Admin only.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "teachers"
                 ],
-                "summary": "List all teachers",
+                "summary": "List all teachers (Admin only)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page number (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (default 50, max 200)",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
-                        "description": "List of teachers",
+                        "description": "Paginated teacher list",
                         "schema": {
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
                     },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/helpers.APIResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden — Admin only",
+                    "500": {
+                        "description": "Database error",
                         "schema": {
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
@@ -1119,7 +1615,6 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Creates a new teacher account with a linked user login. Admin only.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1129,7 +1624,7 @@ const docTemplate = `{
                 "tags": [
                     "teachers"
                 ],
-                "summary": "Create a teacher",
+                "summary": "Create a teacher (Admin only)",
                 "parameters": [
                     {
                         "description": "Teacher data",
@@ -1163,6 +1658,196 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/admin/teachers/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "teachers"
+                ],
+                "summary": "Get a teacher by ID (Admin only)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Teacher ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Teacher record",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Teacher not found",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Updates the qualification of a teacher and reloads the record before returning.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "teachers"
+                ],
+                "summary": "Update a teacher (Admin only)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Teacher ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Fields to update",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.UpdateTeacherInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Teacher updated",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Validation error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Teacher not found",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Deactivates the teacher's user account and soft-deletes the teacher record.\nNOTE: subjects assigned to this teacher are NOT automatically reassigned.\nUse PUT /api/admin/subjects/:id to reassign them before or after archiving.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "teachers"
+                ],
+                "summary": "Archive (soft-delete) a teacher (Admin only)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Teacher ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Teacher archived",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Teacher not found",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Database error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/unenroll": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Deletes the enrollment record. Attendance and grade records for this student/subject are preserved.\nFIX: new endpoint — previously enrollments could only be created, never removed.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "enrollment"
+                ],
+                "summary": "Remove a student from a subject (Admin only)",
+                "parameters": [
+                    {
+                        "description": "Unenrollment data",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controllers.UnenrollStudentInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Student unenrolled",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Validation error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Enrollment not found",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/finance/receipt": {
             "post": {
                 "security": [
@@ -1170,7 +1855,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Student or Parent submits proof of payment. Duplicate receipt IDs are rejected.",
+                "description": "Submits proof of payment via an Ethiopian bank receipt transaction ID.\nStudent can only submit for themselves. Parent can submit for any of their linked children.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1180,7 +1865,7 @@ const docTemplate = `{
                 "tags": [
                     "finance"
                 ],
-                "summary": "Submit a bank receipt",
+                "summary": "Submit a bank receipt (Student or Parent only)",
                 "parameters": [
                     {
                         "description": "Receipt data",
@@ -1206,7 +1891,7 @@ const docTemplate = `{
                         }
                     },
                     "403": {
-                        "description": "Forbidden — Student/Parent only",
+                        "description": "Forbidden — Student/Parent only, or submitting for wrong student",
                         "schema": {
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
@@ -1227,14 +1912,28 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Admin sees all transactions. Students see only their own. Parents see transactions for all their linked children.",
+                "description": "Students see their own transactions. Parents see transactions for all their linked children.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "finance"
                 ],
-                "summary": "List transactions",
+                "summary": "List my transactions (Student or Parent)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page number (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (default 50, max 200)",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "Transaction list",
@@ -1242,14 +1941,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
                     },
-                    "401": {
-                        "description": "Unauthorized",
+                    "404": {
+                        "description": "Student profile not found",
                         "schema": {
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
                     },
-                    "404": {
-                        "description": "Student/user profile not found",
+                    "500": {
+                        "description": "Database error",
                         "schema": {
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
@@ -1264,14 +1963,14 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Students can only delete their own files. Admins can delete any file. Removes from disk and database.",
+                "description": "Removes the file from disk and the database. Student must own the file.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "locker"
                 ],
-                "summary": "Delete a locker file",
+                "summary": "Delete a locker file (Student only)",
                 "parameters": [
                     {
                         "type": "integer",
@@ -1289,7 +1988,7 @@ const docTemplate = `{
                         }
                     },
                     "403": {
-                        "description": "Forbidden — Not your file",
+                        "description": "Forbidden — not your file",
                         "schema": {
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
@@ -1310,14 +2009,14 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Toggles a locker file between private (teacher cannot see) and public (teacher can see). Student must own the file.",
+                "description": "Flips is_public on a locker file. When is_public=true, the student's teachers can read it.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "locker"
                 ],
-                "summary": "Toggle file visibility",
+                "summary": "Toggle file visibility (Student only)",
                 "parameters": [
                     {
                         "type": "integer",
@@ -1329,13 +2028,13 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Visibility updated",
+                        "description": "Visibility toggled",
                         "schema": {
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
                     },
                     "403": {
-                        "description": "Forbidden — Not your file",
+                        "description": "Forbidden — not your file",
                         "schema": {
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
@@ -1349,21 +2048,52 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/locker/student/{studentID}": {
+        "/api/locker/my-files": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Students see all their own files. Teachers see only public files. Admins see all files.",
+                "description": "Returns all files in the authenticated student's own locker (both public and private).",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "locker"
                 ],
-                "summary": "List files in a student's locker",
+                "summary": "List my locker files (Student only)",
+                "responses": {
+                    "200": {
+                        "description": "File list",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Student profile not found",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/locker/student/{studentID}/public": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns only files the student has toggled to is_public=true.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "locker"
+                ],
+                "summary": "List a student's public locker files (Teacher only)",
                 "parameters": [
                     {
                         "type": "integer",
@@ -1375,19 +2105,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "File list",
-                        "schema": {
-                            "$ref": "#/definitions/helpers.APIResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden — Cannot view another student's files",
-                        "schema": {
-                            "$ref": "#/definitions/helpers.APIResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Student profile not found",
+                        "description": "Public file list",
                         "schema": {
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
@@ -1402,7 +2120,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Students can upload files (max 5MB) of allowed types: pdf, jpg, jpeg, png, doc, docx, txt. Each file is stored under the student's locker directory.",
+                "description": "Students upload files (max 5 MB) to their private digital locker.\nAllowed types: pdf, jpg, jpeg, png, doc, docx, txt.\nFIX #14: Both the file extension AND the actual file content (MIME sniffing) are validated.\nA file with a renamed extension (e.g. shell.pdf containing PHP) is rejected.\nFIX #15: Upload directory is configurable via UPLOAD_DIR env variable (defaults to ./uploads/locker).",
                 "consumes": [
                     "multipart/form-data"
                 ],
@@ -1412,11 +2130,11 @@ const docTemplate = `{
                 "tags": [
                     "locker"
                 ],
-                "summary": "Upload a file to the digital locker",
+                "summary": "Upload a file to the locker (Student only)",
                 "parameters": [
                     {
                         "type": "file",
-                        "description": "File to upload (max 5MB)",
+                        "description": "File to upload (max 5 MB)",
                         "name": "file",
                         "in": "formData",
                         "required": true
@@ -1425,8 +2143,7 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Category: Certificate | Assignment | Portfolio | Material",
                         "name": "category",
-                        "in": "formData",
-                        "required": true
+                        "in": "formData"
                     }
                 ],
                 "responses": {
@@ -1437,13 +2154,13 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "File missing, too large, or invalid type",
+                        "description": "File missing, too large, invalid extension, or MIME type mismatch",
                         "schema": {
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
                     },
                     "403": {
-                        "description": "Forbidden — Students only",
+                        "description": "Forbidden — Student only",
                         "schema": {
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
@@ -1459,7 +2176,7 @@ const docTemplate = `{
         },
         "/api/login": {
             "post": {
-                "description": "Authenticates a user and returns an access token (1 hour) and a refresh token (7 days)",
+                "description": "Authenticates a user and returns an access token (1 hour) and a rotated refresh token (7 days).\nUse the access_token in the Authorization header: ` + "`" + `Bearer \u003ctoken\u003e` + "`" + `.\nThe refresh token is also set as an HttpOnly cookie (` + "`" + `sms_refresh` + "`" + `) for browser clients.\nWhen the access_token expires, call POST /api/token/refresh.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1488,8 +2205,45 @@ const docTemplate = `{
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
                     },
+                    "400": {
+                        "description": "Validation error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
                     "401": {
                         "description": "Invalid credentials",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/logout": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Deletes the stored refresh token for this user and clears the sms_refresh cookie.\nAfter logout, the access token remains valid until it expires (max 1 hour).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Logout — revoke refresh token",
+                "responses": {
+                    "200": {
+                        "description": "Logged out",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
@@ -1504,7 +2258,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns the profile of the currently authenticated user",
+                "description": "Returns the profile of the currently authenticated user.",
                 "produces": [
                     "application/json"
                 ],
@@ -1541,7 +2295,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Updates the authenticated user's password. Requires the current password.",
+                "description": "Updates the authenticated user's password. Requires the current password for verification.\nAlso revokes all existing refresh tokens (forces re-login on other devices).",
                 "consumes": [
                     "application/json"
                 ],
@@ -1591,30 +2345,30 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/parent/children": {
+        "/api/notifications": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns all students linked to the authenticated parent's account. Parent only.",
+                "description": "Returns all notifications targeted at the current user, most recent first.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "parent"
+                    "notifications"
                 ],
-                "summary": "Get my children",
+                "summary": "Get my notifications",
                 "responses": {
                     "200": {
-                        "description": "List of children",
+                        "description": "Notification list",
                         "schema": {
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
                     },
-                    "404": {
-                        "description": "User not found",
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
@@ -1622,9 +2376,145 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/register": {
+        "/api/notifications/sse-token": {
             "post": {
-                "description": "Creates a new user account. Available roles: Admin, Teacher, Student, Parent",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns a 60-second token for use in the EventSource URL (?sse_token=...).\nThis avoids passing the long-lived access JWT in the query string (which would appear in logs).\nThe token is signed with a separate SSE secret and only valid for the /notifications/stream endpoint.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Issue a short-lived SSE token",
+                "responses": {
+                    "200": {
+                        "description": "SSE token",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/notifications/stream": {
+            "get": {
+                "description": "Opens a Server-Sent Events stream. Receives a \"notification\" event for every broadcast targeting the caller's role.\nFIX: This endpoint now uses SSEAuthMiddleware. Call POST /api/notifications/sse-token first to get a\nshort-lived 60-second token, then connect with ?sse_token=\u003ctoken\u003e.\nThe full access JWT must NOT be passed in the URL — it would be permanently logged by every proxy.",
+                "produces": [
+                    "text/event-stream"
+                ],
+                "tags": [
+                    "notifications"
+                ],
+                "summary": "SSE stream for live notifications",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Short-lived SSE token (from POST /api/notifications/sse-token)",
+                        "name": "sse_token",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "SSE stream open",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or expired SSE token",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/notifications/{id}/read": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Marks the notification receipt as read for the current user.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "notifications"
+                ],
+                "summary": "Mark a notification as read",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Receipt ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Marked as read",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden — not your receipt",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Receipt not found",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/parent/children": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "parent"
+                ],
+                "summary": "Get parent's children (Parent only)",
+                "responses": {
+                    "200": {
+                        "description": "List of children",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/token/refresh": {
+            "post": {
+                "description": "Exchanges a valid refresh token for a new access token AND a new refresh token (rotation).\nThe old refresh token is invalidated on use (prevents replay attacks).\nToken is read from the ` + "`" + `sms_refresh` + "`" + ` HttpOnly cookie (browser) or the JSON body (API clients).\nThe new refresh token is returned in both the response body and a new cookie.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1634,21 +2524,20 @@ const docTemplate = `{
                 "tags": [
                     "auth"
                 ],
-                "summary": "Register a new user",
+                "summary": "Refresh access token",
                 "parameters": [
                     {
-                        "description": "Registration data",
+                        "description": "Refresh token (API clients only — browser uses cookie)",
                         "name": "body",
                         "in": "body",
-                        "required": true,
                         "schema": {
-                            "$ref": "#/definitions/controllers.RegisterInput"
+                            "$ref": "#/definitions/controllers.RefreshTokenInput"
                         }
                     }
                 ],
                 "responses": {
-                    "201": {
-                        "description": "User created",
+                    "200": {
+                        "description": "New tokens issued",
                         "schema": {
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
@@ -1659,8 +2548,8 @@ const docTemplate = `{
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
                     },
-                    "409": {
-                        "description": "Email already registered",
+                    "401": {
+                        "description": "Invalid or expired refresh token",
                         "schema": {
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
@@ -1759,6 +2648,7 @@ const docTemplate = `{
                 },
                 "max_score": {
                     "type": "number",
+                    "minimum": 1,
                     "example": 100
                 },
                 "subject_id": {
@@ -1851,6 +2741,8 @@ const docTemplate = `{
                 },
                 "year": {
                     "type": "integer",
+                    "maximum": 2100,
+                    "minimum": 2000,
                     "example": 2025
                 }
             }
@@ -2020,6 +2912,27 @@ const docTemplate = `{
                 }
             }
         },
+        "controllers.NotifyAbsencesInput": {
+            "type": "object",
+            "properties": {
+                "date": {
+                    "type": "string",
+                    "example": "2025-05-01"
+                }
+            }
+        },
+        "controllers.RefreshTokenInput": {
+            "type": "object",
+            "required": [
+                "refresh_token"
+            ],
+            "properties": {
+                "refresh_token": {
+                    "type": "string",
+                    "example": "eyJhbGci..."
+                }
+            }
+        },
         "controllers.RegisterInput": {
             "type": "object",
             "required": [
@@ -2045,6 +2958,7 @@ const docTemplate = `{
                     "example": "secret123"
                 },
                 "role": {
+                    "description": "Valid roles: Admin, Teacher, Student, Parent",
                     "type": "string",
                     "enum": [
                         "Admin",
@@ -2077,11 +2991,45 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 50,
                     "minLength": 5,
-                    "example": "CBE-TXN-20250501"
+                    "example": "CBE-TXN-20250501-001"
                 },
                 "student_id": {
                     "type": "integer",
                     "example": 1
+                }
+            }
+        },
+        "controllers.UnenrollStudentInput": {
+            "type": "object",
+            "required": [
+                "student_id",
+                "subject_id"
+            ],
+            "properties": {
+                "student_id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "subject_id": {
+                    "type": "integer",
+                    "example": 2
+                }
+            }
+        },
+        "controllers.UpdateClassInput": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "example": "Grade 10B"
+                },
+                "teacher_id": {
+                    "type": "integer",
+                    "example": 2
+                },
+                "year": {
+                    "type": "integer",
+                    "example": 2026
                 }
             }
         },
@@ -2100,6 +3048,10 @@ const docTemplate = `{
                     "type": "string",
                     "example": "new@email.com"
                 },
+                "parent_id": {
+                    "type": "integer",
+                    "example": 6
+                },
                 "parent_name": {
                     "type": "string",
                     "example": "Mr. Updated"
@@ -2107,6 +3059,35 @@ const docTemplate = `{
                 "parent_phone": {
                     "type": "string",
                     "example": "+251922000000"
+                }
+            }
+        },
+        "controllers.UpdateSubjectInput": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "example": "MATH-201"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Advanced Mathematics"
+                },
+                "teacher_id": {
+                    "type": "integer",
+                    "example": 3
+                }
+            }
+        },
+        "controllers.UpdateTeacherInput": {
+            "type": "object",
+            "required": [
+                "qualification"
+            ],
+            "properties": {
+                "qualification": {
+                    "type": "string",
+                    "example": "PhD Mathematics"
                 }
             }
         },
@@ -2158,7 +3139,7 @@ const docTemplate = `{
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
-	Version:          "1.0",
+	Version:          "1.1",
 	Host:             "localhost:8080",
 	BasePath:         "/",
 	Schemes:          []string{},

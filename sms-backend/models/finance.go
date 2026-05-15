@@ -8,7 +8,7 @@ type Transaction struct {
 	StudentID   uint       `json:"student_id"`
 	Student     Student    `gorm:"foreignKey:StudentID" json:"student,omitempty"`
 	Amount      float64    `gorm:"not null" json:"amount"`
-	ReceiptID   string     `json:"receipt_id"`                    // Ethiopian bank receipt Tx ID
+	ReceiptID   string     `gorm:"uniqueIndex" json:"receipt_id"` // Ethiopian bank receipt Tx ID
 	Type        string     `gorm:"not null" json:"type"`          // "Tuition", "Expense", "Payroll"
 	Status      string     `gorm:"default:Pending" json:"status"` // "Pending", "Verified", "Rejected"
 	Description string     `json:"description"`

@@ -1,12 +1,15 @@
 package controllers
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
-
+	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 
 	"sms-backend/config"
@@ -14,13 +17,15 @@ import (
 	"sms-backend/models"
 )
 
-// ── Input types ──────────────────────────────────────────────────────────────
+// ── Input types ───────────────────────────────────────────────────────────────
 
 type RegisterInput struct {
-	Name     string `json:"name"     binding:"required,min=2,max=100" example:"John Doe"`
-	Email    string `json:"email"    binding:"required,email"         example:"john@school.com"`
+	Name  string `json:"name"     binding:"required,min=2,max=100" example:"John Doe"`
+	Email string `json:"email"    binding:"required,email"         example:"john@school.com"`
+
 	Password string `json:"password" binding:"required,min=8"         example:"secret123"`
-	Role     string `json:"role"     binding:"required,oneof=Admin Teacher Student Parent" example:"Student"`
+	// Valid roles: Admin, Teacher, Student, Parent
+	Role string `json:"role" binding:"required,oneof=Admin Teacher Student Parent" example:"Student"`
 }
 
 type LoginInput struct {
@@ -33,22 +38,31 @@ type ChangePasswordInput struct {
 	NewPassword     string `json:"new_password"     binding:"required,min=8" example:"newpass456"`
 }
 
-// ── Register ─────────────────────────────────────────────────────────────────
+type RefreshTokenInput struct {
+	RefreshToken string `json:"refresh_token" binding:"required" example:"eyJhbGci..."`
+}
+
+// ══════════════════════════════════════════════════════
+//  REGISTER
+// ══════════════════════════════════════════════════════
 
 // Register godoc
-// @Summary      Register a new user
-// @Description  Creates a new user account. Available roles: Admin, Teacher, Student, Parent
+// @Summary      Register a new user (Admin only)
+// @Description  Creates a new user account. Requires Admin JWT.
+// @Description  Valid roles: Admin, Teacher, Student, Parent.
 // @Tags         auth
+// @Security     BearerAuth
 // @Accept       json
 // @Produce      json
-// @Param        body  body      RegisterInput      true  "Registration data"
+// @Param        body  body      RegisterInput        true  "Registration data"
 // @Success      201   {object}  helpers.APIResponse  "User created"
 // @Failure      400   {object}  helpers.APIResponse  "Validation error"
+// @Failure      401   {object}  helpers.APIResponse  "Unauthorized"
+// @Failure      403   {object}  helpers.APIResponse  "Forbidden — Admin only"
 // @Failure      409   {object}  helpers.APIResponse  "Email already registered"
-// @Router       /api/register [post]
+// @Router       /api/admin/register [post]
 func Register(c *gin.Context) {
 	var input RegisterInput
-
 	if err := c.ShouldBindJSON(&input); err != nil {
 		helpers.Error(c, http.StatusBadRequest, err.Error())
 		return
@@ -57,8 +71,7 @@ func Register(c *gin.Context) {
 	input.Email = strings.ToLower(strings.TrimSpace(input.Email))
 
 	var existing models.User
-	result := config.DB.Where("email = ?", input.Email).First(&existing)
-	if result.Error == nil {
+	if result := config.DB.Where("email = ?", input.Email).First(&existing); result.Error == nil {
 		helpers.Error(c, http.StatusConflict, "email already registered")
 		return
 	}
@@ -90,21 +103,26 @@ func Register(c *gin.Context) {
 	})
 }
 
-// ── Login ─────────────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════
+//  LOGIN
+// ══════════════════════════════════════════════════════
 
 // Login godoc
 // @Summary      Login and get JWT tokens
-// @Description  Authenticates a user and returns an access token (1 hour) and a refresh token (7 days)
+// @Description  Authenticates a user and returns an access token (1 hour) and a rotated refresh token (7 days).
+// @Description  Use the access_token in the Authorization header: `Bearer <token>`.
+// @Description  The refresh token is also set as an HttpOnly cookie (`sms_refresh`) for browser clients.
+// @Description  When the access_token expires, call POST /api/token/refresh.
 // @Tags         auth
 // @Accept       json
 // @Produce      json
-// @Param        body  body      LoginInput         true  "Login credentials"
+// @Param        body  body      LoginInput           true  "Login credentials"
 // @Success      200   {object}  helpers.APIResponse  "Tokens returned"
+// @Failure      400   {object}  helpers.APIResponse  "Validation error"
 // @Failure      401   {object}  helpers.APIResponse  "Invalid credentials"
 // @Router       /api/login [post]
 func Login(c *gin.Context) {
 	var input LoginInput
-
 	if err := c.ShouldBindJSON(&input); err != nil {
 		helpers.Error(c, http.StatusBadRequest, err.Error())
 		return
@@ -130,35 +148,245 @@ func Login(c *gin.Context) {
 
 	accessToken, err := config.GenerateAccessToken(user.ID, user.Role, user.Email)
 	if err != nil {
-		helpers.Error(c, http.StatusInternalServerError, "failed to generate token")
+		helpers.Error(c, http.StatusInternalServerError, "failed to generate access token")
 		return
 	}
 
+	// generate a new refresh token and persist it so we can validate/revoke it.
 	refreshToken, err := config.GenerateRefreshToken(user.ID)
 	if err != nil {
 		helpers.Error(c, http.StatusInternalServerError, "failed to generate refresh token")
 		return
 	}
 
+	// store the hashed refresh token in DB so it can be validated and rotated.
+	hashedRT, err := bcrypt.GenerateFromPassword([]byte(refreshToken), 10)
+	if err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "failed to store refresh token")
+		return
+	}
+	expiresAt := time.Now().Add(7 * 24 * time.Hour)
+	rt := models.RefreshToken{
+		UserID:    user.ID,
+		TokenHash: string(hashedRT),
+		ExpiresAt: expiresAt,
+	}
+	// Delete any old refresh tokens for this user (single-session enforcement).
+	config.DB.Where("user_id = ?", user.ID).Delete(&models.RefreshToken{})
+	if err := config.DB.Create(&rt).Error; err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "failed to persist refresh token")
+		return
+	}
+
+	// set refresh token as HttpOnly cookie so browser clients never expose it in JS.
+	// SameSite=Strict prevents CSRF. Secure should be true in production (HTTPS).
+	secure := os.Getenv("ENV") == "production"
+	c.SetCookie(
+		"sms_refresh", // name
+		refreshToken,  // value
+		7*24*60*60,    // maxAge seconds (7 days)
+		"/api/token",  // path — scoped to refresh endpoint only
+		"",            // domain — empty = current host
+		secure,        // secure (HTTPS only in prod)
+		true,          // httpOnly — JS cannot read this cookie
+	)
+
 	helpers.Success(c, http.StatusOK, "login successful", gin.H{
-		"access_token":  accessToken,
-		"refresh_token": refreshToken,
-		"token_type":    "Bearer",
-		"expires_in":    3600, // 1 hour in seconds
+		"access_token": accessToken,
+		"token_type":   "Bearer",
+		"expires_in":   3600, // 1 hour in seconds
 		"user": gin.H{
 			"id":    user.ID,
 			"name":  user.Name,
 			"email": user.Email,
 			"role":  user.Role,
 		},
+		// refresh_token also returned in body for API/mobile clients that cannot use cookies.
+		"refresh_token": refreshToken,
 	})
 }
 
-// ── GetMe ─────────────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════
+//  REFRESH TOKEN
+// ══════════════════════════════════════════════════════
+
+// RefreshToken godoc
+// @Summary      Refresh access token
+// @Description  Exchanges a valid refresh token for a new access token AND a new refresh token (rotation).
+// @Description  The old refresh token is invalidated on use (prevents replay attacks).
+// @Description  Token is read from the `sms_refresh` HttpOnly cookie (browser) or the JSON body (API clients).
+// @Description  The new refresh token is returned in both the response body and a new cookie.
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        body  body      RefreshTokenInput    false "Refresh token (API clients only — browser uses cookie)"
+// @Success      200   {object}  helpers.APIResponse  "New tokens issued"
+// @Failure      400   {object}  helpers.APIResponse  "Validation error"
+// @Failure      401   {object}  helpers.APIResponse  "Invalid or expired refresh token"
+// @Router       /api/token/refresh [post]
+func RefreshToken(c *gin.Context) {
+	// Accept token from cookie (browser) or body (API/mobile clients).
+	tokenStr, _ := c.Cookie("sms_refresh")
+	if tokenStr == "" {
+		var input RefreshTokenInput
+		if err := c.ShouldBindJSON(&input); err != nil {
+			helpers.Error(c, http.StatusBadRequest, "refresh_token required in body or sms_refresh cookie")
+			return
+		}
+		tokenStr = input.RefreshToken
+	}
+
+	// Parse and validate the JWT signature/expiry.
+	token, err := jwt.ParseWithClaims(
+		tokenStr,
+		&jwt.RegisteredClaims{},
+		func(t *jwt.Token) (any, error) {
+			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, errors.New("unexpected signing method")
+			}
+			return []byte(os.Getenv("JWT_REFRESH_SECRET")), nil
+		},
+	)
+	if err != nil || !token.Valid {
+		helpers.Error(c, http.StatusUnauthorized, "invalid or expired refresh token")
+		return
+	}
+
+	claims, ok := token.Claims.(*jwt.RegisteredClaims)
+	if !ok {
+		helpers.Error(c, http.StatusUnauthorized, "invalid token claims")
+		return
+	}
+
+	var userID uint
+	if _, err := fmt.Sscanf(claims.Subject, "%d", &userID); err != nil {
+		helpers.Error(c, http.StatusUnauthorized, "invalid token subject")
+		return
+	}
+
+	// validate against the stored hash (prevents replay of a previously used token).
+	var stored models.RefreshToken
+	if err := config.DB.Where("user_id = ? AND expires_at > ?", userID, time.Now()).
+		First(&stored).Error; err != nil {
+		helpers.Error(c, http.StatusUnauthorized, "refresh token not found or expired — please log in again")
+		return
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(stored.TokenHash), []byte(tokenStr)); err != nil {
+		helpers.Error(c, http.StatusUnauthorized, "refresh token mismatch — please log in again")
+		return
+	}
+
+	// Verify the user still exists and is active.
+	var user models.User
+	if err := config.DB.Where("id = ? AND is_active = true AND deleted_at IS NULL", userID).
+		First(&user).Error; err != nil {
+		helpers.Error(c, http.StatusUnauthorized, "account not found or deactivated")
+		return
+	}
+
+	// issue a NEW refresh token (rotation) and invalidate the old one.
+	newAccessToken, err := config.GenerateAccessToken(user.ID, user.Role, user.Email)
+	if err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "failed to generate access token")
+		return
+	}
+
+	newRefreshToken, err := config.GenerateRefreshToken(user.ID)
+	if err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "failed to generate refresh token")
+		return
+	}
+
+	newHashedRT, err := bcrypt.GenerateFromPassword([]byte(newRefreshToken), 10)
+	if err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "failed to store refresh token")
+		return
+	}
+
+	// Replace old record atomically.
+	newExpiry := time.Now().Add(7 * 24 * time.Hour)
+	if err := config.DB.Model(&stored).Updates(map[string]any{
+		"token_hash": string(newHashedRT),
+		"expires_at": newExpiry,
+	}).Error; err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "failed to rotate refresh token")
+		return
+	}
+
+	// Refresh the cookie.
+	secure := os.Getenv("ENV") == "production"
+	c.SetCookie("sms_refresh", newRefreshToken, 7*24*60*60, "/api/token", "", secure, true)
+
+	helpers.Success(c, http.StatusOK, "token refreshed", gin.H{
+		"access_token":  newAccessToken,
+		"refresh_token": newRefreshToken,
+		"token_type":    "Bearer",
+		"expires_in":    3600,
+	})
+}
+
+// ══════════════════════════════════════════════════════
+//  LOGOUT
+// ══════════════════════════════════════════════════════
+
+// Logout godoc
+// @Summary      Logout — revoke refresh token
+// @Description  Deletes the stored refresh token for this user and clears the sms_refresh cookie.
+// @Description  After logout, the access token remains valid until it expires (max 1 hour).
+// @Tags         auth
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  helpers.APIResponse  "Logged out"
+// @Failure      401  {object}  helpers.APIResponse  "Unauthorized"
+// @Router       /api/logout [post]
+func Logout(c *gin.Context) {
+	userID := c.GetUint("userID")
+	// Revoke all refresh tokens for this user.
+	config.DB.Where("user_id = ?", userID).Delete(&models.RefreshToken{})
+	// Clear the cookie.
+	c.SetCookie("sms_refresh", "", -1, "/api/token", "", false, true)
+	helpers.Success(c, http.StatusOK, "logged out successfully", nil)
+}
+
+// ══════════════════════════════════════════════════════
+//  SSE TOKEN — short-lived token for EventSource
+// ══════════════════════════════════════════════════════
+
+// IssueSSEToken godoc
+// @Summary      Issue a short-lived SSE token
+// @Description  Returns a 60-second token for use in the EventSource URL (?sse_token=...).
+// @Description  This avoids passing the long-lived access JWT in the query string (which would appear in logs).
+// @Description  The token is signed with a separate SSE secret and only valid for the /notifications/stream endpoint.
+// @Tags         auth
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  helpers.APIResponse  "SSE token"
+// @Failure      401  {object}  helpers.APIResponse  "Unauthorized"
+// @Router       /api/notifications/sse-token [post]
+func IssueSSEToken(c *gin.Context) {
+	userID := c.GetUint("userID")
+	role := c.GetString("role")
+	email := c.GetString("email")
+
+	sseToken, err := config.GenerateSSEToken(userID, role, email)
+	if err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "failed to generate SSE token")
+		return
+	}
+
+	helpers.Success(c, http.StatusOK, "SSE token issued", gin.H{
+		"sse_token":  sseToken,
+		"expires_in": 60,
+	})
+}
+
+// ══════════════════════════════════════════════════════
+//  GET ME
+// ══════════════════════════════════════════════════════
 
 // GetMe godoc
 // @Summary      Get current user profile
-// @Description  Returns the profile of the currently authenticated user
+// @Description  Returns the profile of the currently authenticated user.
 // @Tags         auth
 // @Security     BearerAuth
 // @Produce      json
@@ -168,13 +396,11 @@ func Login(c *gin.Context) {
 // @Router       /api/me [get]
 func GetMe(c *gin.Context) {
 	userID := c.GetUint("userID")
-
 	var user models.User
 	if err := config.DB.First(&user, userID).Error; err != nil {
 		helpers.Error(c, http.StatusNotFound, "user not found")
 		return
 	}
-
 	helpers.Success(c, http.StatusOK, "user profile", gin.H{
 		"id":         user.ID,
 		"name":       user.Name,
@@ -186,25 +412,27 @@ func GetMe(c *gin.Context) {
 	})
 }
 
-// ── ChangePassword ────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════
+//  CHANGE PASSWORD
+// ══════════════════════════════════════════════════════
 
 // ChangePassword godoc
 // @Summary      Change password
-// @Description  Updates the authenticated user's password. Requires the current password.
+// @Description  Updates the authenticated user's password. Requires the current password for verification.
+// @Description  Also revokes all existing refresh tokens (forces re-login on other devices).
 // @Tags         auth
 // @Security     BearerAuth
 // @Accept       json
 // @Produce      json
 // @Param        body  body      ChangePasswordInput  true  "Password change data"
-// @Success      200   {object}  helpers.APIResponse    "Password updated"
-// @Failure      400   {object}  helpers.APIResponse    "Validation error"
-// @Failure      401   {object}  helpers.APIResponse    "Current password incorrect"
-// @Failure      404   {object}  helpers.APIResponse    "User not found"
+// @Success      200   {object}  helpers.APIResponse  "Password updated"
+// @Failure      400   {object}  helpers.APIResponse  "Validation error"
+// @Failure      401   {object}  helpers.APIResponse  "Current password incorrect"
+// @Failure      404   {object}  helpers.APIResponse  "User not found"
 // @Router       /api/me/password [put]
 func ChangePassword(c *gin.Context) {
 	userID := c.GetUint("userID")
 	var input ChangePasswordInput
-
 	if err := c.ShouldBindJSON(&input); err != nil {
 		helpers.Error(c, http.StatusBadRequest, err.Error())
 		return
@@ -227,13 +455,17 @@ func ChangePassword(c *gin.Context) {
 		return
 	}
 
-	if err := config.DB.Model(&user).Update("password", string(hashed)).Error; err != nil {
+	if err := config.DB.Model(&user).Updates(map[string]any{
+		"password":   string(hashed),
+		"updated_at": time.Now(),
+	}).Error; err != nil {
 		helpers.Error(c, http.StatusInternalServerError, "failed to update password")
 		return
 	}
 
-	now := time.Now()
-	config.DB.Model(&user).Update("updated_at", now)
+	// revoke all refresh tokens after password change — forces re-login on all devices.
+	config.DB.Where("user_id = ?", userID).Delete(&models.RefreshToken{})
+	c.SetCookie("sms_refresh", "", -1, "/api/token", "", false, true)
 
-	helpers.Success(c, http.StatusOK, "password updated successfully", nil)
+	helpers.Success(c, http.StatusOK, "password updated successfully — please log in again", nil)
 }

@@ -14,7 +14,7 @@ import (
 )
 
 // @title           SMS Backend API
-// @version         1.0
+// @version         1.1
 // @description     School Management System — Go + Gin + PostgreSQL
 // @description
 // @description     ## Authentication
@@ -41,7 +41,23 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 
+	// FIX #7: Fail fast if JWT secrets are missing.
+	// An empty secret signs tokens with "" which is trivially forgeable.
+	// Never allow the server to start without required secrets.
+	for _, envVar := range []string{"JWT_SECRET", "JWT_REFRESH_SECRET"} {
+		if os.Getenv(envVar) == "" {
+			log.Fatalf("FATAL: required environment variable %s is not set — server will not start", envVar)
+		}
+	}
+
 	config.ConnectDB()
+
+	// PreMigrate applies idempotent schema fixups (e.g. safe constraint drops)
+	// that must run before AutoMigrate to avoid SQLSTATE 42704 errors when a
+	// constraint exists under a different name or was never created.
+	if err := config.PreMigrate(config.DB); err != nil {
+		log.Fatal("Pre-migration failed: ", err)
+	}
 
 	err := config.DB.AutoMigrate(
 		&models.User{},
@@ -55,13 +71,21 @@ func main() {
 		&models.LockerFile{},
 		&models.Transaction{},
 		&models.Payroll{},
+		&models.Notification{},
+		&models.NotificationReceipt{},
+		&models.RefreshToken{},
 	)
 	if err != nil {
 		log.Fatal("Migration failed: ", err)
 	}
 	log.Println("All tables migrated successfully")
 
-	if err := os.MkdirAll("./uploads/locker", 0750); err != nil {
+	// FIX #15: Respect UPLOAD_DIR env var — same default as locker_ctrl.go's getUploadDir().
+	uploadDir := os.Getenv("UPLOAD_DIR")
+	if uploadDir == "" {
+		uploadDir = "./uploads/locker"
+	}
+	if err := os.MkdirAll(uploadDir, 0750); err != nil {
 		log.Fatal("Failed to create uploads directory: ", err)
 	}
 
@@ -76,8 +100,9 @@ func main() {
 	}
 
 	log.Printf("SMS server running on :%s\n", port)
-	log.Printf("Swagger UI:  http://localhost:%s/swagger/index.html\n", port)
-	log.Printf("Custom Docs: http://localhost:%s/docs\n", port)
+	log.Printf("Swagger UI:        http://localhost:%s/swagger/index.html\n", port)
+	log.Printf("Custom Docs:       http://localhost:%s/docs\n", port)
+	log.Printf("Notifications page: http://localhost:%s/notifications\n", port)
 
 	if err := r.Run(":" + port); err != nil {
 		log.Fatal("Server failed to start: ", err)

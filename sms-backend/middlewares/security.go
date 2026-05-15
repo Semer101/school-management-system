@@ -3,6 +3,7 @@ package middlewares
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -20,25 +21,38 @@ import (
 // These headers tell browsers how to protect users from common attacks
 func SecurityHeaders() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Prevent clickjacking — stops your site being embedded in an iframe
+		// Prevent clickjacking
 		c.Header("X-Frame-Options", "DENY")
 
-		// Prevent MIME type sniffing — browsers must respect Content-Type header
+		// Prevent MIME sniffing
 		c.Header("X-Content-Type-Options", "nosniff")
 
-		// Force HTTPS for 1 year (only enable in production)
-		// c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		// Enable HSTS in production
+		if os.Getenv("ENV") == "production" {
+			c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		}
 
-		// Control what information is sent in the Referer header
+		// Referrer policy
 		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
 
-		// Content Security Policy — restricts where scripts/styles can load from.
-		// FIX: Added 'unsafe-inline' to script-src (needed for the inline <script> in swagger-ui.html)
-		//      Added connect-src to allow the Swagger UI to make fetch() calls back to the API.
-		c.Header("Content-Security-Policy",
-			"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:8080")
+		// CSP connect-src from env
+		connectSrc := os.Getenv("CSP_CONNECT_SRC")
 
-		// Hide server information to make it harder for attackers to identify vulnerabilities
+		if connectSrc == "" {
+			connectSrc = "'self'"
+		}
+
+		csp := fmt.Sprintf(
+			"default-src 'self'; "+
+				"script-src 'self' 'unsafe-inline'; "+
+				"style-src 'self' 'unsafe-inline'; "+
+				"connect-src %s",
+			connectSrc,
+		)
+
+		c.Header("Content-Security-Policy", csp)
+
+		// Hide server info
 		c.Writer.Header().Del("X-Powered-By")
 
 		c.Next()
@@ -48,21 +62,29 @@ func SecurityHeaders() gin.HandlerFunc {
 // CORSMiddleware controls which origins can call your API (OWASP A05)
 // CORS = Cross-Origin Resource Sharing
 func CORSMiddleware() gin.HandlerFunc {
-	// In production, replace with your actual frontend URL
-	allowedOrigins := []string{
-		"http://localhost:3000", // React dev server
-		"http://localhost:5173", // Vite dev server
-		"http://localhost:8080", 
-		"http://127.0.0.1:5500",
+	corsOrigins := os.Getenv("CORS_ORIGINS")
+
+	var allowedOrigins []string
+
+	if corsOrigins != "" {
+		allowedOrigins = strings.Split(corsOrigins, ",")
+	} else {
+		// fallback only if env variable missing
+		allowedOrigins = []string{
+			"http://localhost:3000",
+			"http://localhost:5173",
+			"http://localhost:8080",
+			"http://127.0.0.1:5500",
+		}
 	}
 
 	return func(c *gin.Context) {
 		origin := c.GetHeader("Origin")
 
-		// Check if the request origin is in our allowed list
 		allowed := false
+
 		for _, o := range allowedOrigins {
-			if o == origin {
+			if strings.TrimSpace(o) == origin {
 				allowed = true
 				break
 			}
@@ -70,17 +92,13 @@ func CORSMiddleware() gin.HandlerFunc {
 
 		if allowed {
 			c.Header("Access-Control-Allow-Origin", origin)
-		} else {
-			// For disallowed origins, we can either omit the header or explicitly deny
-			c.Writer.Header().Del("Access-Control-Allow-Origin")
 		}
 
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-CSRF-Token")
 		c.Header("Access-Control-Allow-Credentials", "true")
-		c.Header("Access-Control-Max-Age", "86400") // 24 hours preflight cache
+		c.Header("Access-Control-Max-Age", "86400")
 
-		// Handle preflight OPTIONS requests — browsers send these before actual requests
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusNoContent)
 			return
@@ -106,8 +124,9 @@ func newRateLimiter(limit int, window time.Duration) *rateLimiter {
 		window:   window,
 	}
 	// Clean up old entries every 5 minutes
+	ticker := time.NewTicker(5 * time.Minute)
 	go func() {
-		for range time.Tick(5 * time.Minute) {
+		for range ticker.C {
 			rl.cleanup()
 		}
 	}()

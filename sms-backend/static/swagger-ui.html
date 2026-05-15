@@ -6,32 +6,23 @@
 <title>SMS Backend API — Swagger UI</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
   :root {
-    --bg: #ffffff;
-    --bg2: #f8f9fa;
-    --bg3: #f1f3f5;
-    --border: #dee2e6;
-    --text: #212529;
-    --text2: #6c757d;
-    --text3: #adb5bd;
+    --bg: #ffffff; --bg2: #f8f9fa; --bg3: #f1f3f5;
+    --border: #dee2e6; --text: #212529; --text2: #6c757d; --text3: #adb5bd;
     --get: #0d6efd;    --get-bg: #e7f0ff;
     --post: #198754;   --post-bg: #e6f4ec;
     --put: #e67e00;    --put-bg: #fff3e0;
     --patch: #6f42c1;  --patch-bg: #f0eaff;
     --delete: #dc3545; --delete-bg: #fde8ea;
-    --badge-bg: #e9ecef;
-    --code-bg: #f6f8fa;
-    --lock: #fd7e14;
+    --badge-bg: #e9ecef; --code-bg: #f6f8fa; --lock: #fd7e14;
+    --new-bg: #d1fae5; --new-text: #065f46;
+    --fix-bg: #fef3c7; --fix-text: #92400e;
   }
-
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg2); color: var(--text); font-size: 14px; line-height: 1.5; }
-
   header { background: var(--bg); border-bottom: 1px solid var(--border); padding: 0 24px; position: sticky; top: 0; z-index: 100; display: flex; align-items: center; gap: 16px; height: 56px; }
   header h1 { font-size: 17px; font-weight: 600; }
   .version-badge { background: var(--badge-bg); border-radius: 4px; padding: 2px 8px; font-size: 12px; color: var(--text2); }
   .server-url { margin-left: auto; font-size: 12px; color: var(--text2); font-family: monospace; background: var(--bg3); padding: 4px 10px; border-radius: 4px; border: 1px solid var(--border); }
-
   .auth-bar { background: #fff8e1; border-bottom: 1px solid #ffe082; padding: 8px 24px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .auth-bar label { font-size: 12px; font-weight: 600; color: #7a5c00; }
   .auth-bar input { flex: 1; min-width: 260px; max-width: 480px; font-family: monospace; font-size: 12px; padding: 5px 10px; border: 1px solid #ffe082; border-radius: 4px; background: #fffde7; color: #333; outline: none; }
@@ -39,9 +30,7 @@
   .auth-bar button { padding: 5px 16px; background: #f9a825; border: none; border-radius: 4px; font-size: 12px; font-weight: 600; color: #fff; cursor: pointer; }
   .auth-bar button:hover { background: #f57f17; }
   .auth-status { font-size: 12px; color: #7a5c00; }
-
   main { max-width: 900px; margin: 24px auto; padding: 0 16px; }
-
   .tag-section { margin-bottom: 24px; }
   .tag-header { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px 6px 0 0; cursor: pointer; user-select: none; }
   .tag-header:hover { background: var(--bg3); }
@@ -50,10 +39,9 @@
   .chevron { margin-left: auto; font-size: 16px; transition: transform 0.2s; color: var(--text2); }
   .tag-section.open .chevron { transform: rotate(180deg); }
   .endpoint-list { border: 1px solid var(--border); border-top: none; border-radius: 0 0 6px 6px; overflow: hidden; }
-
   .endpoint { border-bottom: 1px solid var(--border); }
   .endpoint:last-child { border-bottom: none; }
-  .endpoint-header { display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; background: var(--bg); }
+  .endpoint-header { display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; background: var(--bg); flex-wrap: wrap; }
   .endpoint-header:hover { background: var(--bg3); }
   .method { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px; min-width: 58px; text-align: center; text-transform: uppercase; letter-spacing: 0.5px; }
   .method.get    { color: var(--get);    background: var(--get-bg); }
@@ -62,16 +50,16 @@
   .method.patch  { color: var(--patch);  background: var(--patch-bg); }
   .method.delete { color: var(--delete); background: var(--delete-bg); }
   .path { font-family: monospace; font-size: 13px; color: var(--text); flex: 1; }
-  .summary { font-size: 13px; color: var(--text2); margin-left: 4px; }
-  .lock-icon { font-size: 13px; color: var(--lock); margin-left: auto; }
+  .summary { font-size: 13px; color: var(--text2); }
+  .lock-icon { font-size: 13px; color: var(--lock); }
   .role-badge { font-size: 10px; padding: 2px 6px; border-radius: 3px; background: var(--badge-bg); color: var(--text2); font-weight: 600; }
-
+  .new-badge { font-size: 10px; padding: 2px 6px; border-radius: 3px; background: var(--new-bg); color: var(--new-text); font-weight: 700; }
+  .fix-badge { font-size: 10px; padding: 2px 6px; border-radius: 3px; background: var(--fix-bg); color: var(--fix-text); font-weight: 700; }
   .endpoint-body { display: none; padding: 16px 20px; background: var(--bg2); border-top: 1px solid var(--border); }
   .endpoint.open .endpoint-body { display: block; }
-
   .section-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text3); margin: 12px 0 6px; }
   .section-label:first-child { margin-top: 0; }
-
+  .fix-note { background: var(--fix-bg); color: var(--fix-text); border-radius: 4px; padding: 7px 12px; font-size: 12px; margin-bottom: 10px; border-left: 3px solid #f59e0b; }
   .params-table { width: 100%; border-collapse: collapse; font-size: 13px; }
   .params-table th { text-align: left; padding: 6px 10px; background: var(--bg3); color: var(--text2); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
   .params-table td { padding: 6px 10px; border-top: 1px solid var(--border); vertical-align: top; }
@@ -79,19 +67,15 @@
   .param-name { font-family: monospace; font-size: 12px; font-weight: 600; }
   .required-star { color: var(--delete); }
   .param-in { font-size: 11px; color: var(--text2); }
-
   .responses-list { display: flex; flex-direction: column; gap: 6px; }
   .response-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 12px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg); }
   .status-code { font-family: monospace; font-weight: 700; font-size: 13px; min-width: 40px; }
   .status-2xx { color: var(--post); }
   .status-4xx { color: var(--delete); }
   .status-desc { font-size: 13px; color: var(--text2); }
-
   pre.schema { background: var(--code-bg); border: 1px solid var(--border); border-radius: 4px; padding: 10px 12px; font-family: monospace; font-size: 12px; line-height: 1.6; overflow-x: auto; white-space: pre-wrap; word-break: break-word; }
-
   .try-btn { margin-top: 14px; padding: 6px 18px; background: var(--get); color: #fff; border: none; border-radius: 4px; font-size: 13px; font-weight: 600; cursor: pointer; }
   .try-btn:hover { opacity: 0.88; }
-
   .try-panel { display: none; margin-top: 14px; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
   .try-panel.open { display: block; }
   .try-panel-header { background: var(--bg3); padding: 8px 14px; font-size: 12px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; }
@@ -103,7 +87,6 @@
   .execute-btn { padding: 7px 20px; background: var(--post); color: #fff; border: none; border-radius: 4px; font-size: 13px; font-weight: 600; cursor: pointer; }
   .execute-btn:hover { opacity: 0.88; }
   .response-output { background: var(--code-bg); border: 1px solid var(--border); border-radius: 4px; padding: 10px 12px; font-family: monospace; font-size: 12px; white-space: pre-wrap; word-break: break-word; max-height: 300px; overflow-y: auto; margin-top: 6px; display: none; }
-
   .info-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin-bottom: 24px; }
   .info-card h2 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
   .info-card p { color: var(--text2); font-size: 13px; margin-bottom: 10px; }
@@ -111,13 +94,15 @@
   .info-stat { background: var(--bg3); border-radius: 6px; padding: 10px 14px; }
   .info-stat-val { font-size: 20px; font-weight: 700; }
   .info-stat-lbl { font-size: 11px; color: var(--text2); margin-top: 2px; }
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 10px; font-size: 12px; }
+  .legend span { display: flex; align-items: center; gap: 4px; }
 </style>
 </head>
 <body>
 
 <header>
   <h1>SMS Backend API</h1>
-  <span class="version-badge">v1.0</span>
+  <span class="version-badge">v1.2 — final check fixes</span>
   <span style="font-size:12px;color:var(--text2);">Go · Gin · PostgreSQL</span>
   <span class="server-url">http://localhost:8080</span>
 </header>
@@ -135,11 +120,31 @@
   <h2>School Management System</h2>
   <p>REST API for the SMS backend — authentication, academics, finance, digital locker, and notifications.</p>
   <div class="info-grid">
-    <div class="info-stat"><div class="info-stat-val">38</div><div class="info-stat-lbl">Endpoints</div></div>
-    <div class="info-stat"><div class="info-stat-val">6</div><div class="info-stat-lbl">Tag groups</div></div>
+    <div class="info-stat"><div class="info-stat-val">47</div><div class="info-stat-lbl">Endpoints</div></div>
+    <div class="info-stat"><div class="info-stat-val">8</div><div class="info-stat-lbl">Tag groups</div></div>
     <div class="info-stat"><div class="info-stat-val">4</div><div class="info-stat-lbl">Roles</div></div>
-    <div class="info-stat"><div class="info-stat-val">1 hr</div><div class="info-stat-lbl">Token lifetime</div></div>
+    <div class="info-stat"><div class="info-stat-val">10</div><div class="info-stat-lbl">Bugs fixed (v1.2)</div></div>
   </div>
+  <div class="legend">
+    <span><span class="new-badge">NEW</span> Added in v1.1 patch</span>
+    <span><span class="fix-badge">FIX</span> Behaviour changed in v1.1/v1.2 patch</span>
+  </div>
+  <details style="margin-top:12px;font-size:12px;color:var(--text2);">
+    <summary style="cursor:pointer;font-weight:600;color:var(--text);">v1.2 fixes (10 bugs)</summary>
+    <ul style="margin:8px 0 0 16px;line-height:1.8;">
+      <li><b>#1</b> GetStudents — count/fetch now share the same GORM query object (was diverging silently)</li>
+      <li><b>#2</b> BulkGradeEntry — documented that migration.sql MUST be run or upsert silently creates duplicates</li>
+      <li><b>#3a</b> RecordAttendance — rejects students not enrolled in the subject (was creating phantom records)</li>
+      <li><b>#3b</b> BulkGradeEntry — rejects grades for students not enrolled in the subject</li>
+      <li><b>#4</b> NotifyParentsAbsentStudents — multi-child parents now receive correct per-child emails</li>
+      <li><b>#5</b> GetAttendanceSummary — SQL NULLIF + HAVING prevents division-by-zero for students with no records</li>
+      <li><b>#6</b> VerifyReceipt — admin note only appended when remarks is non-empty</li>
+      <li><b>#7</b> main.go — server now fails to start if JWT_SECRET or JWT_REFRESH_SECRET are missing</li>
+      <li><b>#8</b> SSE stream — moved outside auth group; SSEAuthMiddleware is the sole guard (was unreachable after token expiry)</li>
+      <li><b>#13</b> HSTS — now conditionally enabled in production via ENV=production (was permanently commented out)</li>
+      <li><b>#15</b> UploadDir — configurable via UPLOAD_DIR env variable (was a hardcoded relative path)</li>
+    </ul>
+  </details>
 </div>
 
 <div id="api-docs"></div>
@@ -151,233 +156,479 @@ const BASE = 'http://localhost:8080';
 let jwtToken = '';
 
 function saveToken() {
-  jwtToken = document.getElementById('jwt-input').value.trim();
+  let raw = document.getElementById('jwt-input').value.trim();
+  if (raw.toLowerCase().startsWith('bearer ')) raw = raw.slice(7).trim();
+  jwtToken = raw;
   document.getElementById('auth-status').textContent = jwtToken ? '✓ Token set' : '✗ Cleared';
 }
 
 const ENDPOINTS = [
+  // ── AUTH ────────────────────────────────────────────────────────────────────
   {
-    tag: 'auth', tagLabel: 'Authentication', tagDesc: 'Register, login, and profile',
+    tag: 'auth', tagLabel: 'Authentication', tagDesc: 'Login, tokens, profile, logout',
     routes: [
-      { method:'POST', path:'/api/register', summary:'Register a new user', auth:false, roles:[],
+      {
+        method:'POST', path:'/api/login', summary:'Login — get tokens', auth:false, roles:[], badge:'fix',
+        fixNote:'Now also sets the sms_refresh HttpOnly cookie in addition to returning refresh_token in the body. The cookie is used by browser clients for silent token refresh.',
         params:[],
-        body: { schema:'{\n  "name": "string (2–100 chars)",\n  "email": "string",\n  "password": "string (min 8 chars)",\n  "role": "Admin | Teacher | Student | Parent"\n}' },
-        responses:[{code:'201',desc:'User created'},{code:'400',desc:'Validation error'}]
+        body:{ schema:'{\n  "email": "string",\n  "password": "string"\n}' },
+        responses:[
+          {code:'200',desc:'Returns access_token (1 hr), refresh_token (7 days), user object'},
+          {code:'401',desc:'Invalid credentials or inactive account'},
+          {code:'429',desc:'Too many login attempts — wait 1 minute'}
+        ]
       },
-      { method:'POST', path:'/api/login', summary:'Login and receive tokens', auth:false, roles:[],
+      {
+        method:'POST', path:'/api/token/refresh', summary:'Refresh access token', auth:false, roles:[], badge:'fix',
+        fixNote:'FIX: Now rotates the refresh token on every use (old token is invalidated). Accepts the sms_refresh HttpOnly cookie (browsers) OR refresh_token in the JSON body (API/mobile). Returns a new access token + new refresh token.',
         params:[],
-        body: { schema:'{\n  "email": "string",\n  "password": "string"\n}' },
-        responses:[{code:'200',desc:'Returns access_token + refresh_token'},{code:'401',desc:'Invalid credentials'}]
+        body:{ schema:'// Browser: send empty body — cookie is used automatically\n{}\n\n// API/mobile clients: send token in body\n{\n  "refresh_token": "eyJhbGci..."\n}' },
+        responses:[
+          {code:'200',desc:'New access_token + new refresh_token'},
+          {code:'401',desc:'Invalid, expired, or already-used refresh token — log in again'}
+        ]
       },
-      { method:'GET', path:'/api/me', summary:'Get current user profile', auth:true, roles:['All'],
+      {
+        method:'POST', path:'/api/notifications/sse-token', summary:'Issue short-lived SSE token', auth:true, roles:['All'], badge:'new',
+        fixNote:'NEW: Call this before opening the EventSource stream. Returns a 60-second token to use as ?sse_token= in the SSE URL. Prevents the full JWT from appearing in server logs.',
         params:[], body:null,
-        responses:[{code:'200',desc:'User object'}]
+        responses:[
+          {code:'200',desc:'{ sse_token: "...", expires_in: 60 }'},
+          {code:'401',desc:'Unauthorized'}
+        ]
       },
-      { method:'PUT', path:'/api/me/password', summary:'Change password', auth:true, roles:['All'],
+      {
+        method:'POST', path:'/api/logout', summary:'Logout — revoke refresh token', auth:true, roles:['All'], badge:'new',
+        fixNote:'NEW: Deletes the stored refresh token and clears the sms_refresh cookie. The access token remains valid until it expires (max 1 hour).',
+        params:[], body:null,
+        responses:[{code:'200',desc:'Logged out'},{code:'401',desc:'Unauthorized'}]
+      },
+      {
+        method:'GET', path:'/api/me', summary:'Get current user profile', auth:true, roles:['All'],
+        params:[], body:null,
+        responses:[{code:'200',desc:'User object (id, name, email, role, phone, avatar_url)'}]
+      },
+      {
+        method:'PUT', path:'/api/me/password', summary:'Change password', auth:true, roles:['All'], badge:'fix',
+        fixNote:'FIX: Now also revokes all refresh tokens after a password change, forcing re-login on all devices.',
         params:[],
-        body:{ schema:'{\n  "old_password": "string",\n  "new_password": "string"\n}' },
-        responses:[{code:'200',desc:'Password updated'},{code:'400',desc:'Wrong old password'}]
+        body:{ schema:'{\n  "current_password": "string",\n  "new_password": "string (min 8 chars)"\n}' },
+        responses:[
+          {code:'200',desc:'Password updated — re-login required on all devices'},
+          {code:'401',desc:'Current password incorrect'}
+        ]
+      },
+      {
+        method:'POST', path:'/api/admin/register', summary:'Register a new user (Admin only)', auth:true, roles:['Admin'],
+        params:[],
+        body:{ schema:'{\n  "name": "string (2–100 chars)",\n  "email": "string",\n  "password": "string (min 8 chars)",\n  "role": "Admin | Teacher | Student | Parent"\n}' },
+        responses:[
+          {code:'201',desc:'User created'},
+          {code:'400',desc:'Validation error'},
+          {code:'409',desc:'Email already registered'}
+        ]
       },
     ]
   },
+
+  // ── STUDENTS ────────────────────────────────────────────────────────────────
   {
-    tag: 'admin-users', tagLabel: 'Admin — Users', tagDesc: 'Student & teacher management (Admin only)',
+    tag: 'students', tagLabel: 'Admin — Students', tagDesc: 'Student management (Admin only)',
     routes: [
-      { method:'POST', path:'/api/admin/students', summary:'Create student', auth:true, roles:['Admin'],
+      {
+        method:'POST', path:'/api/admin/students', summary:'Create student', auth:true, roles:['Admin'],
         params:[],
-        body:{ schema:'{\n  "user_id": "uint",\n  "parent_id": "uint (optional)",\n  "class_id": "uint"\n}' },
-        responses:[{code:'201',desc:'Student created'}]
+        body:{ schema:'{\n  "name": "string",\n  "email": "string",\n  "password": "string (min 8)",\n  "student_code": "string",\n  "class_id": 1,\n  "parent_id": 5,\n  "parent_name": "string",\n  "parent_email": "string",\n  "parent_phone": "string",\n  "date_of_birth": "2010-05-15"\n}' },
+        responses:[{code:'201',desc:'Student + user account created'},{code:'400',desc:'Validation error or invalid parent_id'},{code:'409',desc:'Email or student code already exists'}]
       },
-      { method:'GET', path:'/api/admin/students', summary:'List all students', auth:true, roles:['Admin'],
-        params:[], body:null, responses:[{code:'200',desc:'Array of student records'}]
+      {
+        method:'GET', path:'/api/admin/students', summary:'List all students', auth:true, roles:['Admin'], badge:'fix',
+        fixNote:'FIX: Count and fetch now use the same scoped query to prevent race condition where total could reflect a different snapshot than the data.',
+        params:[
+          {name:'page',in:'query',required:false,desc:'Page number (default 1)'},
+          {name:'page_size',in:'query',required:false,desc:'Page size (default 50, max 200)'}
+        ], body:null,
+        responses:[{code:'200',desc:'{ total, data: [...] }'}]
       },
-      { method:'GET', path:'/api/admin/students/:id', summary:'Get student by ID', auth:true, roles:['Admin'],
+      {
+        method:'GET', path:'/api/admin/students/:id', summary:'Get student by ID', auth:true, roles:['Admin'],
         params:[{name:'id',in:'path',required:true,desc:'Student ID'}], body:null,
         responses:[{code:'200',desc:'Student record'},{code:'404',desc:'Not found'}]
       },
-      { method:'PUT', path:'/api/admin/students/:id', summary:'Update student', auth:true, roles:['Admin'],
+      {
+        method:'PUT', path:'/api/admin/students/:id', summary:'Update student', auth:true, roles:['Admin'],
         params:[{name:'id',in:'path',required:true,desc:'Student ID'}],
-        body:{ schema:'{\n  "class_id": "uint",\n  "parent_id": "uint"\n}' },
-        responses:[{code:'200',desc:'Updated'}]
+        body:{ schema:'{\n  "class_id": 2,\n  "parent_id": 6,\n  "parent_name": "string",\n  "parent_email": "string",\n  "parent_phone": "string",\n  "date_of_birth": "2010-05-15"\n}' },
+        responses:[{code:'200',desc:'Student updated (reloaded from DB)'},{code:'404',desc:'Not found'}]
       },
-      { method:'DELETE', path:'/api/admin/students/:id', summary:'Archive (soft-delete) student', auth:true, roles:['Admin'],
+      {
+        method:'DELETE', path:'/api/admin/students/:id', summary:'Archive student', auth:true, roles:['Admin'], badge:'fix',
+        fixNote:'FIX: Now also deletes all subject enrollments for the student before soft-deleting. Archived students no longer appear in subject rosters.',
         params:[{name:'id',in:'path',required:true,desc:'Student ID'}], body:null,
-        responses:[{code:'200',desc:'Archived'}]
-      },
-      { method:'POST', path:'/api/admin/teachers', summary:'Create teacher', auth:true, roles:['Admin'],
-        params:[],
-        body:{ schema:'{\n  "user_id": "uint",\n  "subject_ids": [1, 2]\n}' },
-        responses:[{code:'201',desc:'Teacher created'}]
-      },
-      { method:'GET', path:'/api/admin/teachers', summary:'List all teachers', auth:true, roles:['Admin'],
-        params:[], body:null, responses:[{code:'200',desc:'Array of teachers'}]
+        responses:[{code:'200',desc:'Archived — enrollments removed, attendance/grades preserved'},{code:'404',desc:'Not found'}]
       },
     ]
   },
+
+  // ── TEACHERS ────────────────────────────────────────────────────────────────
   {
-    tag: 'admin-academic', tagLabel: 'Admin — Academic Setup', tagDesc: 'Classes, subjects, enrollment',
+    tag: 'teachers', tagLabel: 'Admin — Teachers', tagDesc: 'Teacher management (Admin only)',
     routes: [
-      { method:'POST', path:'/api/admin/classes', summary:'Create class', auth:true, roles:['Admin'],
+      {
+        method:'POST', path:'/api/admin/teachers', summary:'Create teacher', auth:true, roles:['Admin'],
         params:[],
-        body:{ schema:'{\n  "name": "string",\n  "grade_level": "string",\n  "teacher_id": "uint"\n}' },
-        responses:[{code:'201',desc:'Class created'}]
+        body:{ schema:'{\n  "name": "string",\n  "email": "string",\n  "password": "string (min 8)",\n  "teacher_code": "string",\n  "qualification": "string"\n}' },
+        responses:[{code:'201',desc:'Teacher + user account created'},{code:'409',desc:'Email or teacher code already exists'}]
       },
-      { method:'GET', path:'/api/admin/classes', summary:'List classes', auth:true, roles:['Admin'],
-        params:[], body:null, responses:[{code:'200',desc:'Array of classes'}]
+      {
+        method:'GET', path:'/api/admin/teachers', summary:'List all teachers', auth:true, roles:['Admin'],
+        params:[
+          {name:'page',in:'query',required:false,desc:'Page number (default 1)'},
+          {name:'page_size',in:'query',required:false,desc:'Page size (default 50, max 200)'}
+        ], body:null,
+        responses:[{code:'200',desc:'{ total, data: [...] }'}]
       },
-      { method:'POST', path:'/api/admin/subjects', summary:'Create subject', auth:true, roles:['Admin'],
-        params:[],
-        body:{ schema:'{\n  "name": "string",\n  "code": "string"\n}' },
-        responses:[{code:'201',desc:'Subject created'}]
+      {
+        method:'GET', path:'/api/admin/teachers/:id', summary:'Get teacher by ID', auth:true, roles:['Admin'],
+        params:[{name:'id',in:'path',required:true,desc:'Teacher ID'}], body:null,
+        responses:[{code:'200',desc:'Teacher record'},{code:'404',desc:'Not found'}]
       },
-      { method:'GET', path:'/api/admin/subjects', summary:'List subjects', auth:true, roles:['Admin'],
-        params:[], body:null, responses:[{code:'200',desc:'Array of subjects'}]
+      {
+        method:'PUT', path:'/api/admin/teachers/:id', summary:'Update teacher', auth:true, roles:['Admin'], badge:'fix',
+        fixNote:'FIX: Response now returns the reloaded teacher record. Previously the pre-update data was returned because GORM does not update the struct in place.',
+        params:[{name:'id',in:'path',required:true,desc:'Teacher ID'}],
+        body:{ schema:'{\n  "qualification": "PhD Mathematics"\n}' },
+        responses:[{code:'200',desc:'Teacher updated (reloaded from DB)'},{code:'404',desc:'Not found'}]
       },
-      { method:'POST', path:'/api/admin/enroll', summary:'Enroll student in class', auth:true, roles:['Admin'],
-        params:[],
-        body:{ schema:'{\n  "student_id": "uint",\n  "class_id": "uint",\n  "subject_ids": [1, 2, 3]\n}' },
-        responses:[{code:'200',desc:'Enrolled'}]
+      {
+        method:'DELETE', path:'/api/admin/teachers/:id', summary:'Archive teacher', auth:true, roles:['Admin'],
+        params:[{name:'id',in:'path',required:true,desc:'Teacher ID'}], body:null,
+        responses:[{code:'200',desc:'Teacher archived — use PUT /api/admin/subjects/:id to reassign their subjects'},{code:'404',desc:'Not found'}]
       },
     ]
   },
+
+  // ── CLASSES & SUBJECTS ──────────────────────────────────────────────────────
+  {
+    tag: 'academic-setup', tagLabel: 'Admin — Classes & Subjects', tagDesc: 'Classes, subjects, enrollment',
+    routes: [
+      {
+        method:'POST', path:'/api/admin/classes', summary:'Create class', auth:true, roles:['Admin'],
+        params:[],
+        body:{ schema:'{\n  "name": "Grade 10A",\n  "year": 2025,\n  "teacher_id": 1\n}' },
+        responses:[{code:'201',desc:'Class created'},{code:'400',desc:'Validation error'}]
+      },
+      {
+        method:'GET', path:'/api/admin/classes', summary:'List classes', auth:true, roles:['Admin'],
+        params:[], body:null,
+        responses:[{code:'200',desc:'Array of classes with teacher and students'}]
+      },
+      {
+        method:'PUT', path:'/api/admin/classes/:id', summary:'Update class', auth:true, roles:['Admin'], badge:'new',
+        fixNote:'NEW: Previously classes could only be created or archived — there was no way to change the homeroom teacher or year via the API.',
+        params:[{name:'id',in:'path',required:true,desc:'Class ID'}],
+        body:{ schema:'{\n  "name": "Grade 10B",\n  "year": 2026,\n  "teacher_id": 3\n}' },
+        responses:[{code:'200',desc:'Class updated'},{code:'400',desc:'Teacher not found'},{code:'404',desc:'Class not found'}]
+      },
+      {
+        method:'DELETE', path:'/api/admin/classes/:id', summary:'Archive class', auth:true, roles:['Admin'],
+        params:[{name:'id',in:'path',required:true,desc:'Class ID'}], body:null,
+        responses:[{code:'200',desc:'Archived'},{code:'409',desc:'Active students still assigned'}]
+      },
+      {
+        method:'POST', path:'/api/admin/subjects', summary:'Create subject', auth:true, roles:['Admin'], badge:'fix',
+        fixNote:'FIX: Duplicate code check now happens BEFORE the DB insert. Previously all DB errors (network, disk, etc.) were reported as "subject code already exists" (409).',
+        params:[],
+        body:{ schema:'{\n  "name": "Mathematics",\n  "code": "MATH-101",\n  "teacher_id": 1\n}' },
+        responses:[{code:'201',desc:'Subject created'},{code:'409',desc:'Subject code already exists'},{code:'500',desc:'DB error (other)'}]
+      },
+      {
+        method:'GET', path:'/api/admin/subjects', summary:'List subjects', auth:true, roles:['Admin'],
+        params:[], body:null,
+        responses:[{code:'200',desc:'Array of subjects with assigned teacher'}]
+      },
+      {
+        method:'PUT', path:'/api/admin/subjects/:id', summary:'Update subject', auth:true, roles:['Admin'], badge:'new',
+        fixNote:'NEW: Previously subjects could only be created or archived. This endpoint lets you rename a subject, change its code, or reassign its teacher — critical after archiving a teacher.',
+        params:[{name:'id',in:'path',required:true,desc:'Subject ID'}],
+        body:{ schema:'{\n  "name": "Advanced Mathematics",\n  "code": "MATH-201",\n  "teacher_id": 3\n  // set teacher_id to 0 to unassign\n}' },
+        responses:[{code:'200',desc:'Subject updated'},{code:'400',desc:'Teacher not found or code conflict'},{code:'404',desc:'Subject not found'}]
+      },
+      {
+        method:'DELETE', path:'/api/admin/subjects/:id', summary:'Archive subject', auth:true, roles:['Admin'],
+        params:[{name:'id',in:'path',required:true,desc:'Subject ID'}], body:null,
+        responses:[{code:'200',desc:'Archived'},{code:'409',desc:'Grades or attendance records exist'}]
+      },
+      {
+        method:'POST', path:'/api/admin/enroll', summary:'Enroll student in subject', auth:true, roles:['Admin'],
+        params:[],
+        body:{ schema:'{\n  "student_id": 1,\n  "subject_id": 2\n}' },
+        responses:[{code:'201',desc:'Enrolled'},{code:'409',desc:'Already enrolled'}]
+      },
+      {
+        method:'DELETE', path:'/api/admin/unenroll', summary:'Unenroll student from subject', auth:true, roles:['Admin'], badge:'new',
+        fixNote:'NEW: Previously there was no way to remove an enrollment — only create one. This was blocking subject archival and left stale enrollments for students who changed subjects.',
+        params:[],
+        body:{ schema:'{\n  "student_id": 1,\n  "subject_id": 2\n}' },
+        responses:[{code:'200',desc:'Unenrolled — attendance and grade records preserved'},{code:'404',desc:'Enrollment not found'}]
+      },
+    ]
+  },
+
+  // ── ACADEMICS ───────────────────────────────────────────────────────────────
   {
     tag: 'academics', tagLabel: 'Academics', tagDesc: 'Attendance, grades, report cards',
     routes: [
-      { method:'POST', path:'/api/academics/attendance', summary:'Record attendance', auth:true, roles:['Teacher'],
+      {
+        method:'POST', path:'/api/academics/attendance', summary:'Record attendance (Teacher only)', auth:true, roles:['Teacher'], badge:'fix',
+        fixNote:'FIX #3a: Student must now be enrolled in the subject before attendance can be recorded. Previously a teacher could record attendance for any student in any subject, creating phantom records with no enrollment.',
         params:[],
-        body:{ schema:'{\n  "class_id": "uint",\n  "date": "2025-05-01",\n  "records": [\n    {"student_id": 1, "status": "Present|Absent|Late"}\n  ]\n}' },
-        responses:[{code:'200',desc:'Attendance saved'}]
+        body:{ schema:'{\n  "student_id": 1,\n  "subject_id": 2,\n  "date": "2025-05-01",\n  "status": "Present | Absent | Late",\n  "notes": "optional"\n}' },
+        responses:[{code:'201',desc:'Attendance recorded'},{code:'200',desc:'Same-day attendance updated'},{code:'400',desc:'Student not enrolled in this subject'},{code:'403',desc:'Not assigned to this subject'}]
       },
-      { method:'GET', path:'/api/academics/attendance/class/:classID', summary:'Class attendance list', auth:true, roles:['Teacher'],
-        params:[{name:'classID',in:'path',required:true,desc:'Class ID'}], body:null,
-        responses:[{code:'200',desc:'Attendance records'}]
+      {
+        method:'GET', path:'/api/academics/attendance/class/:classID', summary:'Class attendance for a date', auth:true, roles:['Teacher'],
+        params:[
+          {name:'classID',in:'path',required:true,desc:'Class ID'},
+          {name:'date',in:'query',required:true,desc:'Date in YYYY-MM-DD format'}
+        ], body:null,
+        responses:[{code:'200',desc:'Attendance records for the class'}]
       },
-      { method:'GET', path:'/api/academics/attendance/:studentID', summary:'Student attendance %', auth:true, roles:['Teacher'],
+      {
+        method:'GET', path:'/api/academics/attendance/:studentID', summary:'Student attendance %', auth:true, roles:['Teacher','Student','Admin'],
         params:[{name:'studentID',in:'path',required:true,desc:'Student ID'}], body:null,
-        responses:[{code:'200',desc:'Attendance percentage'}]
+        responses:[{code:'200',desc:'Overall % + per-subject breakdown'},{code:'403',desc:'Students can only view their own'}]
       },
-      { method:'POST', path:'/api/academics/grades/bulk', summary:'Bulk grade entry', auth:true, roles:['Teacher'],
+      {
+        method:'POST', path:'/api/academics/grades/bulk', summary:'Bulk grade entry (Teacher only)', auth:true, roles:['Teacher'], badge:'fix',
+        fixNote:'FIX #2 + #3b: (1) Each student_id in the grades array is now validated to be enrolled in the subject — unenrolled students are rejected with 400. (2) The upsert requires a DB unique constraint on (student_id, subject_id, type, term, academic_year) — run migration.sql before deploying or silent duplicate rows will be created.',
         params:[],
-        body:{ schema:'{\n  "subject_id": "uint",\n  "grades": [\n    {"student_id": 1, "score": 87.5, "term": "Term1"}\n  ]\n}' },
-        responses:[{code:'200',desc:'Grades saved'}]
+        body:{ schema:'{\n  "subject_id": 2,\n  "type": "Midterm | Final | Quiz | Assignment",\n  "term": "Term1 | Term2 | Term3",\n  "academic_year": 2025,\n  "max_score": 100,\n  "grades": [\n    {"student_id": 1, "score": 87.5, "remarks": "optional"}\n  ]\n}' },
+        responses:[{code:'201',desc:'Grades saved (upserted)'},{code:'400',desc:'Student not enrolled in subject'},{code:'403',desc:'Not assigned to this subject'}]
       },
-      { method:'GET', path:'/api/academics/grades/subject/:subjectID', summary:'Grades for a subject', auth:true, roles:['Teacher'],
-        params:[{name:'subjectID',in:'path',required:true,desc:'Subject ID'}], body:null,
+      {
+        method:'GET', path:'/api/academics/grades/subject/:subjectID', summary:'Grades for a subject', auth:true, roles:['Teacher'],
+        params:[
+          {name:'subjectID',in:'path',required:true,desc:'Subject ID'},
+          {name:'type',in:'query',required:false,desc:'Midterm | Final | Quiz | Assignment'},
+          {name:'term',in:'query',required:false,desc:'Term1 | Term2 | Term3'}
+        ], body:null,
         responses:[{code:'200',desc:'Grade list'}]
       },
-      { method:'GET', path:'/api/academics/grades/student/:studentID', summary:"Student's grades", auth:true, roles:['Teacher','Student','Admin'],
-        params:[{name:'studentID',in:'path',required:true,desc:'Student ID'}], body:null,
-        responses:[{code:'200',desc:'Grade records'}]
+      {
+        method:'GET', path:'/api/academics/grades/student/:studentID', summary:"Student's grades", auth:true, roles:['Teacher','Student','Admin'],
+        params:[
+          {name:'studentID',in:'path',required:true,desc:'Student ID'},
+          {name:'term',in:'query',required:false,desc:'Term1 | Term2 | Term3'},
+          {name:'year',in:'query',required:false,desc:'Academic year e.g. 2025'}
+        ], body:null,
+        responses:[{code:'200',desc:'Grade records'},{code:'403',desc:'Students can only view their own'}]
       },
-      { method:'GET', path:'/api/academics/reportcard/:studentID', summary:'Get report card', auth:true, roles:['Teacher','Student','Admin'],
-        params:[{name:'studentID',in:'path',required:true,desc:'Student ID'}], body:null,
-        responses:[{code:'200',desc:'Report card JSON'}]
+      {
+        method:'GET', path:'/api/academics/reportcard/:studentID', summary:'Get report card (JSON)', auth:true, roles:['Teacher','Student','Admin'], badge:'fix',
+        fixNote:'FIX: academic_year is now required (defaults to current year if omitted). Previously the query had no year filter, producing meaningless cross-year averages for returning students.',
+        params:[
+          {name:'studentID',in:'path',required:true,desc:'Student ID'},
+          {name:'academic_year',in:'query',required:false,desc:'e.g. 2025 (defaults to current year)'},
+          {name:'term',in:'query',required:false,desc:'Term1 | Term2 | Term3 (omit for full-year average)'}
+        ], body:null,
+        responses:[{code:'200',desc:'Per-subject averages, letter grades, student info'}]
       },
-      { method:'GET', path:'/api/academics/reportcard/:studentID/pdf', summary:'Download report card PDF', auth:true, roles:['Teacher','Student','Admin'],
-        params:[{name:'studentID',in:'path',required:true,desc:'Student ID'}], body:null,
+      {
+        method:'GET', path:'/api/academics/reportcard/:studentID/pdf', summary:'Download report card PDF', auth:true, roles:['Teacher','Student','Admin'], badge:'fix',
+        fixNote:'FIX: Accepts same academic_year and term filters as the JSON endpoint.',
+        params:[
+          {name:'studentID',in:'path',required:true,desc:'Student ID'},
+          {name:'academic_year',in:'query',required:false,desc:'e.g. 2025 (defaults to current year)'},
+          {name:'term',in:'query',required:false,desc:'Term1 | Term2 | Term3'}
+        ], body:null,
         responses:[{code:'200',desc:'PDF file download'}]
       },
-      { method:'GET', path:'/api/admin/attendance/summary', summary:'Attendance summary dashboard', auth:true, roles:['Admin'],
+      {
+        method:'GET', path:'/api/admin/attendance/summary', summary:'School-wide attendance summary (Admin only)', auth:true, roles:['Admin'], badge:'fix',
+        fixNote:'FIX #5: SQL now uses NULLIF(COUNT, 0) and HAVING COUNT > 0 to prevent a database division-by-zero error for students who have no attendance records.',
         params:[], body:null,
-        responses:[{code:'200',desc:'School-wide attendance stats'}]
+        responses:[{code:'200',desc:'Per-student attendance % ranked ascending (only students with ≥1 record)'}]
       },
     ]
   },
+
+  // ── FINANCE ─────────────────────────────────────────────────────────────────
   {
-    tag: 'finance', tagLabel: 'Finance', tagDesc: 'Payments, receipts, payroll',
+    tag: 'finance', tagLabel: 'Finance', tagDesc: 'Receipts, transactions, payroll',
     routes: [
-      { method:'POST', path:'/api/finance/receipt', summary:'Submit bank receipt', auth:true, roles:['Student','Parent'],
+      {
+        method:'POST', path:'/api/finance/receipt', summary:'Submit bank receipt', auth:true, roles:['Student'],
         params:[],
-        body:{ schema:'{\n  "amount": 1000.00,\n  "bank_ref": "string",\n  "receipt_url": "string (optional)"\n}' },
-        responses:[{code:'201',desc:'Receipt submitted'}]
+        body:{ schema:'{\n  "student_id": 1,\n  "amount": 5000.00,\n  "receipt_id": "CBE-TXN-20250501-001",\n  "description": "Term 1 tuition fee"\n}' },
+        responses:[{code:'201',desc:'Receipt submitted (Pending)'},{code:'409',desc:'Receipt ID already submitted'}]
       },
-      { method:'GET', path:'/api/finance/transactions', summary:'List transactions', auth:true, roles:['Student','Admin','Parent'],
-        params:[], body:null, responses:[{code:'200',desc:'Transaction list'}]
-      },
-      { method:'PATCH', path:'/api/admin/finance/receipt/:id/verify', summary:'Verify bank receipt', auth:true, roles:['Admin'],
-        params:[{name:'id',in:'path',required:true,desc:'Transaction ID'}], body:null,
-        responses:[{code:'200',desc:'Receipt verified'}]
-      },
-      { method:'POST', path:'/api/admin/finance/payroll', summary:'Create payroll entry', auth:true, roles:['Admin'],
+      {
+        method:'POST', path:'/api/parent/finance/receipt', summary:'Submit bank receipt (Parent)', auth:true, roles:['Parent'],
         params:[],
-        body:{ schema:'{\n  "teacher_id": "uint",\n  "amount": 5000.00,\n  "month": "2025-05"\n}' },
-        responses:[{code:'201',desc:'Payroll created'}]
+        body:{ schema:'{\n  "student_id": 1,\n  "amount": 5000.00,\n  "receipt_id": "CBE-TXN-20250501-002",\n  "description": "Term 1 tuition fee"\n}' },
+        responses:[{code:'201',desc:'Receipt submitted'},{code:'403',desc:'Student not linked to this parent account'}]
       },
-      { method:'PATCH', path:'/api/admin/finance/payroll/:id/pay', summary:'Mark payroll as paid', auth:true, roles:['Admin'],
+      {
+        method:'GET', path:'/api/finance/transactions', summary:'My transactions (Student)', auth:true, roles:['Student'],
+        params:[
+          {name:'page',in:'query',required:false,desc:'Page number'},
+          {name:'page_size',in:'query',required:false,desc:'Page size'}
+        ], body:null,
+        responses:[{code:'200',desc:'Own transaction list'}]
+      },
+      {
+        method:'GET', path:'/api/parent/finance/transactions', summary:'My transactions (Parent)', auth:true, roles:['Parent'],
+        params:[], body:null,
+        responses:[{code:'200',desc:'Transactions for all linked children'}]
+      },
+      {
+        method:'PATCH', path:'/api/admin/finance/receipt/:id/verify', summary:'Verify or reject receipt', auth:true, roles:['Admin'], badge:'fix',
+        fixNote:'FIX #6: Admin note is now only appended to the description when remarks is non-empty. Previously submitting with an empty remarks still polluted the description with " | Admin note: ".',
+        params:[{name:'id',in:'path',required:true,desc:'Transaction ID'}],
+        body:{ schema:'{\n  "status": "Verified | Rejected",\n  "remarks": "Confirmed with bank (optional)"\n}' },
+        responses:[{code:'200',desc:'Receipt processed'},{code:'400',desc:'Already processed'}]
+      },
+      {
+        method:'POST', path:'/api/admin/finance/payroll', summary:'Create payroll entry', auth:true, roles:['Admin'], badge:'fix',
+        fixNote:'FIX: Year field now validated with min=2000. Previously a year of 0 or 1 was silently accepted.',
+        params:[],
+        body:{ schema:'{\n  "teacher_id": 2,\n  "amount": 15000.00,\n  "month": 5,\n  "year": 2025\n}' },
+        responses:[{code:'201',desc:'Payroll created'},{code:'400',desc:'Validation error (including invalid year < 2000)'},{code:'409',desc:'Payroll already exists for this teacher/month/year'}]
+      },
+      {
+        method:'PATCH', path:'/api/admin/finance/payroll/:id/pay', summary:'Mark payroll as paid', auth:true, roles:['Admin'],
         params:[{name:'id',in:'path',required:true,desc:'Payroll ID'}], body:null,
-        responses:[{code:'200',desc:'Marked paid'}]
+        responses:[{code:'200',desc:'Marked paid'},{code:'400',desc:'Already paid'}]
       },
-      { method:'GET', path:'/api/admin/finance/summary', summary:'Finance summary', auth:true, roles:['Admin'],
-        params:[], body:null, responses:[{code:'200',desc:'Financial overview'}]
+      {
+        method:'GET', path:'/api/admin/finance/summary', summary:'All transactions (Admin)', auth:true, roles:['Admin'],
+        params:[
+          {name:'page',in:'query',required:false,desc:'Page number'},
+          {name:'page_size',in:'query',required:false,desc:'Page size'}
+        ], body:null,
+        responses:[{code:'200',desc:'All transactions across the school'}]
       },
     ]
   },
+
+  // ── LOCKER ──────────────────────────────────────────────────────────────────
   {
     tag: 'locker', tagLabel: 'Digital Locker', tagDesc: 'File storage per student',
     routes: [
-      { method:'POST', path:'/api/locker/upload', summary:'Upload file to locker', auth:true, roles:['Student','Teacher','Admin'],
-        params:[{name:'file',in:'formData',required:true,desc:'File (multipart)'},{name:'category',in:'formData',required:true,desc:'Certificate | Assignment | Portfolio | Material'}],
-        body:null, responses:[{code:'201',desc:'File uploaded'}]
+      {
+        method:'POST', path:'/api/locker/upload', summary:'Upload file (Student only)', auth:true, roles:['Student'], badge:'fix',
+        fixNote:'FIX #14: File validation checks both extension AND actual file content (MIME sniffing on first 512 bytes). A malicious file renamed to .pdf is rejected. FIX #15: Upload directory is now configurable via UPLOAD_DIR env variable so the server works correctly in Docker or when started from any working directory.',
+        params:[
+          {name:'file',in:'formData',required:true,desc:'File (multipart, max 5 MB) — allowed: pdf, jpg, jpeg, png, doc, docx, txt'},
+          {name:'category',in:'formData',required:false,desc:'Certificate | Assignment | Portfolio | Material'}
+        ], body:null,
+        responses:[{code:'201',desc:'File uploaded'},{code:'400',desc:'File too large, invalid extension, or MIME type mismatch'}]
       },
-      { method:'GET', path:'/api/locker/student/:studentID', summary:'List locker files', auth:true, roles:['Student','Teacher','Admin'],
+      {
+        method:'GET', path:'/api/locker/my-files', summary:'List my locker files (Student)', auth:true, roles:['Student'],
+        params:[], body:null,
+        responses:[{code:'200',desc:'All files (public and private) in own locker'}]
+      },
+      {
+        method:'GET', path:'/api/locker/student/:studentID/public', summary:"Student's public files (Teacher)", auth:true, roles:['Teacher'],
         params:[{name:'studentID',in:'path',required:true,desc:'Student ID'}], body:null,
-        responses:[{code:'200',desc:'File list'}]
+        responses:[{code:'200',desc:'Public files only'}]
       },
-      { method:'DELETE', path:'/api/locker/files/:fileID', summary:'Delete locker file', auth:true, roles:['Student','Teacher','Admin'],
+      {
+        method:'GET', path:'/api/admin/locker/student/:studentID', summary:'All locker files for student (Admin)', auth:true, roles:['Admin'],
+        params:[{name:'studentID',in:'path',required:true,desc:'Student ID'}], body:null,
+        responses:[{code:'200',desc:'All files — public and private'}]
+      },
+      {
+        method:'DELETE', path:'/api/locker/files/:fileID', summary:'Delete locker file (Student)', auth:true, roles:['Student'],
         params:[{name:'fileID',in:'path',required:true,desc:'File ID'}], body:null,
-        responses:[{code:'200',desc:'Deleted'}]
+        responses:[{code:'200',desc:'Deleted from disk and DB'},{code:'403',desc:'Must own the file'}]
       },
-      { method:'PATCH', path:'/api/locker/files/:fileID/visibility', summary:'Toggle file visibility', auth:true, roles:['Student','Teacher','Admin'],
-        params:[{name:'fileID',in:'path',required:true,desc:'File ID'}],
-        body:{ schema:'{\n  "public": true\n}' },
-        responses:[{code:'200',desc:'Visibility updated'}]
-      },
-    ]
-  },
-  {
-    tag: 'notifications', tagLabel: 'Notifications', tagDesc: 'Broadcasts and parent alerts',
-    routes: [
-      { method:'POST', path:'/api/admin/notify/broadcast', summary:'Broadcast announcement', auth:true, roles:['Admin'],
-        params:[],
-        body:{ schema:'{\n  "title": "string",\n  "message": "string",\n  "roles": ["Student","Teacher","Parent"]\n}' },
-        responses:[{code:'200',desc:'Broadcast sent'}]
-      },
-      { method:'POST', path:'/api/admin/notify/absences', summary:'Notify parents of absent students', auth:true, roles:['Admin'],
-        params:[],
-        body:{ schema:'{\n  "date": "2025-05-01"\n}' },
-        responses:[{code:'200',desc:'Emails sent to parents'}]
+      {
+        method:'PATCH', path:'/api/locker/files/:fileID/visibility', summary:'Toggle file visibility (Student)', auth:true, roles:['Student'],
+        params:[{name:'fileID',in:'path',required:true,desc:'File ID'}], body:null,
+        responses:[{code:'200',desc:'is_public toggled — teachers can see public files'},{code:'403',desc:'Must own the file'}]
       },
     ]
   },
+
+  // ── NOTIFICATIONS ────────────────────────────────────────────────────────────
   {
-    tag: 'parent', tagLabel: 'Parent Portal', tagDesc: 'View children, attendance, grades',
+    tag: 'notifications', tagLabel: 'Notifications', tagDesc: 'Broadcasts, inbox, SSE stream, absence alerts',
     routes: [
-      { method:'GET', path:'/api/parent/children', summary:'My linked children', auth:true, roles:['Parent'],
-        params:[], body:null, responses:[{code:'200',desc:'List of children'}]
+      {
+        method:'POST', path:'/api/admin/notify/broadcast', summary:'Broadcast announcement (Admin)', auth:true, roles:['Admin'],
+        params:[],
+        body:{ schema:'{\n  "title": "string (min 5 chars)",\n  "body": "string (min 10 chars)",\n  "roles": ["Student","Teacher","Parent"]\n  // omit roles to broadcast to everyone\n}' },
+        responses:[{code:'200',desc:'Saved to DB, receipts created, SSE pushed, emails sent'},{code:'400',desc:'Validation error or invalid role name'}]
       },
-      { method:'GET', path:'/api/parent/attendance/:studentID', summary:"Child's attendance", auth:true, roles:['Parent'],
-        params:[{name:'studentID',in:'path',required:true,desc:'Child student ID'}], body:null,
-        responses:[{code:'200',desc:'Attendance percentage'}]
+      {
+        method:'POST', path:'/api/admin/notify/absences', summary:'Notify parents of absences (Admin)', auth:true, roles:['Admin'], badge:'fix',
+        fixNote:'FIX #4: Parents with multiple absent children now receive correct per-child emails. Previously the bundle only stored the last child\'s name — if two children were absent, only one child appeared in the email. Now each child is tracked separately per parent.',
+        params:[],
+        body:{ schema:'{\n  "date": "2025-05-01"\n  // omit date to default to today\n}' },
+        responses:[{code:'200',desc:'{ emails_sent: N, date: "..." }'}]
       },
-      { method:'GET', path:'/api/parent/grades/:studentID', summary:"Child's grades", auth:true, roles:['Parent'],
-        params:[{name:'studentID',in:'path',required:true,desc:'Child student ID'}], body:null,
-        responses:[{code:'200',desc:'Grade list'}]
+      {
+        method:'GET', path:'/api/notifications', summary:'Get my notifications', auth:true, roles:['All'],
+        params:[], body:null,
+        responses:[{code:'200',desc:'Notification list with receipt_id, is_read, read_at — most recent first'}]
       },
-      { method:'GET', path:'/api/parent/reportcard/:studentID', summary:"Child's report card", auth:true, roles:['Parent'],
-        params:[{name:'studentID',in:'path',required:true,desc:'Child student ID'}], body:null,
-        responses:[{code:'200',desc:'Report card'}]
+      {
+        method:'PATCH', path:'/api/notifications/:id/read', summary:'Mark notification as read', auth:true, roles:['All'],
+        params:[{name:'id',in:'path',required:true,desc:'Receipt ID (from GET /api/notifications)'}], body:null,
+        responses:[{code:'200',desc:'Marked as read'},{code:'403',desc:'Not your notification'},{code:'404',desc:'Receipt not found'}]
       },
-      { method:'GET', path:'/api/parent/reportcard/:studentID/pdf', summary:'Download report card PDF', auth:true, roles:['Parent'],
+      {
+        method:'GET', path:'/api/notifications/stream', summary:'SSE live notification stream', auth:false, roles:['All'], badge:'fix',
+        fixNote:'FIX #8: Stream is now outside the auth group — protected ONLY by SSEAuthMiddleware. Previously it was inside the auth group, so the connection was dropped when the access JWT expired even with a valid sse_token. Now: call POST /api/notifications/sse-token → connect here with ?sse_token=. The full JWT must never appear in a URL.',
+        params:[{name:'sse_token',in:'query',required:true,desc:'60-second SSE token from POST /api/notifications/sse-token'}], body:null,
+        responses:[{code:'200',desc:'text/event-stream — event: notification, data: JSON'},{code:'401',desc:'Invalid or expired SSE token'}]
+      },
+    ]
+  },
+
+  // ── PARENT ──────────────────────────────────────────────────────────────────
+  {
+    tag: 'parent', tagLabel: 'Parent Portal', tagDesc: 'View children, attendance, grades, report cards',
+    routes: [
+      {
+        method:'GET', path:'/api/parent/children', summary:'My linked children', auth:true, roles:['Parent'],
+        params:[], body:null,
+        responses:[{code:'200',desc:'List of children with class info'}]
+      },
+      {
+        method:'GET', path:'/api/parent/attendance/:studentID', summary:"Child's attendance", auth:true, roles:['Parent'],
         params:[{name:'studentID',in:'path',required:true,desc:'Child student ID'}], body:null,
+        responses:[{code:'200',desc:'Attendance % + per-subject breakdown'},{code:'403',desc:'Student not linked to this parent'}]
+      },
+      {
+        method:'GET', path:'/api/parent/grades/:studentID', summary:"Child's grades", auth:true, roles:['Parent'],
+        params:[
+          {name:'studentID',in:'path',required:true,desc:'Child student ID'},
+          {name:'term',in:'query',required:false,desc:'Term1 | Term2 | Term3'},
+          {name:'year',in:'query',required:false,desc:'e.g. 2025'}
+        ], body:null,
+        responses:[{code:'200',desc:'Grade records'},{code:'403',desc:'Student not linked to this parent'}]
+      },
+      {
+        method:'GET', path:'/api/parent/reportcard/:studentID', summary:"Child's report card", auth:true, roles:['Parent'],
+        params:[
+          {name:'studentID',in:'path',required:true,desc:'Child student ID'},
+          {name:'academic_year',in:'query',required:false,desc:'e.g. 2025'},
+          {name:'term',in:'query',required:false,desc:'Term1 | Term2 | Term3'}
+        ], body:null,
+        responses:[{code:'200',desc:'Report card JSON'}]
+      },
+      {
+        method:'GET', path:'/api/parent/reportcard/:studentID/pdf', summary:"Download child's report card PDF", auth:true, roles:['Parent'],
+        params:[
+          {name:'studentID',in:'path',required:true,desc:'Child student ID'},
+          {name:'academic_year',in:'query',required:false,desc:'e.g. 2025'},
+          {name:'term',in:'query',required:false,desc:'Term1 | Term2 | Term3'}
+        ], body:null,
         responses:[{code:'200',desc:'PDF download'}]
-      },
-      { method:'POST', path:'/api/parent/finance/receipt', summary:'Submit payment receipt', auth:true, roles:['Parent'],
-        params:[],
-        body:{ schema:'{\n  "amount": 1000.00,\n  "bank_ref": "string"\n}' },
-        responses:[{code:'201',desc:'Receipt submitted'}]
-      },
-      { method:'GET', path:'/api/parent/finance/transactions', summary:'Payment history', auth:true, roles:['Parent'],
-        params:[], body:null, responses:[{code:'200',desc:'Transaction list'}]
       },
     ]
   },
@@ -406,7 +657,9 @@ function buildUI() {
 
 function buildEndpoint(r, si, ri) {
   const id = `ep-${si}-${ri}`;
-  const roleHtml = r.roles.map(role => `<span class="role-badge">${role}</span>`).join(' ');
+  const roleHtml = r.roles.filter(x=>x!=='All').map(role => `<span class="role-badge">${role}</span>`).join(' ');
+  const badgeHtml = r.badge === 'new' ? '<span class="new-badge">NEW</span>' : r.badge === 'fix' ? '<span class="fix-badge">FIX</span>' : '';
+
   const paramRows = (r.params||[]).map(p => `
     <tr>
       <td><span class="param-name">${p.name}</span>${p.required ? '<span class="required-star">*</span>':''}</td>
@@ -428,6 +681,8 @@ function buildEndpoint(r, si, ri) {
     <pre class="schema">${r.body.schema}</pre>
   ` : '';
 
+  const fixNoteHtml = r.fixNote ? `<div class="fix-note">${r.fixNote}</div>` : '';
+
   const responseRows = (r.responses||[]).map(res => `
     <div class="response-row">
       <span class="status-code ${res.code.startsWith('2') ? 'status-2xx':'status-4xx'}">${res.code}</span>
@@ -443,10 +698,12 @@ function buildEndpoint(r, si, ri) {
         <span class="method ${METHOD_COLORS[r.method]||'get'}">${r.method}</span>
         <span class="path">${r.path}</span>
         <span class="summary">${r.summary}</span>
+        ${badgeHtml}
         ${r.auth ? `<span class="lock-icon" title="Requires authentication">🔒</span>` : ''}
         ${roleHtml}
       </div>
       <div class="endpoint-body">
+        ${fixNoteHtml}
         ${paramsSection}
         ${bodySection}
         <div class="section-label">Responses</div>
@@ -471,21 +728,17 @@ function buildTryFields(r, id) {
     fields += `<div class="try-field"><label>${p.name} (${p.in})${p.required?' *':''}</label><input type="text" id="${id}-param-${p.name}" placeholder="${p.desc}" /></div>`;
   });
   if (r.body) {
-    fields += `<div class="try-field"><label>Request body</label><textarea id="${id}-body">${r.body.schema}</textarea></div>`;
+    fields += `<div class="try-field"><label>Request body</label><textarea id="${id}-body">${r.body.schema.replace(/\/\/.*/g,'').trim()}</textarea></div>`;
   }
   return fields || '<p style="font-size:13px;color:var(--text2)">No parameters required.</p>';
 }
 
 function toggleSection(si) {
-  const sections = document.querySelectorAll('.tag-section');
-  sections[si].classList.toggle('open');
+  document.querySelectorAll('.tag-section')[si].classList.toggle('open');
 }
-
 function toggleEndpoint(id) {
-  const el = document.getElementById(id);
-  el.classList.toggle('open');
+  document.getElementById(id).classList.toggle('open');
 }
-
 function toggleTry(id) {
   document.getElementById(id).classList.toggle('open');
 }
@@ -502,26 +755,31 @@ async function execute(id, method, pathTemplate, needsAuth) {
 
   let url = BASE + pathTemplate;
   const inputs = document.querySelectorAll(`[id^="${id}-param-"]`);
+  const queryParams = [];
   inputs.forEach(inp => {
     const paramName = inp.id.replace(`${id}-param-`, '');
-    const encoded = encodeURIComponent(inp.value || paramName);
-    // FIX: Handle both OpenAPI {param} style and Gin :param style
-    url = url.replace(`{${paramName}}`, encoded);
-    url = url.replace(`:${paramName}`, encoded);
+    const val = inp.value.trim();
+    if (!val) return;
+    const encoded = encodeURIComponent(val);
+    const before = url;
+    url = url.replace(`{${paramName}}`, encoded).replace(`:${paramName}`, encoded);
+    if (url === before) queryParams.push(`${paramName}=${encoded}`);
   });
+  if (queryParams.length) url += '?' + queryParams.join('&');
 
   const bodyEl = document.getElementById(id + '-body');
   const headers = { 'Content-Type': 'application/json' };
   if (needsAuth && jwtToken) headers['Authorization'] = 'Bearer ' + jwtToken;
 
   let body = undefined;
-  if (bodyEl && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
-    try { JSON.parse(bodyEl.value); body = bodyEl.value; }
+  if (bodyEl && ['POST','PUT','PATCH','DELETE'].includes(method)) {
+    const raw = bodyEl.value.replace(/\/\/.*/g,'').trim();
+    try { JSON.parse(raw); body = raw; }
     catch(e) { respEl.textContent = '⚠ Invalid JSON in request body.'; return; }
   }
 
   try {
-    const res = await fetch(url, { method, headers, body });
+    const res = await fetch(url, { method, headers, body, credentials: 'include' });
     const text = await res.text();
     let pretty;
     try { pretty = JSON.stringify(JSON.parse(text), null, 2); } catch { pretty = text; }

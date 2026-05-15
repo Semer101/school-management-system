@@ -23,12 +23,6 @@ func RoleMiddleware(allowedRoles ...string) gin.HandlerFunc {
 			return
 		}
 
-		// Admin always bypasses role checks — full system access
-		if userRole == models.RoleAdmin {
-			c.Next()
-			return
-		}
-
 		// Check if user's role is in the allowed list
 		for _, role := range allowedRoles {
 			if userRole == role {
