@@ -1402,12 +1402,12 @@ func GetSubjectGrades(c *gin.Context) {
 	role, _ := c.Get("role")
 
 	// Only enforce for teachers
-	if role == "teacher" {
+	if role == models.RoleTeacher {
 		var count int64
 
-		// Check if this teacher is assigned to the subject
-		err := config.DB.Table("teacher_subjects").
-			Where("teacher_id = ? AND subject_id = ?", userID, subjectID).
+		// Verify the teacher owns this subject
+		err := config.DB.Model(&models.Subject{}).
+			Where("id = ? AND teacher_id = ?", subjectID, userID).
 			Count(&count).Error
 
 		if err != nil {
@@ -1428,12 +1428,17 @@ func GetSubjectGrades(c *gin.Context) {
 	if gradeType != "" {
 		query = query.Where("type = ?", gradeType)
 	}
+
 	if term != "" {
 		query = query.Where("term = ?", term)
 	}
 
 	var grades []models.Grade
-	query.Find(&grades)
+
+	if err := query.Find(&grades).Error; err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "failed to fetch grades")
+		return
+	}
 
 	helpers.Success(c, http.StatusOK, "subject grades", grades)
 }
@@ -1672,11 +1677,17 @@ func GetMyChildren(c *gin.Context) {
 	parentUserID := c.GetUint("userID")
 
 	var students []models.Student
-	config.DB.
+
+	err := config.DB.
 		Preload("User").
 		Preload("Class").
 		Where("parent_id = ?", parentUserID).
-		Find(&students)
+		Find(&students).Error
+
+	if err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "failed to fetch children")
+		return
+	}
 
 	helpers.Success(c, http.StatusOK, "children fetched", students)
 }
