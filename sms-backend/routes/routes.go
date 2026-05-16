@@ -21,7 +21,7 @@ func SetupRoutes(r *gin.Engine) {
 	r.Use(gin.Recovery())
 
 	// ── Swagger UI ────────────────────────────────────
-	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, ginSwagger.URL("/swagger/doc.json")))
 	r.StaticFile("/docs", "./static/swagger-ui.html")
 
 	// ── Static pages ──────────────────────────────────
