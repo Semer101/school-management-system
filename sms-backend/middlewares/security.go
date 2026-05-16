@@ -21,40 +21,39 @@ import (
 // These headers tell browsers how to protect users from common attacks
 func SecurityHeaders() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Prevent clickjacking
 		c.Header("X-Frame-Options", "DENY")
-
-		// Prevent MIME sniffing
 		c.Header("X-Content-Type-Options", "nosniff")
+		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
 
-		// Enable HSTS in production
 		if os.Getenv("ENV") == "production" {
 			c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		}
 
-		// Referrer policy
-		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
-
-		// CSP connect-src from env
-		connectSrc := os.Getenv("CSP_CONNECT_SRC")
-
-		if connectSrc == "" {
-			connectSrc = "'self'"
+		// Swagger UI needs looser CSP — it loads assets from unpkg/jsdelivr
+		if strings.HasPrefix(c.Request.URL.Path, "/swagger") {
+			c.Header("Content-Security-Policy",
+				"default-src 'self'; "+
+					"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdn.jsdelivr.net; "+
+					"style-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net; "+
+					"img-src 'self' data:; "+
+					"connect-src 'self'",
+			)
+		} else {
+			connectSrc := os.Getenv("CSP_CONNECT_SRC")
+			if connectSrc == "" {
+				connectSrc = "'self'"
+			}
+			csp := fmt.Sprintf(
+				"default-src 'self'; "+
+					"script-src 'self' 'unsafe-inline'; "+
+					"style-src 'self' 'unsafe-inline'; "+
+					"connect-src %s",
+				connectSrc,
+			)
+			c.Header("Content-Security-Policy", csp)
 		}
 
-		csp := fmt.Sprintf(
-			"default-src 'self'; "+
-				"script-src 'self' 'unsafe-inline'; "+
-				"style-src 'self' 'unsafe-inline'; "+
-				"connect-src %s",
-			connectSrc,
-		)
-
-		c.Header("Content-Security-Policy", csp)
-
-		// Hide server info
 		c.Writer.Header().Del("X-Powered-By")
-
 		c.Next()
 	}
 }
@@ -75,6 +74,7 @@ func CORSMiddleware() gin.HandlerFunc {
 			"http://localhost:5173",
 			"http://localhost:8080",
 			"http://127.0.0.1:5500",
+			"https://school-management-system-70z3.onrender.com",
 		}
 	}
 
