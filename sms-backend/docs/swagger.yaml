@@ -742,11 +742,20 @@ paths:
       - attendance
   /api/admin/classes:
     get:
+      parameters:
+      - description: Page number (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Page size (default 50, max 200)
+        in: query
+        name: page_size
+        type: integer
       produces:
       - application/json
       responses:
         "200":
-          description: List of classes
+          description: Paginated list of classes
           schema:
             $ref: '#/definitions/helpers.APIResponse'
       security:
@@ -1338,11 +1347,20 @@ paths:
       - students
   /api/admin/subjects:
     get:
+      parameters:
+      - description: Page number (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Page size (default 50, max 200)
+        in: query
+        name: page_size
+        type: integer
       produces:
       - application/json
       responses:
         "200":
-          description: List of subjects
+          description: Paginated list of subjects
           schema:
             $ref: '#/definitions/helpers.APIResponse'
       security:

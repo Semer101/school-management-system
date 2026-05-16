@@ -473,9 +473,23 @@
                     "classes"
                 ],
                 "summary": "List all classes (Admin only)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page number (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (default 50, max 200)",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
-                        "description": "List of classes",
+                        "description": "Paginated list of classes",
                         "schema": {
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
@@ -1388,9 +1402,23 @@
                     "subjects"
                 ],
                 "summary": "List all subjects (Admin only)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page number (default 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (default 50, max 200)",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
-                        "description": "List of subjects",
+                        "description": "Paginated list of subjects",
                         "schema": {
                             "$ref": "#/definitions/helpers.APIResponse"
                         }
