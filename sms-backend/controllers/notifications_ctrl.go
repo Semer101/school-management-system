@@ -43,12 +43,19 @@ func (h *sseHub) register(c *sseClient) {
 	h.clients[c.userID] = c
 }
 
-func (h *sseHub) unregister(userID uint) {
+// FIX #2: unregister now accepts the client pointer and only removes/closes the
+// entry if it still points to THIS client instance.
+// The previous version accepted only a userID, so when a user reconnected:
+//  1. register() closed the old client's channel (correct).
+//  2. The old goroutine exited and its deferred unregister(userID) ran.
+//  3. unregister found the *new* client in the map, closed its channel, and
+//     deleted it — silently killing the brand-new SSE stream.
+func (h *sseHub) unregister(c *sseClient) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if c, ok := h.clients[userID]; ok {
-		close(c.ch)
-		delete(h.clients, userID)
+	if current, ok := h.clients[c.userID]; ok && current == c {
+		close(current.ch)
+		delete(h.clients, c.userID)
 	}
 }
 
@@ -111,7 +118,7 @@ func StreamNotifications(c *gin.Context) {
 		ch:     make(chan string, 16),
 	}
 	hub.register(client)
-	defer hub.unregister(userID)
+	defer hub.unregister(client) // FIX #2: pass pointer so only THIS client is removed
 
 	c.Writer.Header().Set("Content-Type", "text/event-stream")
 	c.Writer.Header().Set("Cache-Control", "no-cache")
@@ -409,7 +416,7 @@ func NotifyParentsAbsentStudents(c *gin.Context) {
 			u.name AS student_name,
 			COALESCE(NULLIF(pu.email, ''), NULLIF(st.parent_email, '')) AS parent_email,
 			s.name AS subject_name,
-			a.date::date::text AS date
+			TO_CHAR(a.date, 'YYYY-MM-DD') AS date
 		FROM attendances a
 		JOIN students st ON a.student_id = st.id
 		JOIN users u ON st.user_id = u.id

@@ -139,16 +139,21 @@ func SetupRoutes(r *gin.Engine) {
 		{
 			teacher.POST("/attendance", controllers.RecordAttendance)
 			teacher.GET("/attendance/class/:classID", controllers.GetClassAttendance)
-			teacher.GET("/attendance/:studentID", controllers.GetAttendancePercentage)
 
 			teacher.POST("/grades/bulk", controllers.BulkGradeEntry)
 			teacher.GET("/grades/subject/:subjectID", controllers.GetSubjectGrades)
 		}
 
 		// Shared academic reads — Teacher + Student + Admin
+		// FIX #5: GetAttendancePercentage is now here (Teacher + Student + Admin) instead of
+		// the Teacher-only group above.  The handler already contains an internal self-ownership
+		// guard for the Student role, so students are correctly restricted to their own data.
+		// Previously the handler was Teacher-only, making the Student guard permanently dead code.
+		// Registering the same path in a separate Student group caused a Gin route conflict panic.
 		shared := auth.Group("/academics")
 		shared.Use(middlewares.RoleMiddleware(models.RoleTeacher, models.RoleStudent, models.RoleAdmin))
 		{
+			shared.GET("/attendance/:studentID", controllers.GetAttendancePercentage)
 			shared.GET("/grades/student/:studentID", controllers.GetStudentGrades)
 			shared.GET("/reportcard/:studentID", controllers.GetReportCard)
 			shared.GET("/reportcard/:studentID/pdf", controllers.DownloadReportCard)

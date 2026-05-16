@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"fmt"
+	"mime"
 	"net/http"
 	"strconv"
 	"strings"
@@ -496,8 +497,12 @@ func GetTeachers(c *gin.Context) {
 	var teachers []models.Teacher
 	var total int64
 
-	config.DB.Model(&models.Teacher{}).Count(&total)
-	if err := config.DB.Preload("User").Offset(offset).Limit(limit).Find(&teachers).Error; err != nil {
+	// FIX #6: use a single shared query base for both Count and Find so that
+	// the same GORM scoping (soft-delete filter, etc.) applies to both calls —
+	// same pattern as the FIX #1 applied to GetStudents.
+	db := config.DB.Model(&models.Teacher{})
+	db.Count(&total)
+	if err := db.Preload("User").Offset(offset).Limit(limit).Find(&teachers).Error; err != nil {
 		helpers.Error(c, http.StatusInternalServerError, "failed to fetch teachers")
 		return
 	}
@@ -628,12 +633,25 @@ func CreateClass(c *gin.Context) {
 // @Tags         classes
 // @Security     BearerAuth
 // @Produce      json
-// @Success      200  {object}  helpers.APIResponse  "List of classes"
+// @Param        page       query  int  false  "Page number (default 1)"
+// @Param        page_size  query  int  false  "Page size (default 50, max 200)"
+// @Success      200  {object}  helpers.APIResponse  "Paginated list of classes"
 // @Router       /api/admin/classes [get]
 func GetClasses(c *gin.Context) {
+	offset, limit := parsePage(c)
 	var classes []models.Class
-	config.DB.Preload("Teacher").Preload("Students").Find(&classes)
-	helpers.Success(c, http.StatusOK, "classes fetched", classes)
+	var total int64
+
+	// FIX #8: apply pagination — GetClasses was the only list endpoint that returned
+	// all rows unbounded. Large schools with hundreds of classes would get a slow,
+	// oversized response.
+	db := config.DB.Model(&models.Class{})
+	db.Count(&total)
+	if err := db.Preload("Teacher").Preload("Students").Offset(offset).Limit(limit).Find(&classes).Error; err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "failed to fetch classes")
+		return
+	}
+	helpers.Success(c, http.StatusOK, "classes fetched", gin.H{"total": total, "data": classes})
 }
 
 // UpdateClass godoc
@@ -774,12 +792,23 @@ func CreateSubject(c *gin.Context) {
 // @Tags         subjects
 // @Security     BearerAuth
 // @Produce      json
-// @Success      200  {object}  helpers.APIResponse  "List of subjects"
+// @Param        page       query  int  false  "Page number (default 1)"
+// @Param        page_size  query  int  false  "Page size (default 50, max 200)"
+// @Success      200  {object}  helpers.APIResponse  "Paginated list of subjects"
 // @Router       /api/admin/subjects [get]
 func GetSubjects(c *gin.Context) {
+	offset, limit := parsePage(c)
 	var subjects []models.Subject
-	config.DB.Preload("Teacher").Find(&subjects)
-	helpers.Success(c, http.StatusOK, "subjects fetched", subjects)
+	var total int64
+
+	// FIX #8: apply pagination — same as GetClasses fix above.
+	db := config.DB.Model(&models.Subject{})
+	db.Count(&total)
+	if err := db.Preload("Teacher").Offset(offset).Limit(limit).Find(&subjects).Error; err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "failed to fetch subjects")
+		return
+	}
+	helpers.Success(c, http.StatusOK, "subjects fetched", gin.H{"total": total, "data": subjects})
 }
 
 // UpdateSubject godoc
@@ -1274,7 +1303,10 @@ func BulkGradeEntry(c *gin.Context) {
 	enrolledStudentIDs := make(map[uint]bool)
 	var enrollments []models.Enrollment
 
-	config.DB.Where("subject_id = ?", input.SubjectID).Find(&enrollments)
+	if err := config.DB.Where("subject_id = ?", input.SubjectID).Find(&enrollments).Error; err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "failed to verify enrollments")
+		return
+	}
 	for _, e := range enrollments {
 		enrolledStudentIDs[e.StudentID] = true
 	}
@@ -1287,10 +1319,13 @@ func BulkGradeEntry(c *gin.Context) {
 	existing := make(map[uint]bool)
 
 	var oldGrades []models.Grade
-	config.DB.Where(
+	if err := config.DB.Where(
 		"subject_id = ? AND type = ? AND term = ? AND academic_year = ?",
 		input.SubjectID, input.Type, input.Term, input.AcademicYear,
-	).Find(&oldGrades)
+	).Find(&oldGrades).Error; err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "failed to check existing grades")
+		return
+	}
 
 	for _, g := range oldGrades {
 		existing[g.StudentID] = true
@@ -1351,6 +1386,13 @@ func BulkGradeEntry(c *gin.Context) {
 	// Only notify NEW grade inserts
 	// ─────────────────────────────────────────────────────────────
 
+	// Build a studentID → score map so the goroutine can send the real score
+	// instead of the previous hard-coded 0.
+	scoreMap := make(map[uint]float64, len(input.Grades))
+	for _, entry := range input.Grades {
+		scoreMap[entry.StudentID] = entry.Score
+	}
+
 	go func() {
 		for _, studentID := range newStudents {
 
@@ -1367,7 +1409,7 @@ func BulkGradeEntry(c *gin.Context) {
 				student.User.Email,
 				student.User.Name,
 				subject.Name,
-				0, // optional: can be enhanced later to pass real score
+				scoreMap[studentID], // FIX #3: pass the actual score, not 0
 			)
 		}
 	}()
@@ -1403,14 +1445,21 @@ func GetSubjectGrades(c *gin.Context) {
 
 	// Only enforce for teachers
 	if role == models.RoleTeacher {
+		// FIX #1: subject.teacher_id stores Teacher.ID (the Teacher table PK), not User.ID.
+		// We must resolve the Teacher record first, then compare teacher.ID — exactly as
+		// RecordAttendance and BulkGradeEntry already do.  The previous code compared
+		// teacher_id against the JWT userID (User.ID), which breaks for any teacher whose
+		// User.ID != Teacher.ID (i.e. almost everyone after the first user).
+		var teacher models.Teacher
+		if err := config.DB.Where("user_id = ?", userID).First(&teacher).Error; err != nil {
+			helpers.Error(c, http.StatusForbidden, "teacher profile not found")
+			return
+		}
+
 		var count int64
-
-		// Verify the teacher owns this subject
-		err := config.DB.Model(&models.Subject{}).
-			Where("id = ? AND teacher_id = ?", subjectID, userID).
-			Count(&count).Error
-
-		if err != nil {
+		if err := config.DB.Model(&models.Subject{}).
+			Where("id = ? AND teacher_id = ?", subjectID, teacher.ID).
+			Count(&count).Error; err != nil {
 			helpers.Error(c, http.StatusInternalServerError, "failed to verify subject ownership")
 			return
 		}
@@ -1482,7 +1531,10 @@ func GetStudentGrades(c *gin.Context) {
 		query = query.Where("academic_year = ?", year)
 	}
 	var grades []models.Grade
-	query.Find(&grades)
+	if err := query.Find(&grades).Error; err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "failed to fetch grades")
+		return
+	}
 	helpers.Success(c, http.StatusOK, "grades fetched", grades)
 }
 
@@ -1652,12 +1704,15 @@ func DownloadReportCard(c *gin.Context) {
 		return
 	}
 
-	safeCode := strings.ReplaceAll(student.StudentCode, `"`, `_`)
-
-	c.Header(
-		"Content-Disposition",
-		fmt.Sprintf(`attachment; filename="report_%s.pdf"`, safeCode),
-	)
+	// FIX #7: use mime.FormatMediaType to safely encode the filename.
+	// The previous strings.ReplaceAll only escaped double-quotes, leaving CRLF
+	// characters (\r\n) and semicolons exploitable for HTTP response splitting or
+	// Content-Disposition parameter injection. mime.FormatMediaType handles all
+	// RFC 6266 encoding correctly.
+	disposition := mime.FormatMediaType("attachment", map[string]string{
+		"filename": fmt.Sprintf("report_%s.pdf", student.StudentCode),
+	})
+	c.Header("Content-Disposition", disposition)
 
 	c.Data(http.StatusOK, "application/pdf", pdfBytes)
 }
