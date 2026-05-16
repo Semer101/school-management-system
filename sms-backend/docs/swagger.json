@@ -1,4 +1,7 @@
 {
+    "schemes": [
+        "https"
+    ],
     "swagger": "2.0",
     "info": {
         "description": "School Management System — Go + Gin + PostgreSQL\n\n## Authentication\nThis API uses JWT Bearer tokens. Login via `POST /api/login` to receive an access token (1 hour) and a refresh token (7 days).\nClick the **Authorize** button above and enter: `Bearer \u003cyour_token\u003e`\n\n## Roles\n| Role    | Access                                              |\n|---------|-----------------------------------------------------|\n| Admin   | Full access to all endpoints                        |\n| Teacher | Attendance, grades, locker (read public)             |\n| Student | Own grades, report card, locker, finance             |\n| Parent  | Children's data, report cards, finance               |",
@@ -6,7 +9,7 @@
         "contact": {},
         "version": "1.1"
     },
-    "host": "localhost:8080",
+    "host": "school-management-system-70z3.onrender.com",
     "basePath": "/",
     "paths": {
         "/api/academics/attendance": {

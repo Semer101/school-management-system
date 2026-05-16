@@ -3168,9 +3168,9 @@ const docTemplate = `{
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.1",
-	Host:             "localhost:8080",
+	Host:             "school-management-system-70z3.onrender.com",
 	BasePath:         "/",
-	Schemes:          []string{},
+	Schemes:          []string{"https"},
 	Title:            "SMS Backend API",
 	Description:      "School Management System — Go + Gin + PostgreSQL\n\n## Authentication\nThis API uses JWT Bearer tokens. Login via `POST /api/login` to receive an access token (1 hour) and a refresh token (7 days).\nClick the **Authorize** button above and enter: `Bearer <your_token>`\n\n## Roles\n| Role    | Access                                              |\n|---------|-----------------------------------------------------|\n| Admin   | Full access to all endpoints                        |\n| Teacher | Attendance, grades, locker (read public)             |\n| Student | Own grades, report card, locker, finance             |\n| Parent  | Children's data, report cards, finance               |",
 	InfoInstanceName: "swagger",

@@ -417,7 +417,7 @@ definitions:
       success:
         type: boolean
     type: object
-host: localhost:8080
+host: school-management-system-70z3.onrender.com
 info:
   contact: {}
   description: |-
@@ -2134,6 +2134,8 @@ paths:
       summary: Refresh access token
       tags:
       - auth
+schemes:
+- https
 securityDefinitions:
   BearerAuth:
     description: 'Type "Bearer" followed by a space and your JWT token. Example: **Bearer
