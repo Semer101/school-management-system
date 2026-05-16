@@ -29,8 +29,9 @@ import (
 // @description     | Student | Own grades, report card, locker, finance             |
 // @description     | Parent  | Children's data, report cards, finance               |
 
-// @host            localhost:8080
-// @BasePath        /
+// @host school-management-system-70z3.onrender.com
+// @BasePath /
+// @schemes https
 
 // @securityDefinitions.apikey BearerAuth
 // @in              header
@@ -100,7 +101,7 @@ func main() {
 	}
 
 	log.Printf("SMS server running on :%s\n", port)
-	log.Printf("Swagger UI:        http://localhost:%s/swagger/index.html\n", port)
+	log.Printf("Swagger UI: https://school-management-system-70z3.onrender.com/swagger/index.html")
 	log.Printf("Custom Docs:       http://localhost:%s/docs\n", port)
 	log.Printf("Notifications page: http://localhost:%s/notifications\n", port)
 
