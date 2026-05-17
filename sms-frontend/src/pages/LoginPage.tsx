@@ -33,9 +33,7 @@ export default function LoginPage() {
         className="w-full max-w-md relative z-10"
       >
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-accent/15 border border-accent/40 mb-4">
-            <span className="font-mono text-accent font-bold">S</span>
-          </div>
+          
           <h1 className="text-2xl font-semibold text-foreground tracking-tight">School Management</h1>
           <p className="text-sm text-muted mt-1">Secure access portal</p>
         </div>
@@ -71,9 +69,7 @@ export default function LoginPage() {
               Sign in
             </Button>
           </form>
-          <p className="text-[10px] text-muted text-center mt-4 font-mono">
-            Auth via HttpOnly cookies — no tokens stored in browser storage
-          </p>
+          
         </GlassCard>
       </motion.div>
     </div>
