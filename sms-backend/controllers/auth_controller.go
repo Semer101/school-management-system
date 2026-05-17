@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"net/http"
@@ -159,8 +160,9 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	// store the hashed refresh token in DB so it can be validated and rotated.
-	hashedRT, err := bcrypt.GenerateFromPassword([]byte(refreshToken), 10)
+	// SHA-256 the JWT first — bcrypt rejects inputs >72 bytes (golang.org/x/crypto v0.17+)
+	rtSum := sha256.Sum256([]byte(refreshToken))
+	hashedRT, err := bcrypt.GenerateFromPassword(rtSum[:], 10)
 	if err != nil {
 		helpers.Error(c, http.StatusInternalServerError, "failed to store refresh token")
 		return
@@ -271,7 +273,8 @@ func RefreshToken(c *gin.Context) {
 		helpers.Error(c, http.StatusUnauthorized, "refresh token not found or expired — please log in again")
 		return
 	}
-	if err := bcrypt.CompareHashAndPassword([]byte(stored.TokenHash), []byte(tokenStr)); err != nil {
+	tokenSum := sha256.Sum256([]byte(tokenStr))
+	if err := bcrypt.CompareHashAndPassword([]byte(stored.TokenHash), tokenSum[:]); err != nil {
 		helpers.Error(c, http.StatusUnauthorized, "refresh token mismatch — please log in again")
 		return
 	}
@@ -297,7 +300,8 @@ func RefreshToken(c *gin.Context) {
 		return
 	}
 
-	newHashedRT, err := bcrypt.GenerateFromPassword([]byte(newRefreshToken), 10)
+	newRTSum := sha256.Sum256([]byte(newRefreshToken))
+	newHashedRT, err := bcrypt.GenerateFromPassword(newRTSum[:], 10)
 	if err != nil {
 		helpers.Error(c, http.StatusInternalServerError, "failed to store refresh token")
 		return

@@ -71,10 +71,16 @@ func CORSMiddleware() gin.HandlerFunc {
 		// fallback only if env variable missing
 		allowedOrigins = []string{
 			"http://localhost:3000",
-			"http://localhost:5173",
 			"http://localhost:8080",
 			"http://127.0.0.1:5500",
 			"https://school-management-system-70z3.onrender.com",
+		}
+		// Vite may use 5173+ when ports are busy; allow the usual dev range
+		for port := 5173; port <= 5190; port++ {
+			allowedOrigins = append(allowedOrigins,
+				fmt.Sprintf("http://localhost:%d", port),
+				fmt.Sprintf("http://127.0.0.1:%d", port),
+			)
 		}
 	}
 

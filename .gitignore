@@ -1,0 +1,5 @@
+# Secrets — use .env.example locally
+sms-backend/.env
+
+# Compiled seed binary (use: go run cmd/seed/main.go)
+sms-backend/seeder
