@@ -1,53 +1,51 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import { useAuth } from '../hooks/useAuth'
 import { Input } from '../components/ui/Input'
 import { Button } from '../components/ui/Button'
+import { GlassCard } from '../components/ui/GlassCard'
 
 export default function LoginPage() {
-  const { login } = useAuth()
+  const { login, loading, error, clearError } = useAuth()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    setError('')
-    setLoading(true)
+    clearError()
     try {
       await login(email, password)
       navigate('/dashboard')
-    } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
-        'Invalid email or password.'
-      setError(msg)
-    } finally {
-      setLoading(false)
+    } catch {
+      /* error in store */
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[var(--bg)] px-4">
-      <div className="w-full max-w-sm">
-        {/* Logo */}
+    <div className="min-h-screen flex items-center justify-center app-grid-bg px-4 relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-transparent pointer-events-none" />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        className="w-full max-w-md relative z-10"
+      >
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[var(--accent-bg)] text-3xl mb-4">
-            📐
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-accent/15 border border-accent/40 mb-4">
+            <span className="font-mono text-accent font-bold">S</span>
           </div>
-          <h1 className="text-2xl font-bold text-[var(--text-h)]">School Management</h1>
-          <p className="text-sm text-[var(--text)] mt-1">Sign in to your account</p>
+          <h1 className="text-2xl font-semibold text-foreground tracking-tight">School Management</h1>
+          <p className="text-sm text-muted mt-1">Secure access portal</p>
         </div>
 
-        {/* Card */}
-        <div className="bg-[var(--bg)] border border-[var(--border)] rounded-2xl p-6 shadow-[var(--shadow)]">
+        <GlassCard className="p-6">
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <Input
               label="Email"
               type="email"
-              placeholder="you@school.edu"
+              placeholder="admin@school.et"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -56,7 +54,7 @@ export default function LoginPage() {
             <Input
               label="Password"
               type="password"
-              placeholder="••••••••"
+              placeholder="Enter password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -64,17 +62,20 @@ export default function LoginPage() {
             />
 
             {error && (
-              <p className="text-sm text-red-500 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 px-3 py-2 rounded-lg">
+              <p className="text-sm text-danger bg-danger/10 border border-danger/30 rounded-lg px-3 py-2">
                 {error}
               </p>
             )}
 
             <Button type="submit" loading={loading} className="w-full mt-1">
-              Sign In
+              Sign in
             </Button>
           </form>
-        </div>
-      </div>
+          <p className="text-[10px] text-muted text-center mt-4 font-mono">
+            Auth via HttpOnly cookies — no tokens stored in browser storage
+          </p>
+        </GlassCard>
+      </motion.div>
     </div>
   )
 }

@@ -1,10 +1,10 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { AuthProvider } from './context/AuthContext'
+import { AnimatePresence } from 'framer-motion'
 import { ProtectedRoute } from './components/layout/ProtectedRoute'
 import { AppShell } from './components/layout/AppShell'
+import { PageTransition } from './components/motion/PageTransition'
 
-// Pages
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/dashboard/DashboardPage'
 import ProfilePage from './pages/profile/ProfilePage'
@@ -29,91 +29,54 @@ import ChildDetailPage from './pages/parent/ChildDetailPage'
 
 const queryClient = new QueryClient()
 
+function AnimatedRoutes() {
+  const location = useLocation()
+
+  return (
+    <AnimatePresence mode="wait">
+      <Routes location={location} key={location.pathname}>
+        <Route path="/login" element={<PageTransition><LoginPage /></PageTransition>} />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+
+        <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
+          <Route path="/dashboard" element={<PageTransition><DashboardPage /></PageTransition>} />
+          <Route path="/profile" element={<PageTransition><ProfilePage /></PageTransition>} />
+          <Route path="/notifications" element={<PageTransition><NotificationsPage /></PageTransition>} />
+
+          <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['Admin']}><PageTransition><UsersPage /></PageTransition></ProtectedRoute>} />
+          <Route path="/admin/students" element={<ProtectedRoute allowedRoles={['Admin']}><PageTransition><StudentsPage /></PageTransition></ProtectedRoute>} />
+          <Route path="/admin/teachers" element={<ProtectedRoute allowedRoles={['Admin']}><PageTransition><TeachersPage /></PageTransition></ProtectedRoute>} />
+          <Route path="/admin/classes" element={<ProtectedRoute allowedRoles={['Admin']}><PageTransition><ClassesPage /></PageTransition></ProtectedRoute>} />
+          <Route path="/admin/subjects" element={<ProtectedRoute allowedRoles={['Admin']}><PageTransition><SubjectsPage /></PageTransition></ProtectedRoute>} />
+          <Route path="/admin/enrollment" element={<ProtectedRoute allowedRoles={['Admin']}><PageTransition><EnrollmentPage /></PageTransition></ProtectedRoute>} />
+          <Route path="/admin/attendance-summary" element={<ProtectedRoute allowedRoles={['Admin']}><PageTransition><AttendanceSummary /></PageTransition></ProtectedRoute>} />
+          <Route path="/admin/notify" element={<ProtectedRoute allowedRoles={['Admin']}><PageTransition><NotifyPage /></PageTransition></ProtectedRoute>} />
+          <Route path="/admin/finance" element={<ProtectedRoute allowedRoles={['Admin']}><PageTransition><AdminFinancePage /></PageTransition></ProtectedRoute>} />
+
+          <Route path="/academics/attendance" element={<ProtectedRoute allowedRoles={['Admin', 'Teacher', 'Student']}><PageTransition><AttendancePage /></PageTransition></ProtectedRoute>} />
+          <Route path="/academics/grades" element={<ProtectedRoute allowedRoles={['Admin', 'Teacher', 'Student']}><PageTransition><GradesPage /></PageTransition></ProtectedRoute>} />
+          <Route path="/academics/reportcard" element={<ProtectedRoute allowedRoles={['Student']}><PageTransition><ReportCardPage /></PageTransition></ProtectedRoute>} />
+
+          <Route path="/finance" element={<ProtectedRoute allowedRoles={['Student', 'Parent']}><PageTransition><MyFinancePage /></PageTransition></ProtectedRoute>} />
+          <Route path="/locker" element={<ProtectedRoute allowedRoles={['Student']}><PageTransition><MyLockerPage /></PageTransition></ProtectedRoute>} />
+          <Route path="/locker/student" element={<ProtectedRoute allowedRoles={['Admin', 'Teacher']}><PageTransition><StudentLockerPage /></PageTransition></ProtectedRoute>} />
+
+          <Route path="/parent/children" element={<ProtectedRoute allowedRoles={['Parent']}><PageTransition><ChildrenPage /></PageTransition></ProtectedRoute>} />
+          <Route path="/parent/children/:id" element={<ProtectedRoute allowedRoles={['Parent']}><PageTransition><ChildDetailPage /></PageTransition></ProtectedRoute>} />
+        </Route>
+
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    </AnimatePresence>
+  )
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <BrowserRouter>
-          <Routes>
-            {/* Public */}
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-
-            {/* Protected — all authenticated users */}
-            <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/profile" element={<ProfilePage />} />
-              <Route path="/notifications" element={<NotificationsPage />} />
-
-              {/* Admin only */}
-              <Route path="/admin/users" element={
-                <ProtectedRoute allowedRoles={['Admin']}><UsersPage /></ProtectedRoute>
-              } />
-              <Route path="/admin/students" element={
-                <ProtectedRoute allowedRoles={['Admin']}><StudentsPage /></ProtectedRoute>
-              } />
-              <Route path="/admin/teachers" element={
-                <ProtectedRoute allowedRoles={['Admin']}><TeachersPage /></ProtectedRoute>
-              } />
-              <Route path="/admin/classes" element={
-                <ProtectedRoute allowedRoles={['Admin']}><ClassesPage /></ProtectedRoute>
-              } />
-              <Route path="/admin/subjects" element={
-                <ProtectedRoute allowedRoles={['Admin']}><SubjectsPage /></ProtectedRoute>
-              } />
-              <Route path="/admin/enrollment" element={
-                <ProtectedRoute allowedRoles={['Admin']}><EnrollmentPage /></ProtectedRoute>
-              } />
-              <Route path="/admin/attendance-summary" element={
-                <ProtectedRoute allowedRoles={['Admin']}><AttendanceSummary /></ProtectedRoute>
-              } />
-              <Route path="/admin/notify" element={
-                <ProtectedRoute allowedRoles={['Admin']}><NotifyPage /></ProtectedRoute>
-              } />
-              <Route path="/admin/finance" element={
-                <ProtectedRoute allowedRoles={['Admin']}><AdminFinancePage /></ProtectedRoute>
-              } />
-
-              {/* Teacher + Admin + Student */}
-              <Route path="/academics/attendance" element={
-                <ProtectedRoute allowedRoles={['Admin', 'Teacher', 'Student']}><AttendancePage /></ProtectedRoute>
-              } />
-              <Route path="/academics/grades" element={
-                <ProtectedRoute allowedRoles={['Admin', 'Teacher', 'Student']}><GradesPage /></ProtectedRoute>
-              } />
-              <Route path="/academics/reportcard" element={
-                <ProtectedRoute allowedRoles={['Student']}><ReportCardPage /></ProtectedRoute>
-              } />
-
-              {/* Student + Parent */}
-              <Route path="/finance" element={
-                <ProtectedRoute allowedRoles={['Student', 'Parent']}><MyFinancePage /></ProtectedRoute>
-              } />
-
-              {/* Student locker */}
-              <Route path="/locker" element={
-                <ProtectedRoute allowedRoles={['Student']}><MyLockerPage /></ProtectedRoute>
-              } />
-
-              {/* Teacher + Admin locker view */}
-              <Route path="/locker/student" element={
-                <ProtectedRoute allowedRoles={['Admin', 'Teacher']}><StudentLockerPage /></ProtectedRoute>
-              } />
-
-              {/* Parent */}
-              <Route path="/parent/children" element={
-                <ProtectedRoute allowedRoles={['Parent']}><ChildrenPage /></ProtectedRoute>
-              } />
-              <Route path="/parent/children/:id" element={
-                <ProtectedRoute allowedRoles={['Parent']}><ChildDetailPage /></ProtectedRoute>
-              } />
-            </Route>
-
-            {/* Catch-all */}
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
-        </BrowserRouter>
-      </AuthProvider>
+      <BrowserRouter>
+        <AnimatedRoutes />
+      </BrowserRouter>
     </QueryClientProvider>
   )
 }

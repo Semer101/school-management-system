@@ -4,6 +4,8 @@ import { getStudentPublicFiles } from '../../api/locker'
 import type { Student } from '../../types/academic'
 import { listFromApi } from '../../types/api'
 import type { LockerFile } from '../../types/locker'
+import { FolderOpen } from 'lucide-react'
+import { FileTypeIcon } from '../../lib/file-type-icon'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { Spinner } from '../../components/ui/Spinner'
 import { Badge } from '../../components/ui/Badge'
@@ -45,14 +47,12 @@ export default function StudentLockerPage() {
       </div>
 
       {loading ? <Spinner /> : selectedId === 0 ? null : files.length === 0 ? (
-        <EmptyState icon="🗂️" title="No public files" description="This student has no public locker files." />
+        <EmptyState icon={FolderOpen} title="No public files" description="This student has no public locker files." />
       ) : (
         <div className="space-y-2">
           {files.map((file) => (
             <div key={file.id} className="flex items-center gap-3 px-4 py-3 bg-[var(--bg)] border border-[var(--border)] rounded-xl">
-              <span className="text-lg shrink-0">
-                {file.file_type === 'pdf' ? '📄' : ['jpg', 'jpeg', 'png'].includes(file.file_type) ? '🖼️' : '📎'}
-              </span>
+              <FileTypeIcon type={file.file_type} />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-[var(--text-h)] truncate">{file.file_name}</p>
                 <p className="text-xs text-[var(--text)]">{formatBytes(file.file_size)} · {file.category}</p>

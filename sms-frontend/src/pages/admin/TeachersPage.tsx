@@ -4,6 +4,7 @@ import type { Teacher } from '../../types/academic'
 import { listFromApi } from '../../types/api'
 import { Table } from '../../components/ui/Table'
 import { Button } from '../../components/ui/Button'
+import { School } from 'lucide-react'
 import { EmptyState } from '../../components/ui/EmptyState'
 
 export default function TeachersPage() {
@@ -29,7 +30,7 @@ export default function TeachersPage() {
   }
 
   if (!loading && teachers.length === 0 && !error) {
-    return <EmptyState icon="🏫" title="No teachers yet" />
+    return <EmptyState icon={School} title="No teachers yet" />
   }
 
   return (

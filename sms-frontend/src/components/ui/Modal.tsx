@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect } from 'react'
+import { X } from 'lucide-react'
 
 interface ModalProps {
   open: boolean
@@ -18,39 +19,32 @@ export function Modal({ open, onClose, title, children, footer }: ModalProps) {
 
   if (!open) return null
 
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+  const overlay = 'fixed inset-0 z-50 flex items-center justify-center p-4'
 
-      {/* Panel */}
+  return (
+    <div className={overlay} onClick={onClose} role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div className="absolute inset-0 bg-void/80 backdrop-blur-sm" aria-hidden />
       <div
-        className="relative w-full max-w-md bg-[var(--bg)] border border-[var(--border)] rounded-2xl shadow-2xl"
+        className="relative w-full max-w-md bg-surface border border-surface-border rounded-2xl shadow-glass"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
-          <h2 className="text-base font-semibold text-[var(--text-h)]">{title}</h2>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-surface-border">
+          <h2 id="modal-title" className="text-base font-semibold text-foreground">
+            {title}
+          </h2>
           <button
+            type="button"
             onClick={onClose}
-            className="w-7 h-7 flex items-center justify-center rounded-lg text-[var(--text)] hover:bg-[var(--code-bg)] transition-colors"
+            className="w-7 h-7 flex items-center justify-center rounded-lg text-muted hover:text-foreground hover:bg-surface-elevated transition-colors"
+            aria-label="Close"
           >
-            ✕
+            <X className="w-4 h-4" />
           </button>
         </div>
-
-        {/* Body */}
         <div className="px-6 py-4">{children}</div>
-
-        {/* Footer */}
-        {footer && (
-          <div className="px-6 py-4 border-t border-[var(--border)] flex justify-end gap-2">
-            {footer}
-          </div>
-        )}
+        {footer ? (
+          <div className="px-6 py-4 border-t border-surface-border flex justify-end gap-2">{footer}</div>
+        ) : null}
       </div>
     </div>
   )

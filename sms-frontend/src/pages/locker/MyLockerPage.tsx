@@ -3,6 +3,8 @@ import { getMyLockerFiles, uploadLockerFile, deleteLockerFile, toggleFileVisibil
 import type { LockerFile } from '../../types/locker'
 import { Button } from '../../components/ui/Button'
 import { Badge } from '../../components/ui/Badge'
+import { FolderOpen, Paperclip, Lock, Eye, X } from 'lucide-react'
+import { FileTypeIcon } from '../../lib/file-type-icon'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { Spinner } from '../../components/ui/Spinner'
 
@@ -73,22 +75,21 @@ export default function MyLockerPage() {
           </div>
           <input type="file" ref={fileRef} onChange={handleUpload} className="hidden" />
           <Button variant="secondary" loading={uploading} onClick={() => fileRef.current?.click()}>
-            📎 Choose File
+            <Paperclip className="w-4 h-4" />
+            Choose File
           </Button>
         </div>
       </div>
 
       {/* File list */}
       {files.length === 0 ? (
-        <EmptyState icon="🗂️" title="Your locker is empty" description="Upload certificates, assignments, or portfolio items." />
+        <EmptyState icon={FolderOpen} title="Your locker is empty" description="Upload certificates, assignments, or portfolio items." />
       ) : (
         <div className="space-y-2">
           {files.map((file) => (
             <div key={file.id} className="flex items-center justify-between px-4 py-3 bg-[var(--bg)] border border-[var(--border)] rounded-xl">
               <div className="flex items-center gap-3 min-w-0">
-                <span className="text-lg shrink-0">
-                  {file.file_type === 'pdf' ? '📄' : ['jpg', 'jpeg', 'png'].includes(file.file_type) ? '🖼️' : '📎'}
-                </span>
+                <FileTypeIcon type={file.file_type} />
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-[var(--text-h)] truncate">{file.file_name}</p>
                   <p className="text-xs text-[var(--text)]">{formatBytes(file.file_size)} · {file.category}</p>
@@ -96,10 +97,12 @@ export default function MyLockerPage() {
               </div>
               <div className="flex items-center gap-2 shrink-0 ml-3">
                 <Badge label={file.is_public ? 'Public' : 'Private'} variant={file.is_public ? 'success' : 'default'} />
-                <Button size="sm" variant="ghost" onClick={() => handleToggle(file)}>
-                  {file.is_public ? '🔒' : '👁️'}
+                <Button size="sm" variant="ghost" onClick={() => handleToggle(file)} aria-label={file.is_public ? 'Make private' : 'Make public'}>
+                  {file.is_public ? <Lock className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </Button>
-                <Button size="sm" variant="danger" onClick={() => handleDelete(file.id)}>✕</Button>
+                <Button size="sm" variant="danger" onClick={() => handleDelete(file.id)} aria-label="Delete file">
+                  <X className="w-4 h-4" />
+                </Button>
               </div>
             </div>
           ))}

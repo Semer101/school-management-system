@@ -1,5 +1,6 @@
 import { useNotifications } from '../../hooks/useNotifications'
 import { Spinner } from '../../components/ui/Spinner'
+import { Bell } from 'lucide-react'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { Button } from '../../components/ui/Button'
 
@@ -19,7 +20,7 @@ export default function NotificationsPage() {
   if (loading) return <Spinner fullPage />
 
   if (receipts.length === 0) {
-    return <EmptyState icon="🔔" title="No notifications yet" description="Announcements from your school will appear here." />
+    return <EmptyState icon={Bell} title="No notifications yet" description="Announcements from your school will appear here." />
   }
 
   return (

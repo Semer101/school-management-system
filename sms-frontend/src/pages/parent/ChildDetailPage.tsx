@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { ChevronLeft } from 'lucide-react'
 import {
   getChildAttendance,
   getChildGrades,
@@ -54,7 +55,9 @@ export default function ChildDetailPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
-        <button onClick={() => navigate('/parent/children')} className="text-[var(--text)] hover:text-[var(--text-h)]">←</button>
+        <button type="button" onClick={() => navigate('/parent/children')} className="text-muted hover:text-foreground p-1" aria-label="Back">
+          <ChevronLeft className="w-5 h-5" />
+        </button>
         <h1 className="text-xl font-bold text-[var(--text-h)]">
           {report?.student?.user?.name ?? `Student #${studentId}`}
         </h1>

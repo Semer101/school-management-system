@@ -3,6 +3,7 @@ import { getAttendanceSummary, type AttendanceSummaryRow } from '../../api/admin
 import { Table } from '../../components/ui/Table'
 import { Badge } from '../../components/ui/Badge'
 import { Spinner } from '../../components/ui/Spinner'
+import { BarChart3 } from 'lucide-react'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { listFromApi } from '../../types/api'
 
@@ -20,7 +21,7 @@ export default function AttendanceSummary() {
 
   if (loading) return <Spinner fullPage />
   if (error) return <p className="text-sm text-red-500">{error}</p>
-  if (rows.length === 0) return <EmptyState icon="📊" title="No attendance data yet" />
+  if (rows.length === 0) return <EmptyState icon={BarChart3} title="No attendance data yet" />
 
   return (
     <div>

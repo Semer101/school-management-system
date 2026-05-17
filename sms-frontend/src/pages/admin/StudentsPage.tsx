@@ -4,6 +4,7 @@ import type { Student } from '../../types/academic'
 import { listFromApi } from '../../types/api'
 import { Table } from '../../components/ui/Table'
 import { Button } from '../../components/ui/Button'
+import { GraduationCap } from 'lucide-react'
 import { EmptyState } from '../../components/ui/EmptyState'
 
 export default function StudentsPage() {
@@ -36,7 +37,7 @@ export default function StudentsPage() {
   }
 
   if (!loading && students.length === 0 && !error) {
-    return <EmptyState icon="🎓" title="No students yet" description="Students will appear here once registered." />
+    return <EmptyState icon={GraduationCap} title="No students yet" description="Students will appear here once registered." />
   }
 
   return (

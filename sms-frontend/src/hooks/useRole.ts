@@ -1,7 +1,7 @@
-import { useAuth } from './useAuth'
+import { useAppSelector } from '../store/hooks'
 
 export function useRole() {
-  const { user } = useAuth()
+  const user = useAppSelector((s) => s.auth.user)
   const role = user?.role ?? null
 
   return {

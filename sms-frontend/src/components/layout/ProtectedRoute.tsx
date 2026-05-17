@@ -10,9 +10,9 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
-  const { user, loading } = useAuth()
+  const { user, loading, initialized } = useAuth()
 
-  if (loading) return <Spinner fullPage />
+  if (!initialized || loading) return <Spinner fullPage />
   if (!user) return <Navigate to="/login" replace />
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     return <Navigate to="/dashboard" replace />

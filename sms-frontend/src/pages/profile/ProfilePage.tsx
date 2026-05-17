@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { Phone } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { changePassword } from '../../api/me'
 import { Input } from '../../components/ui/Input'
@@ -53,7 +54,10 @@ export default function ProfilePage() {
           </div>
         </div>
         {user?.phone && (
-          <p className="text-sm text-[var(--text)]">📞 {user.phone}</p>
+          <p className="text-sm text-[var(--text)] flex items-center gap-2">
+            <Phone className="w-4 h-4 text-accent shrink-0" />
+            {user.phone}
+          </p>
         )}
         <p className="text-xs text-[var(--text)] mt-2">
           Member since {user?.created_at ? new Date(user.created_at).toLocaleDateString() : '—'}

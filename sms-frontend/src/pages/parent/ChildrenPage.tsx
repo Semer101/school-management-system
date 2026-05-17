@@ -4,6 +4,7 @@ import { getMyChildren } from '../../api/parent'
 import type { Student } from '../../types/academic'
 import { listFromApi } from '../../types/api'
 import { Spinner } from '../../components/ui/Spinner'
+import { Users } from 'lucide-react'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { Button } from '../../components/ui/Button'
 
@@ -20,7 +21,7 @@ export default function ChildrenPage() {
 
   if (loading) return <Spinner fullPage />
   if (children.length === 0) {
-    return <EmptyState icon="👨‍👧" title="No children linked" description="Contact the school administrator to link your children to your account." />
+    return <EmptyState icon={Users} title="No children linked" description="Contact the school administrator to link your children to your account." />
   }
 
   return (

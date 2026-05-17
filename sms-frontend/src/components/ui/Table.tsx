@@ -22,14 +22,14 @@ export function Table<T>({
   emptyMessage = 'No data found.',
 }: TableProps<T>) {
   return (
-    <div className="w-full overflow-x-auto rounded-xl border border-[var(--border)]">
+    <div className="w-full overflow-x-auto rounded-xl border border-surface-border">
       <table className="w-full text-sm border-collapse">
         <thead>
-          <tr className="bg-[var(--code-bg)]">
+          <tr className="bg-surface-elevated/80">
             {columns.map((col) => (
               <th
                 key={col.key}
-                className="text-left px-4 py-3 font-semibold text-[var(--text-h)] border-b border-[var(--border)] whitespace-nowrap"
+                className="text-left px-4 py-3 font-semibold text-foreground border-b border-surface-border whitespace-nowrap font-mono text-xs uppercase tracking-wider"
               >
                 {col.header}
               </th>
@@ -40,15 +40,12 @@ export function Table<T>({
           {loading ? (
             <tr>
               <td colSpan={columns.length} className="text-center py-10">
-                <span className="inline-block w-5 h-5 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
+                <span className="inline-block w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
               </td>
             </tr>
           ) : data.length === 0 ? (
             <tr>
-              <td
-                colSpan={columns.length}
-                className="text-center py-10 text-[var(--text)]"
-              >
+              <td colSpan={columns.length} className="text-center py-10 text-muted">
                 {emptyMessage}
               </td>
             </tr>
@@ -56,10 +53,10 @@ export function Table<T>({
             data.map((row) => (
               <tr
                 key={keyExtractor(row)}
-                className="border-b border-[var(--border)] hover:bg-[var(--code-bg)] transition-colors"
+                className="border-b border-surface-border hover:bg-surface-elevated/40 transition-colors"
               >
                 {columns.map((col) => (
-                  <td key={col.key} className="px-4 py-3 text-[var(--text)]">
+                  <td key={col.key} className="px-4 py-3 text-muted">
                     {col.render
                       ? col.render(row)
                       : String((row as Record<string, unknown>)[col.key] ?? '')}

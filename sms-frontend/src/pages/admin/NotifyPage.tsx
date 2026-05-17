@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { Megaphone, Bell } from 'lucide-react'
 import { broadcastAnnouncement, notifyAbsentParents } from '../../api/admin'
 import { Input } from '../../components/ui/Input'
 import { Button } from '../../components/ui/Button'
@@ -57,7 +58,10 @@ export default function NotifyPage() {
 
       {/* Broadcast */}
       <div className="bg-[var(--bg)] border border-[var(--border)] rounded-2xl p-6">
-        <h2 className="text-base font-semibold text-[var(--text-h)] mb-4">📣 Broadcast Announcement</h2>
+        <h2 className="text-base font-semibold text-[var(--text-h)] mb-4 flex items-center gap-2">
+          <Megaphone className="w-4 h-4 text-accent" />
+          Broadcast Announcement
+        </h2>
         <form onSubmit={handleBroadcast} className="flex flex-col gap-4">
           <Input
             label="Title"
@@ -105,7 +109,10 @@ export default function NotifyPage() {
 
       {/* Notify absent parents */}
       <div className="bg-[var(--bg)] border border-[var(--border)] rounded-2xl p-6">
-        <h2 className="text-base font-semibold text-[var(--text-h)] mb-2">🔔 Notify Absent Parents</h2>
+        <h2 className="text-base font-semibold text-[var(--text-h)] mb-2 flex items-center gap-2">
+          <Bell className="w-4 h-4 text-accent" />
+          Notify Absent Parents
+        </h2>
         <p className="text-sm text-[var(--text)] mb-4">
           Automatically send notifications to parents of all students marked absent today.
         </p>

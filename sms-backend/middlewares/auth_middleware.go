@@ -2,7 +2,6 @@ package middlewares
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -11,24 +10,15 @@ import (
 )
 
 // AuthMiddleware validates the JWT on every protected route.
+// Accepts Bearer header (API clients) or sms_access HttpOnly cookie (browser).
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
-			helpers.Error(c, http.StatusUnauthorized, "authorization header required")
+		tokenStr, ok := helpers.ExtractAccessToken(c)
+		if !ok {
+			helpers.Error(c, http.StatusUnauthorized, "authentication required")
 			c.Abort()
 			return
 		}
-
-		// Header must be in format "Bearer <token>"
-		parts := strings.SplitN(authHeader, " ", 2)
-		if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
-			helpers.Error(c, http.StatusUnauthorized, "authorization format must be: Bearer <token>")
-			c.Abort()
-			return
-		}
-
-		tokenStr := parts[1]
 
 		claims, err := config.ParseAccessToken(tokenStr)
 		if err != nil {

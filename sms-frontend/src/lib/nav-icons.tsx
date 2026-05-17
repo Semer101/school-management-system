@@ -1,0 +1,43 @@
+import {
+  LayoutDashboard,
+  User,
+  Users,
+  GraduationCap,
+  School,
+  Layers,
+  BookOpen,
+  ClipboardList,
+  BarChart3,
+  Wallet,
+  Megaphone,
+  CheckSquare,
+  FileText,
+  CreditCard,
+  FolderLock,
+  UsersRound,
+  Bell,
+  type LucideIcon,
+} from 'lucide-react'
+
+export const navIcons = {
+  dashboard: LayoutDashboard,
+  profile: User,
+  users: Users,
+  students: GraduationCap,
+  teachers: School,
+  classes: Layers,
+  subjects: BookOpen,
+  enrollment: ClipboardList,
+  attendance: BarChart3,
+  finance: Wallet,
+  notify: Megaphone,
+  attendanceCheck: CheckSquare,
+  grades: FileText,
+  reportCard: FileText,
+  payments: CreditCard,
+  locker: FolderLock,
+  children: UsersRound,
+  notifications: Bell,
+} satisfies Record<string, LucideIcon>
+
+export type NavIconKey = keyof typeof navIcons

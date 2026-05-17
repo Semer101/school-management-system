@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { X } from 'lucide-react'
 import { useRole } from '../../hooks/useRole'
 import { bulkGradeEntry, getSubjectGrades, getStudentGrades } from '../../api/academics'
 import { getStudents, getSubjects } from '../../api/admin'
@@ -99,7 +100,9 @@ function TeacherView() {
                 </select>
               </div>
               <button type="button" onClick={() => setEntries((prev) => prev.filter((_, idx) => idx !== i))}
-                className="text-red-400 hover:text-red-600 text-sm pb-0.5">✕</button>
+                className="text-danger hover:text-danger/80 p-1" aria-label="Remove row">
+                <X className="w-4 h-4" />
+              </button>
             </div>
           ))}
 

@@ -2,80 +2,44 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px,
-    rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
-
-  --sans: 'DM Sans', system-ui, sans-serif;
-  --heading: 'DM Sans', system-ui, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
-
-  font: 16px/150% var(--sans);
-  letter-spacing: 0.1px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px,
-      rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+    --bg: #0c0c12;
+    --code-bg: #12121c;
+    --border: rgba(148, 163, 184, 0.12);
+    --text: #94a3b8;
+    --text-h: #f1f5f9;
+    --accent: #22d3ee;
+    --accent-bg: rgba(34, 211, 238, 0.15);
+    --accent-border: rgba(34, 211, 238, 0.3);
+  }
+
+  html {
+    @apply antialiased scroll-smooth;
+  }
+
+  body {
+    @apply bg-void text-foreground font-sans min-h-screen;
+    background-image: linear-gradient(180deg, #050508 0%, #0a0a10 50%, #050508 100%);
+  }
+
+  #root {
+    @apply min-h-screen;
+  }
+
+  ::selection {
+    @apply bg-accent/30 text-foreground;
   }
 }
 
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--text);
-}
+@layer components {
+  .app-grid-bg {
+    background-image: linear-gradient(rgba(34, 211, 238, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(34, 211, 238, 0.04) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
 
-#root {
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
+  .text-gradient {
+    @apply bg-gradient-to-r from-accent to-cyan-200 bg-clip-text text-transparent;
+  }
 }
-
-h1, h2, h3, h4, h5, h6 {
-  font-family: var(--heading);
-  color: var(--text-h);
-  margin: 0;
-}
-
-p {
-  margin: 0;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-/* Scrollbar */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--text); }

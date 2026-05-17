@@ -180,18 +180,9 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	// set refresh token as HttpOnly cookie so browser clients never expose it in JS.
-	// SameSite=Strict prevents CSRF. Secure should be true in production (HTTPS).
-	secure := os.Getenv("ENV") == "production"
-	c.SetCookie(
-		"sms_refresh", // name
-		refreshToken,  // value
-		7*24*60*60,    // maxAge seconds (7 days)
-		"/api/token",  // path — scoped to refresh endpoint only
-		"",            // domain — empty = current host
-		secure,        // secure (HTTPS only in prod)
-		true,          // httpOnly — JS cannot read this cookie
-	)
+	// HttpOnly cookies for browser clients — never readable from JavaScript.
+	helpers.SetAccessCookie(c, accessToken)
+	helpers.SetRefreshCookie(c, refreshToken)
 
 	helpers.Success(c, http.StatusOK, "login successful", gin.H{
 		"access_token": accessToken,
@@ -317,9 +308,8 @@ func RefreshToken(c *gin.Context) {
 		return
 	}
 
-	// Refresh the cookie.
-	secure := os.Getenv("ENV") == "production"
-	c.SetCookie("sms_refresh", newRefreshToken, 7*24*60*60, "/api/token", "", secure, true)
+	helpers.SetAccessCookie(c, newAccessToken)
+	helpers.SetRefreshCookie(c, newRefreshToken)
 
 	helpers.Success(c, http.StatusOK, "token refreshed", gin.H{
 		"access_token":  newAccessToken,
@@ -347,8 +337,7 @@ func Logout(c *gin.Context) {
 	userID := c.GetUint("userID")
 	// Revoke all refresh tokens for this user.
 	config.DB.Where("user_id = ?", userID).Delete(&models.RefreshToken{})
-	// Clear the cookie.
-	c.SetCookie("sms_refresh", "", -1, "/api/token", "", false, true)
+	helpers.ClearAuthCookies(c)
 	helpers.Success(c, http.StatusOK, "logged out successfully", nil)
 }
 
@@ -469,7 +458,7 @@ func ChangePassword(c *gin.Context) {
 
 	// revoke all refresh tokens after password change — forces re-login on all devices.
 	config.DB.Where("user_id = ?", userID).Delete(&models.RefreshToken{})
-	c.SetCookie("sms_refresh", "", -1, "/api/token", "", false, true)
+	helpers.ClearAuthCookies(c)
 
 	helpers.Success(c, http.StatusOK, "password updated successfully — please log in again", nil)
 }
