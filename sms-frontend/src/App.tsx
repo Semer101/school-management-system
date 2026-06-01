@@ -8,12 +8,15 @@ import { PageTransition } from './components/motion/PageTransition'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/dashboard/DashboardPage'
 import ProfilePage from './pages/profile/ProfilePage'
-import UsersPage from './pages/admin/UsersPage'
 import StudentsPage from './pages/admin/StudentsPage'
+import AnalyticsPage from './pages/admin/AnalyticsPage'
+import TrashPage from './pages/admin/TrashPage'
+import ParentsPage from './pages/admin/ParentsPage'
+import AdminsPage from './pages/admin/AdminsPage'
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import TeachersPage from './pages/admin/TeachersPage'
 import ClassesPage from './pages/admin/ClassesPage'
 import SubjectsPage from './pages/admin/SubjectsPage'
-import EnrollmentPage from './pages/admin/EnrollmentPage'
 import AttendanceSummary from './pages/admin/AttendanceSummary'
 import NotifyPage from './pages/admin/NotifyPage'
 import AdminFinancePage from './pages/finance/AdminFinancePage'
@@ -36,6 +39,7 @@ function AnimatedRoutes() {
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
         <Route path="/login" element={<PageTransition><LoginPage /></PageTransition>} />
+        <Route path="/forgot-password" element={<PageTransition><ForgotPasswordPage /></PageTransition>} />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
         <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
@@ -43,12 +47,14 @@ function AnimatedRoutes() {
           <Route path="/profile" element={<PageTransition><ProfilePage /></PageTransition>} />
           <Route path="/notifications" element={<PageTransition><NotificationsPage /></PageTransition>} />
 
-          <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['Admin']}><PageTransition><UsersPage /></PageTransition></ProtectedRoute>} />
           <Route path="/admin/students" element={<ProtectedRoute allowedRoles={['Admin']}><PageTransition><StudentsPage /></PageTransition></ProtectedRoute>} />
+          <Route path="/admin/admins" element={<ProtectedRoute allowedRoles={['Admin']}><PageTransition><AdminsPage /></PageTransition></ProtectedRoute>} />
+          <Route path="/admin/parents" element={<ProtectedRoute allowedRoles={['Admin']}><PageTransition><ParentsPage /></PageTransition></ProtectedRoute>} />
+          <Route path="/admin/analytics" element={<ProtectedRoute allowedRoles={['Admin']}><PageTransition><AnalyticsPage /></PageTransition></ProtectedRoute>} />
+          <Route path="/admin/trash" element={<ProtectedRoute allowedRoles={['Admin']}><PageTransition><TrashPage /></PageTransition></ProtectedRoute>} />
           <Route path="/admin/teachers" element={<ProtectedRoute allowedRoles={['Admin']}><PageTransition><TeachersPage /></PageTransition></ProtectedRoute>} />
           <Route path="/admin/classes" element={<ProtectedRoute allowedRoles={['Admin']}><PageTransition><ClassesPage /></PageTransition></ProtectedRoute>} />
           <Route path="/admin/subjects" element={<ProtectedRoute allowedRoles={['Admin']}><PageTransition><SubjectsPage /></PageTransition></ProtectedRoute>} />
-          <Route path="/admin/enrollment" element={<ProtectedRoute allowedRoles={['Admin']}><PageTransition><EnrollmentPage /></PageTransition></ProtectedRoute>} />
           <Route path="/admin/attendance-summary" element={<ProtectedRoute allowedRoles={['Admin']}><PageTransition><AttendanceSummary /></PageTransition></ProtectedRoute>} />
           <Route path="/admin/notify" element={<ProtectedRoute allowedRoles={['Admin']}><PageTransition><NotifyPage /></PageTransition></ProtectedRoute>} />
           <Route path="/admin/finance" element={<ProtectedRoute allowedRoles={['Admin']}><PageTransition><AdminFinancePage /></PageTransition></ProtectedRoute>} />

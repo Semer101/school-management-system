@@ -1,60 +1,134 @@
-import { useEffect, useState } from 'react'
-import { getTeachers, archiveTeacher } from '../../api/admin'
+import { useEffect, useState, type FormEvent } from 'react'
+import { Plus } from 'lucide-react'
+import { getTeachers, archiveTeacher, createTeacher, updateTeacher, type CreateTeacherPayload } from '../../api/admin'
 import type { Teacher } from '../../types/academic'
 import { listFromApi } from '../../types/api'
-import { Table } from '../../components/ui/Table'
+import { DataTable } from '../../components/ui/DataTable'
+import { RowActions } from '../../components/ui/RowActions'
 import { Button } from '../../components/ui/Button'
-import { School } from 'lucide-react'
-import { EmptyState } from '../../components/ui/EmptyState'
+import { Modal } from '../../components/ui/Modal'
+import { Input } from '../../components/ui/Input'
+import { ConfirmModal } from '../../components/ui/ConfirmModal'
+import { PageHeader } from '../../components/ui/PageHeader'
 
 export default function TeachersPage() {
   const [teachers, setTeachers] = useState<Teacher[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [createOpen, setCreateOpen] = useState(false)
+  const [updateTeacher_, setUpdateTeacher] = useState<Teacher | null>(null)
+  const [archiveId, setArchiveId] = useState<number | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState<CreateTeacherPayload>({
+    name: '', email: '', password: 'Teacher@1234', teacher_code: '', qualification: '', phone: '',
+  })
+  const [editForm, setEditForm] = useState({ qualification: '', phone: '' })
 
-  useEffect(() => {
-    getTeachers()
+  const fetchTeachers = () => {
+    setLoading(true)
+    getTeachers({ page_size: 50 })
       .then((r) => setTeachers(listFromApi(r.data)))
-      .catch(() => setError('Failed to load teachers.'))
+      .catch(() => setTeachers([]))
       .finally(() => setLoading(false))
-  }, [])
+  }
 
-  const handleArchive = async (id: number) => {
-    if (!confirm('Archive this teacher?')) return
+  useEffect(() => { fetchTeachers() }, [])
+
+  const handleCreate = async (e: FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
     try {
-      await archiveTeacher(id)
-      setTeachers((prev) => prev.filter((t) => t.id !== id))
+      await createTeacher(form)
+      setCreateOpen(false)
+      fetchTeachers()
     } catch {
-      alert('Failed to archive teacher.')
+      alert('Create failed')
+    } finally {
+      setSaving(false)
     }
   }
 
-  if (!loading && teachers.length === 0 && !error) {
-    return <EmptyState icon={School} title="No teachers yet" />
+  const handleUpdate = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!updateTeacher_) return
+    setSaving(true)
+    try {
+      await updateTeacher(updateTeacher_.id, { qualification: editForm.qualification, phone: editForm.phone })
+      setUpdateTeacher(null)
+      fetchTeachers()
+    } catch {
+      alert('Update failed')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleArchive = async () => {
+    if (!archiveId) return
+    setSaving(true)
+    try {
+      await archiveTeacher(archiveId)
+      setArchiveId(null)
+      fetchTeachers()
+    } catch {
+      alert('Archive failed')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
     <div>
-      <h1 className="text-xl font-bold text-[var(--text-h)] mb-6">Teachers</h1>
-      {error && <p className="text-sm text-red-500 mb-4">{error}</p>}
-      <Table
+      <PageHeader title="Teachers" action={
+        <Button onClick={() => setCreateOpen(true)}><Plus className="w-4 h-4 mr-1" /> Create</Button>
+      } />
+
+      <DataTable
         loading={loading}
-        keyExtractor={(t) => t.id}
         data={teachers}
+        keyExtractor={(t) => t.id}
+        searchKeys={['teacher_code', 'qualification']}
         columns={[
           { key: 'teacher_code', header: 'Code' },
           { key: 'user', header: 'Name', render: (t) => t.user?.name ?? '—' },
           { key: 'email', header: 'Email', render: (t) => t.user?.email ?? '—' },
+          { key: 'phone', header: 'Phone', render: (t) => t.user?.phone || '—' },
           { key: 'qualification', header: 'Qualification' },
           { key: 'joined_at', header: 'Joined', render: (t) => new Date(t.joined_at).toLocaleDateString() },
           {
             key: 'actions', header: '',
             render: (t) => (
-              <Button size="sm" variant="danger" onClick={() => handleArchive(t.id)}>Archive</Button>
+              <RowActions
+                onUpdate={() => { setUpdateTeacher(t); setEditForm({ qualification: t.qualification ?? '', phone: t.user?.phone ?? '' }) }}
+                onArchive={() => setArchiveId(t.id)}
+              />
             ),
           },
         ]}
       />
+
+      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Create Teacher"
+        footer={<><Button variant="ghost" onClick={() => setCreateOpen(false)}>Cancel</Button><Button loading={saving} type="submit" form="teacher-form">Create</Button></>}>
+        <form id="teacher-form" onSubmit={handleCreate} className="space-y-3">
+          <Input label="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+          <Input label="Email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
+          <Input label="Password" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
+          <Input label="Teacher code" value={form.teacher_code} onChange={(e) => setForm({ ...form, teacher_code: e.target.value })} required />
+          <Input label="Qualification" value={form.qualification} onChange={(e) => setForm({ ...form, qualification: e.target.value })} />
+          <Input label="Phone" value={form.phone ?? ''} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="09xxxxxxxx" required />
+        </form>
+      </Modal>
+
+      <Modal open={!!updateTeacher_} onClose={() => setUpdateTeacher(null)} title="Update Teacher"
+        footer={<><Button variant="ghost" onClick={() => setUpdateTeacher(null)}>Cancel</Button><Button loading={saving} type="submit" form="teacher-update-form">Save</Button></>}>
+        <form id="teacher-update-form" onSubmit={handleUpdate} className="space-y-3">
+          <p className="text-sm text-muted">{updateTeacher_?.user?.name} — {updateTeacher_?.user?.email}</p>
+          <Input label="Qualification" value={editForm.qualification} onChange={(e) => setEditForm({ ...editForm, qualification: e.target.value })} required />
+          <Input label="Phone" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} placeholder="09xxxxxxxx" />
+        </form>
+      </Modal>
+
+      <ConfirmModal open={!!archiveId} onClose={() => setArchiveId(null)} title="Archive Teacher"
+        message="Teacher will be moved to Trash." confirmLabel="Archive" variant="danger" loading={saving} onConfirm={handleArchive} />
     </div>
   )
 }

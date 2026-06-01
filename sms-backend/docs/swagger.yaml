@@ -18,14 +18,10 @@ definitions:
       student_id:
         example: 1
         type: integer
-      subject_id:
-        example: 2
-        type: integer
     required:
     - date
     - status
     - student_id
-    - subject_id
     type: object
   controllers.BroadcastInput:
     properties:
@@ -103,8 +99,22 @@ definitions:
     type: object
   controllers.CreateClassInput:
     properties:
+      grade_level:
+        example: 10
+        maximum: 12
+        minimum: 9
+        type: integer
       name:
-        example: Grade 10A
+        example: Grade 10A Natural
+        type: string
+      section:
+        example: A
+        type: string
+      status:
+        example: Active
+        type: string
+      stream:
+        example: Natural Science
         type: string
       teacher_id:
         example: 1
@@ -113,7 +123,8 @@ definitions:
         example: 2025
         type: integer
     required:
-    - name
+    - grade_level
+    - section
     - year
     type: object
   controllers.CreatePayrollRequest:
@@ -152,6 +163,11 @@ definitions:
       email:
         example: alice@school.com
         type: string
+      grade_level:
+        example: 9
+        maximum: 12
+        minimum: 9
+        type: integer
       name:
         example: Alice Bekele
         minLength: 2
@@ -172,23 +188,36 @@ definitions:
         example: password123
         minLength: 8
         type: string
+      stream:
+        description: required only for grades 11-12
+        example: Natural Science
+        type: string
       student_code:
-        example: STU-001
+        example: STU-2025-001
         type: string
     required:
     - email
+    - grade_level
     - name
     - parent_id
     - password
-    - student_code
     type: object
   controllers.CreateSubjectInput:
     properties:
       code:
-        example: MATH-101
+        example: MATH-G9
         type: string
+      grade_level:
+        example: 9
+        type: integer
       name:
         example: Mathematics
+        type: string
+      status:
+        example: Active
+        type: string
+      stream:
+        example: ""
         type: string
       teacher_id:
         example: 1
@@ -210,6 +239,9 @@ definitions:
         example: teacher123
         minLength: 8
         type: string
+      phone:
+        example: "0911000001"
+        type: string
       qualification:
         example: MSc Mathematics
         type: string
@@ -220,6 +252,7 @@ definitions:
     - email
     - name
     - password
+    - phone
     - teacher_code
     type: object
   controllers.EnrollStudentInput:
@@ -360,6 +393,9 @@ definitions:
       date_of_birth:
         example: "2010-05-15"
         type: string
+      grade_level:
+        example: 10
+        type: integer
       parent_email:
         example: new@email.com
         type: string
@@ -371,6 +407,9 @@ definitions:
         type: string
       parent_phone:
         example: "+251922000000"
+        type: string
+      stream:
+        example: Natural Science
         type: string
     type: object
   controllers.UpdateSubjectInput:
@@ -387,11 +426,12 @@ definitions:
     type: object
   controllers.UpdateTeacherInput:
     properties:
+      phone:
+        example: "0911000001"
+        type: string
       qualification:
         example: PhD Mathematics
         type: string
-    required:
-    - qualification
     type: object
   controllers.VerifyReceiptRequest:
     properties:

@@ -3,9 +3,13 @@ import type { User } from './user'
 export interface Class {
   id: number
   name: string
+  grade_level?: number
+  section?: string
+  stream?: string
+  status?: string
   year: number
   teacher_id: number
-  teacher?: User
+  teacher?: Teacher
   students?: Student[]
   created_at: string
 }
@@ -14,8 +18,11 @@ export interface Subject {
   id: number
   name: string
   code: string
+  grade_level?: number
+  stream?: string
+  status?: string
   teacher_id: number
-  teacher?: User
+  teacher?: Teacher
   created_at: string
 }
 
@@ -32,6 +39,10 @@ export interface Student {
   parent_phone: string
   date_of_birth: string
   enrolled_at: string
+  stream?: string
+  grade_level?: number
+  promotion_status?: string
+  academic_year?: number
 }
 
 export interface Teacher {
@@ -54,7 +65,7 @@ export interface Enrollment {
 export interface Attendance {
   id: number
   student_id: number
-  subject_id: number
+  subject_id?: number | null
   date: string
   status: 'Present' | 'Absent' | 'Late'
   student?: Student

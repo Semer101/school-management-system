@@ -1,19 +1,40 @@
-import { useState, type FormEvent } from 'react'
-import { Phone } from 'lucide-react'
+import { useRef, useState, type FormEvent } from 'react'
+import { Phone, Camera } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
-import { changePassword } from '../../api/me'
+import { changePassword, uploadAvatar } from '../../api/me'
 import { Input } from '../../components/ui/Input'
 import { Button } from '../../components/ui/Button'
 import { Badge, roleBadgeVariant } from '../../components/ui/Badge'
+import { PageHeader } from '../../components/ui/PageHeader'
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 
 export default function ProfilePage() {
   const { user } = useAuth()
+  const fileRef = useRef<HTMLInputElement>(null)
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')
   const [confirm, setConfirm] = useState('')
   const [loading, setLoading] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
+
+  const avatarSrc = user?.avatar_url ? `${API_BASE}${user.avatar_url}` : null
+
+  const handleAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    try {
+      await uploadAvatar(file)
+      setSuccess('Profile picture updated. Refresh the page to see it in the navbar.')
+    } catch {
+      setError('Failed to upload image.')
+    } finally {
+      setUploading(false)
+    }
+  }
 
   const handlePassword = async (e: FormEvent) => {
     e.preventDefault()
@@ -35,63 +56,53 @@ export default function ProfilePage() {
 
   return (
     <div className="max-w-lg mx-auto">
-      <h1 className="text-xl font-bold text-[var(--text-h)] mb-6">My Profile</h1>
+      <PageHeader title="My Profile" />
 
-      {/* Info card */}
-      <div className="bg-[var(--bg)] border border-[var(--border)] rounded-2xl p-6 mb-6">
+      <div className="bg-surface border border-surface-border rounded-2xl p-6 mb-6">
         <div className="flex items-center gap-4 mb-4">
-          <div className="w-14 h-14 rounded-full bg-[var(--accent-bg)] flex items-center justify-center text-[var(--accent)] text-2xl font-bold">
-            {user?.name?.[0]?.toUpperCase()}
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold text-[var(--text-h)]">{user?.name}</h2>
-            <p className="text-sm text-[var(--text)]">{user?.email}</p>
-            {user?.role && (
-              <div className="mt-1">
-                <Badge label={user.role} variant={roleBadgeVariant(user.role)} />
+          <div className="relative">
+            {avatarSrc ? (
+              <img src={avatarSrc} alt="" className="w-16 h-16 rounded-full object-cover border-2 border-accent/30" />
+            ) : (
+              <div className="w-16 h-16 rounded-full bg-accent/20 flex items-center justify-center text-accent text-2xl font-bold">
+                {user?.name?.[0]?.toUpperCase()}
               </div>
             )}
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className="absolute -bottom-1 -right-1 p-1.5 rounded-full bg-accent text-white shadow"
+              disabled={uploading}
+            >
+              <Camera className="w-3 h-3" />
+            </button>
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatar} />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">{user?.name}</h2>
+            <p className="text-sm text-muted">{user?.email}</p>
+            {user?.role && <div className="mt-1"><Badge label={user.role} variant={roleBadgeVariant(user.role)} /></div>}
           </div>
         </div>
         {user?.phone && (
-          <p className="text-sm text-[var(--text)] flex items-center gap-2">
+          <p className="text-sm text-muted flex items-center gap-2">
             <Phone className="w-4 h-4 text-accent shrink-0" />
             {user.phone}
           </p>
         )}
-        <p className="text-xs text-[var(--text)] mt-2">
+        <p className="text-xs text-muted mt-2">
           Member since {user?.created_at ? new Date(user.created_at).toLocaleDateString() : '—'}
         </p>
       </div>
 
-      {/* Change password */}
-      <div className="bg-[var(--bg)] border border-[var(--border)] rounded-2xl p-6">
-        <h2 className="text-base font-semibold text-[var(--text-h)] mb-4">Change Password</h2>
+      <div className="bg-surface border border-surface-border rounded-2xl p-6">
+        <h2 className="text-base font-semibold text-foreground mb-4">Change Password</h2>
         <form onSubmit={handlePassword} className="flex flex-col gap-4">
-          <Input
-            label="Current Password"
-            type="password"
-            value={current}
-            onChange={(e) => setCurrent(e.target.value)}
-            required
-          />
-          <Input
-            label="New Password"
-            type="password"
-            value={next}
-            onChange={(e) => setNext(e.target.value)}
-            required
-          />
-          <Input
-            label="Confirm New Password"
-            type="password"
-            value={confirm}
-            onChange={(e) => setConfirm(e.target.value)}
-            required
-            error={confirm && next !== confirm ? 'Passwords do not match' : undefined}
-          />
-          {error && <p className="text-sm text-red-500">{error}</p>}
-          {success && <p className="text-sm text-green-600">{success}</p>}
+          <Input label="Current Password" type="password" value={current} onChange={(e) => setCurrent(e.target.value)} required />
+          <Input label="New Password" type="password" value={next} onChange={(e) => setNext(e.target.value)} required />
+          <Input label="Confirm New Password" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required />
+          {error && <p className="text-sm text-danger">{error}</p>}
+          {success && <p className="text-sm text-success">{success}</p>}
           <Button type="submit" loading={loading}>Update Password</Button>
         </form>
       </div>

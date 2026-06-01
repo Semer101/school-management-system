@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useAuth } from '../hooks/useAuth'
 import { Input } from '../components/ui/Input'
@@ -65,11 +65,14 @@ export default function LoginPage() {
               </p>
             )}
 
+            <div className="flex justify-end">
+              <Link to="/forgot-password" className="text-xs text-accent hover:underline">Forgot password?</Link>
+            </div>
+
             <Button type="submit" loading={loading} className="w-full mt-1">
               Sign in
             </Button>
           </form>
-          
         </GlassCard>
       </motion.div>
     </div>

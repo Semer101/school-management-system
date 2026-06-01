@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { getAllTransactions, verifyReceipt, createPayroll } from '../../api/finance'
+import { getAllTransactions, verifyReceipt, createPayroll, getPayrolls, markPayrollPaid } from '../../api/finance'
 import { getTeachers } from '../../api/admin'
-import type { Transaction } from '../../types/finance'
+import type { Transaction, Payroll } from '../../types/finance'
 import { listFromApi } from '../../types/api'
 import type { Teacher } from '../../types/academic'
 import { Table } from '../../components/ui/Table'
@@ -16,15 +16,23 @@ type Tab = 'transactions' | 'payroll'
 export default function AdminFinancePage() {
   const [tab, setTab] = useState<Tab>('transactions')
   const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [payrolls, setPayrolls] = useState<Payroll[]>([])
   const [teachers, setTeachers] = useState<Teacher[]>([])
   const [loading, setLoading] = useState(true)
   const [payrollModal, setPayrollModal] = useState(false)
   const [payrollForm, setPayrollForm] = useState({ teacher_id: 0, amount: '', month: new Date().getMonth() + 1, year: new Date().getFullYear() })
   const [savingPayroll, setSavingPayroll] = useState(false)
 
+  const loadPayrolls = () =>
+    getPayrolls().then((r) => setPayrolls(Array.isArray(r.data.data) ? r.data.data : []))
+
   useEffect(() => {
-    Promise.all([getAllTransactions(), getTeachers()])
-      .then(([t, te]) => { setTransactions(listFromApi(t.data)); setTeachers(listFromApi(te.data)) })
+    Promise.all([getAllTransactions(), getTeachers({ page_size: 50 }), getPayrolls()])
+      .then(([t, te, p]) => {
+        setTransactions(listFromApi(t.data))
+        setTeachers(listFromApi(te.data))
+        setPayrolls(Array.isArray(p.data.data) ? p.data.data : [])
+      })
       .finally(() => setLoading(false))
   }, [])
 
@@ -34,13 +42,20 @@ export default function AdminFinancePage() {
   }
 
   const handlePayroll = async (e: FormEvent) => {
-    e.preventDefault(); setSavingPayroll(true)
+    e.preventDefault()
+    setSavingPayroll(true)
     try {
       await createPayroll({ ...payrollForm, amount: Number(payrollForm.amount) })
       setPayrollModal(false)
+      await loadPayrolls()
     } finally {
       setSavingPayroll(false)
     }
+  }
+
+  const handleMarkPaid = async (id: number) => {
+    await markPayrollPaid(id)
+    await loadPayrolls()
   }
 
   if (loading) return <Spinner fullPage />
@@ -52,7 +67,6 @@ export default function AdminFinancePage() {
         <Button size="sm" onClick={() => setPayrollModal(true)}>+ Payroll</Button>
       </div>
 
-      {/* Tabs */}
       <div className="flex gap-2">
         {(['transactions', 'payroll'] as Tab[]).map((t) => (
           <button key={t} onClick={() => setTab(t)}
@@ -84,10 +98,25 @@ export default function AdminFinancePage() {
       )}
 
       {tab === 'payroll' && (
-        <p className="text-sm text-[var(--text)]">Payroll records appear here once created.</p>
+        <div className="max-h-[480px] overflow-y-auto rounded-xl border border-[var(--border)]">
+          <Table keyExtractor={(p) => p.id} data={payrolls} emptyMessage="No payroll records. Run seed or create one."
+            columns={[
+              { key: 'teacher', header: 'Teacher', render: (p) => p.teacher?.user?.name ?? `#${p.teacher_id}` },
+              { key: 'amount', header: 'Amount', render: (p) => `ETB ${p.amount.toLocaleString()}` },
+              { key: 'month', header: 'Month', render: (p) => new Date(0, p.month - 1).toLocaleString('default', { month: 'long' }) },
+              { key: 'year', header: 'Year' },
+              { key: 'status', header: 'Status', render: (p) => <Badge label={p.status} variant={statusVariant(p.status)} /> },
+              {
+                key: 'actions', header: '',
+                render: (p) => p.status === 'Pending' ? (
+                  <Button size="sm" variant="secondary" onClick={() => handleMarkPaid(p.id)}>Mark paid</Button>
+                ) : null,
+              },
+            ]}
+          />
+        </div>
       )}
 
-      {/* Payroll Modal */}
       <Modal open={payrollModal} onClose={() => setPayrollModal(false)} title="Create Payroll"
         footer={<Button form="payroll-form" type="submit" loading={savingPayroll}>Create</Button>}
       >

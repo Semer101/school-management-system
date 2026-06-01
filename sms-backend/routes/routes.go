@@ -36,6 +36,8 @@ func SetupRoutes(r *gin.Engine) {
 
 	// ── Public routes — NO auth required ──────────────
 	api.POST("/login", middlewares.RateLimitLogin(), controllers.Login)
+	api.POST("/forgot-password", controllers.ForgotPassword)
+	api.POST("/reset-password", controllers.ResetPasswordWithOTP)
 
 	// token/refresh accepts both the sms_refresh HttpOnly cookie (browser)
 	// and a refresh_token in the JSON body (API/mobile clients). No auth header needed.
@@ -61,6 +63,7 @@ func SetupRoutes(r *gin.Engine) {
 		// Profile — any authenticated user
 		auth.GET("/me", controllers.GetMe)
 		auth.PUT("/me/password", controllers.ChangePassword)
+		auth.POST("/me/avatar", controllers.UploadAvatar)
 
 		// Notifications — any authenticated user
 		auth.GET("/notifications", controllers.GetMyNotifications)
@@ -78,6 +81,13 @@ func SetupRoutes(r *gin.Engine) {
 		admin.Use(middlewares.RoleMiddleware(models.RoleAdmin))
 		{
 			admin.POST("/register", controllers.Register)
+
+			admin.GET("/admins", controllers.GetAdmins)
+			admin.PUT("/admins/:id", controllers.UpdateAdmin)
+			admin.DELETE("/admins/:id", controllers.ArchiveAdmin)
+			admin.GET("/parents", controllers.GetParents)
+			admin.PUT("/parents/:id", controllers.UpdateParent)
+			admin.DELETE("/parents/:id", controllers.ArchiveParent)
 
 			// Student management
 			admin.POST("/students", controllers.CreateStudent)
@@ -117,6 +127,7 @@ func SetupRoutes(r *gin.Engine) {
 			// Finance — admin actions
 			admin.GET("/finance/summary", controllers.GetAllTransactions)
 			admin.PATCH("/finance/receipt/:id/verify", controllers.VerifyReceipt)
+			admin.GET("/finance/payroll", controllers.GetPayrolls)
 			admin.POST("/finance/payroll", controllers.CreatePayroll)
 			admin.PATCH("/finance/payroll/:id/pay", controllers.MarkPayrollPaid)
 
@@ -126,6 +137,20 @@ func SetupRoutes(r *gin.Engine) {
 
 			// Attendance dashboard
 			admin.GET("/attendance/summary", controllers.GetAttendanceSummary)
+
+			// Analytics & dashboard KPIs
+			admin.GET("/analytics", controllers.GetAnalyticsSummary)
+			admin.GET("/dashboard/kpis", controllers.GetDashboardKPIs)
+
+			// Trash (soft-deleted records)
+			admin.GET("/trash", controllers.ListTrash)
+			admin.POST("/trash/:entity/:id/restore", controllers.RestoreTrash)
+			admin.DELETE("/trash/:entity/:id/permanent", controllers.PermanentDelete)
+
+			// Promotion & enrollment status
+			admin.GET("/students/:id/enrollment-status", controllers.GetStudentEnrollmentStatus)
+			admin.GET("/students/:id/promotion-preview", controllers.CheckPromotionPreview)
+			admin.POST("/students/:id/promote", controllers.PromoteStudent)
 
 			// Locker — admin read-only view for compliance/support
 			admin.GET("/locker/student/:studentID", controllers.AdminGetLockerFiles)
@@ -137,7 +162,6 @@ func SetupRoutes(r *gin.Engine) {
 		teacher := auth.Group("/academics")
 		teacher.Use(middlewares.RoleMiddleware(models.RoleTeacher))
 		{
-			teacher.POST("/attendance", controllers.RecordAttendance)
 			teacher.GET("/attendance/class/:classID", controllers.GetClassAttendance)
 
 			teacher.POST("/grades/bulk", controllers.BulkGradeEntry)
@@ -153,6 +177,7 @@ func SetupRoutes(r *gin.Engine) {
 		shared := auth.Group("/academics")
 		shared.Use(middlewares.RoleMiddleware(models.RoleTeacher, models.RoleStudent, models.RoleAdmin))
 		{
+			shared.POST("/attendance", controllers.RecordAttendance)
 			shared.GET("/attendance/:studentID", controllers.GetAttendancePercentage)
 			shared.GET("/grades/student/:studentID", controllers.GetStudentGrades)
 			shared.GET("/reportcard/:studentID", controllers.GetReportCard)

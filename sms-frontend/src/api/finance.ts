@@ -28,3 +28,6 @@ export const createPayroll = (data: {
 
 export const markPayrollPaid = (id: number) =>
   api.patch<APIResponse>(`/api/admin/finance/payroll/${id}/pay`)
+
+export const getPayrolls = () =>
+  api.get<APIResponse<Payroll[]>>('/api/admin/finance/payroll')

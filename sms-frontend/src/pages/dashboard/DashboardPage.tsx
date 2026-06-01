@@ -1,14 +1,18 @@
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import {
+  Users, GraduationCap, BookOpen, Layers, ClipboardCheck, Wallet,
+} from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useRole } from '../../hooks/useRole'
 import { useNotifications } from '../../hooks/useNotifications'
 import { Badge, roleBadgeVariant } from '../../components/ui/Badge'
-import { Button } from '../../components/ui/Button'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { GlassCard } from '../../components/ui/GlassCard'
 import { navIcons, type NavIconKey } from '../../lib/nav-icons'
 import { cn } from '../../lib/utils'
+import { getDashboardKPIs, type DashboardKPIs } from '../../api/analytics'
 
 interface DashCard {
   icon: NavIconKey
@@ -22,7 +26,6 @@ const cards: DashCard[] = [
   { icon: 'teachers', label: 'Teachers', to: '/admin/teachers', roles: ['Admin'] },
   { icon: 'classes', label: 'Classes', to: '/admin/classes', roles: ['Admin'] },
   { icon: 'subjects', label: 'Subjects', to: '/admin/subjects', roles: ['Admin'] },
-  { icon: 'enrollment', label: 'Enrollment', to: '/admin/enrollment', roles: ['Admin'] },
   { icon: 'attendance', label: 'Attendance', to: '/admin/attendance-summary', roles: ['Admin'] },
   { icon: 'finance', label: 'Finance', to: '/admin/finance', roles: ['Admin'] },
   { icon: 'notify', label: 'Broadcast', to: '/admin/notify', roles: ['Admin'] },
@@ -34,15 +37,14 @@ const cards: DashCard[] = [
   { icon: 'children', label: 'Children', to: '/parent/children', roles: ['Parent'] },
 ]
 
-const container = {
-  hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { staggerChildren: 0.05 } },
-}
-
-const item = {
-  hidden: { opacity: 0, y: 12 },
-  show: { opacity: 1, y: 0 },
-}
+const kpiConfig: { key: keyof DashboardKPIs; label: string; icon: typeof Users; color: string; bg: string }[] = [
+  { key: 'students', label: 'Students', icon: GraduationCap, color: 'text-kpi-students', bg: 'bg-kpi-students/10 border-kpi-students/30' },
+  { key: 'teachers', label: 'Teachers', icon: Users, color: 'text-kpi-teachers', bg: 'bg-kpi-teachers/10 border-kpi-teachers/30' },
+  { key: 'classes', label: 'Classes', icon: Layers, color: 'text-kpi-classes', bg: 'bg-kpi-classes/10 border-kpi-classes/30' },
+  { key: 'subjects', label: 'Subjects', icon: BookOpen, color: 'text-kpi-subjects', bg: 'bg-kpi-subjects/10 border-kpi-subjects/30' },
+  { key: 'present_today', label: 'Present Today', icon: ClipboardCheck, color: 'text-kpi-attendance', bg: 'bg-kpi-attendance/10 border-kpi-attendance/30' },
+  { key: 'pending_transactions', label: 'Pending Payments', icon: Wallet, color: 'text-kpi-finance', bg: 'bg-kpi-finance/10 border-kpi-finance/30' },
+]
 
 export default function DashboardPage() {
   const { user } = useAuth()
@@ -50,9 +52,17 @@ export default function DashboardPage() {
   const { unreadCount } = useNotifications()
   const navigate = useNavigate()
   const visible = cards.filter((c) => role && c.roles.includes(role))
+  const [kpis, setKpis] = useState<DashboardKPIs | null>(null)
+
+  useEffect(() => {
+    if (role !== 'Admin') return
+    getDashboardKPIs()
+      .then((res) => setKpis(res.data.data as DashboardKPIs))
+      .catch(() => {})
+  }, [role])
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className="max-w-6xl mx-auto">
       <PageHeader
         title={`Welcome, ${user?.name?.split(' ')[0] ?? 'User'}`}
         subtitle={user?.email}
@@ -60,29 +70,35 @@ export default function DashboardPage() {
       />
 
       {unreadCount > 0 && (
-        <GlassCard
-          hover
-          className="mb-6 px-4 py-3 flex items-center justify-between cursor-pointer"
-        >
-          <motion.div
-            role="button"
-            tabIndex={0}
-            onClick={() => navigate('/notifications')}
-            onKeyDown={(e) => e.key === 'Enter' && navigate('/notifications')}
-            className="flex items-center justify-between w-full"
-          >
+        <GlassCard hover className="mb-6 px-4 py-3 cursor-pointer">
+          <button type="button" className="w-full text-left" onClick={() => navigate('/notifications')}>
             <p className="text-sm text-accent font-medium">
               {unreadCount} unread notification{unreadCount > 1 ? 's' : ''}
             </p>
-            <span className="text-xs text-accent font-mono">VIEW</span>
-          </motion.div>
+          </button>
         </GlassCard>
       )}
 
+      {role === 'Admin' && kpis && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-8">
+          {kpiConfig.map(({ key, label, icon: Icon, color, bg }) => (
+            <motion.div
+              key={key}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={cn('rounded-xl border p-4', bg)}
+            >
+              <Icon className={cn('w-5 h-5 mb-2', color)} />
+              <p className="text-2xl font-bold text-foreground">{kpis[key] ?? 0}</p>
+              <p className="text-xs text-muted mt-1">{label}</p>
+            </motion.div>
+          ))}
+        </div>
+      )}
+
       <motion.div
-        variants={container}
-        initial="hidden"
-        animate="show"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
         className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"
       >
         {visible.map((card) => {
@@ -90,7 +106,6 @@ export default function DashboardPage() {
           return (
             <motion.button
               key={card.to + card.label}
-              variants={item}
               type="button"
               onClick={() => navigate(card.to)}
               className={cn(
@@ -104,12 +119,6 @@ export default function DashboardPage() {
           )
         })}
       </motion.div>
-
-      <div className="mt-8 flex justify-end">
-        <Button variant="ghost" size="sm" onClick={() => navigate('/profile')}>
-          Profile settings
-        </Button>
-      </div>
     </div>
   )
 }

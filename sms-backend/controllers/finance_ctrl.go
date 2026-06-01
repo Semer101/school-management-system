@@ -250,6 +250,19 @@ func CreatePayroll(c *gin.Context) {
 	helpers.Success(c, http.StatusCreated, "payroll created", payroll)
 }
 
+// GetPayrolls lists payroll records (Admin only)
+func GetPayrolls(c *gin.Context) {
+	var payrolls []models.Payroll
+	if err := config.DB.Preload("Teacher.User").
+		Order("year DESC, month DESC, id DESC").
+		Limit(200).
+		Find(&payrolls).Error; err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "failed to fetch payroll")
+		return
+	}
+	helpers.Success(c, http.StatusOK, "payroll fetched", payrolls)
+}
+
 // MarkPayrollPaid godoc
 // @Summary      Mark payroll as paid (Admin only)
 // @Description  Sets a payroll record's status to Paid and records the payment timestamp.

@@ -1,4 +1,10 @@
 import api from './axiosClient'
+
+export const forgotPassword = (email: string) =>
+  api.post('/api/forgot-password', { email })
+
+export const resetPasswordWithOTP = (email: string, otp: string, new_password: string) =>
+  api.post('/api/reset-password', { email, otp, new_password })
 import type { APIResponse } from '../types/api'
 import type { User } from '../types/user'
 

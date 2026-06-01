@@ -23,7 +23,7 @@ export function Modal({ open, onClose, title, children, footer }: ModalProps) {
 
   return (
     <div className={overlay} onClick={onClose} role="dialog" aria-modal="true" aria-labelledby="modal-title">
-      <div className="absolute inset-0 bg-void/80 backdrop-blur-sm" aria-hidden />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" aria-hidden />
       <div
         className="relative w-full max-w-md bg-surface border border-surface-border rounded-2xl shadow-glass"
         onClick={(e) => e.stopPropagation()}

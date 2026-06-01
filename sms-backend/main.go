@@ -76,6 +76,7 @@ func main() {
 			&models.Notification{},
 			&models.NotificationReceipt{},
 			&models.RefreshToken{},
+			&models.PasswordResetOTP{},
 		)
 
 		if err != nil {
@@ -93,8 +94,16 @@ func main() {
 	if err := os.MkdirAll(uploadDir, 0750); err != nil {
 		log.Fatal("Failed to create uploads directory: ", err)
 	}
+	avatarDir := os.Getenv("AVATAR_DIR")
+	if avatarDir == "" {
+		avatarDir = "./uploads/avatars"
+	}
+	if err := os.MkdirAll(avatarDir, 0750); err != nil {
+		log.Fatal("Failed to create avatars directory: ", err)
+	}
 
 	r := gin.Default()
+	r.Static("/uploads", "./uploads")
 	r.SetTrustedProxies(nil)
 
 	routes.SetupRoutes(r)

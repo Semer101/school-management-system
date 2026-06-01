@@ -2592,8 +2592,7 @@ const docTemplate = `{
             "required": [
                 "date",
                 "status",
-                "student_id",
-                "subject_id"
+                "student_id"
             ],
             "properties": {
                 "date": {
@@ -2616,10 +2615,6 @@ const docTemplate = `{
                 "student_id": {
                     "type": "integer",
                     "example": 1
-                },
-                "subject_id": {
-                    "type": "integer",
-                    "example": 2
                 }
             }
         },
@@ -2725,13 +2720,32 @@ const docTemplate = `{
         "controllers.CreateClassInput": {
             "type": "object",
             "required": [
-                "name",
+                "grade_level",
+                "section",
                 "year"
             ],
             "properties": {
+                "grade_level": {
+                    "type": "integer",
+                    "maximum": 12,
+                    "minimum": 9,
+                    "example": 10
+                },
                 "name": {
                     "type": "string",
-                    "example": "Grade 10A"
+                    "example": "Grade 10A Natural"
+                },
+                "section": {
+                    "type": "string",
+                    "example": "A"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "Active"
+                },
+                "stream": {
+                    "type": "string",
+                    "example": "Natural Science"
                 },
                 "teacher_id": {
                     "type": "integer",
@@ -2779,10 +2793,10 @@ const docTemplate = `{
             "type": "object",
             "required": [
                 "email",
+                "grade_level",
                 "name",
                 "parent_id",
-                "password",
-                "student_code"
+                "password"
             ],
             "properties": {
                 "class_id": {
@@ -2796,6 +2810,12 @@ const docTemplate = `{
                 "email": {
                     "type": "string",
                     "example": "alice@school.com"
+                },
+                "grade_level": {
+                    "type": "integer",
+                    "maximum": 12,
+                    "minimum": 9,
+                    "example": 9
                 },
                 "name": {
                     "type": "string",
@@ -2823,9 +2843,14 @@ const docTemplate = `{
                     "minLength": 8,
                     "example": "password123"
                 },
+                "stream": {
+                    "description": "required only for grades 11-12",
+                    "type": "string",
+                    "example": "Natural Science"
+                },
                 "student_code": {
                     "type": "string",
-                    "example": "STU-001"
+                    "example": "STU-2025-001"
                 }
             }
         },
@@ -2838,11 +2863,23 @@ const docTemplate = `{
             "properties": {
                 "code": {
                     "type": "string",
-                    "example": "MATH-101"
+                    "example": "MATH-G9"
+                },
+                "grade_level": {
+                    "type": "integer",
+                    "example": 9
                 },
                 "name": {
                     "type": "string",
                     "example": "Mathematics"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "Active"
+                },
+                "stream": {
+                    "type": "string",
+                    "example": ""
                 },
                 "teacher_id": {
                     "type": "integer",
@@ -2856,6 +2893,7 @@ const docTemplate = `{
                 "email",
                 "name",
                 "password",
+                "phone",
                 "teacher_code"
             ],
             "properties": {
@@ -2872,6 +2910,10 @@ const docTemplate = `{
                     "type": "string",
                     "minLength": 8,
                     "example": "teacher123"
+                },
+                "phone": {
+                    "type": "string",
+                    "example": "0911000001"
                 },
                 "qualification": {
                     "type": "string",
@@ -3072,6 +3114,10 @@ const docTemplate = `{
                     "type": "string",
                     "example": "2010-05-15"
                 },
+                "grade_level": {
+                    "type": "integer",
+                    "example": 10
+                },
                 "parent_email": {
                     "type": "string",
                     "example": "new@email.com"
@@ -3087,6 +3133,10 @@ const docTemplate = `{
                 "parent_phone": {
                     "type": "string",
                     "example": "+251922000000"
+                },
+                "stream": {
+                    "type": "string",
+                    "example": "Natural Science"
                 }
             }
         },
@@ -3109,10 +3159,11 @@ const docTemplate = `{
         },
         "controllers.UpdateTeacherInput": {
             "type": "object",
-            "required": [
-                "qualification"
-            ],
             "properties": {
+                "phone": {
+                    "type": "string",
+                    "example": "0911000001"
+                },
                 "qualification": {
                     "type": "string",
                     "example": "PhD Mathematics"

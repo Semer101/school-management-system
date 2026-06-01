@@ -10,6 +10,8 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 
 function Bootstrap() {
   useEffect(() => {
+    const theme = localStorage.getItem('sms_theme')
+    document.documentElement.classList.toggle('dark', theme === 'dark')
     store.dispatch(initializeAuth())
   }, [])
 

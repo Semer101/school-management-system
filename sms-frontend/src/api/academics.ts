@@ -1,20 +1,28 @@
 import api from './axiosClient'
 import type { APIResponse } from '../types/api'
-import type { Attendance, AttendancePercentage, Grade, ReportCard } from '../types/academic'
+import type { Attendance, Grade, ReportCard } from '../types/academic'
 
 // ── Attendance ───────────────────────────────────────────
 export const recordAttendance = (data: {
   student_id: number
-  subject_id: number
   date: string
   status: 'Present' | 'Absent' | 'Late'
+  notes?: string
 }) => api.post<APIResponse<Attendance>>('/api/academics/attendance', data)
 
-export const getClassAttendance = (classID: number) =>
-  api.get<APIResponse<Attendance[]>>(`/api/academics/attendance/class/${classID}`)
+export const getClassAttendance = (classID: number, date: string) =>
+  api.get<APIResponse<Attendance[]>>(`/api/academics/attendance/class/${classID}`, { params: { date } })
+
+export type AttendanceStats = {
+  student_id: string
+  overall_percentage: number
+  total_days: number
+  attended: number
+  by_month: { month: string; total: number; present: number; percentage: number }[]
+}
 
 export const getAttendancePercentage = (studentID: number) =>
-  api.get<APIResponse<AttendancePercentage[]>>(`/api/academics/attendance/${studentID}`)
+  api.get<APIResponse<AttendanceStats>>(`/api/academics/attendance/${studentID}`)
 
 // ── Grades ───────────────────────────────────────────────
 export const bulkGradeEntry = (grades: {

@@ -24,13 +24,15 @@ type CreateStudentInput struct {
 	Name        string `json:"name"          binding:"required,min=2"        example:"Alice Bekele"`
 	Email       string `json:"email"         binding:"required,email"        example:"alice@school.com"`
 	Password    string `json:"password"      binding:"required,min=8"        example:"password123"`
-	StudentCode string `json:"student_code"  binding:"required"              example:"STU-001"`
+	StudentCode string `json:"student_code"  example:"STU-2025-001"`
 	ClassID     uint   `json:"class_id"                                       example:"1"`
 	ParentID    uint   `json:"parent_id"     binding:"required"              example:"5"`
 	ParentName  string `json:"parent_name"                                   example:"Mr. Bekele"`
 	ParentEmail string `json:"parent_email"  binding:"omitempty,email"       example:"parent@email.com"`
 	ParentPhone string `json:"parent_phone"                                  example:"+251911000000"`
 	DateOfBirth string `json:"date_of_birth"                                 example:"2010-05-15"`
+	Stream      string `json:"stream"        example:"Natural Science"` // required only for grades 11-12
+	GradeLevel  int    `json:"grade_level"   binding:"required,min=9,max=12" example:"9"`
 }
 
 type UpdateStudentInput struct {
@@ -40,6 +42,8 @@ type UpdateStudentInput struct {
 	ParentEmail string `json:"parent_email"  binding:"omitempty,email" example:"new@email.com"`
 	ParentPhone string `json:"parent_phone"                            example:"+251922000000"`
 	DateOfBirth string `json:"date_of_birth"                           example:"2010-05-15"`
+	Stream      string `json:"stream"                                  example:"Natural Science"`
+	GradeLevel  *int   `json:"grade_level"                             example:"10"`
 }
 
 type CreateTeacherInput struct {
@@ -48,15 +52,16 @@ type CreateTeacherInput struct {
 	Password      string `json:"password"      binding:"required,min=8" example:"teacher123"`
 	TeacherCode   string `json:"teacher_code"  binding:"required"       example:"TCH-001"`
 	Qualification string `json:"qualification"                          example:"MSc Mathematics"`
+	Phone         string `json:"phone"         binding:"required"        example:"0911000001"`
 }
 
 type UpdateTeacherInput struct {
-	Qualification string `json:"qualification" binding:"required" example:"PhD Mathematics"`
+	Qualification string `json:"qualification" example:"PhD Mathematics"`
+	Phone         string `json:"phone"         example:"0911000001"`
 }
 
 type AttendanceInput struct {
 	StudentID uint   `json:"student_id" binding:"required"                           example:"1"`
-	SubjectID uint   `json:"subject_id" binding:"required"                           example:"2"`
 	Date      string `json:"date"       binding:"required"                           example:"2025-05-01"`
 	Status    string `json:"status"     binding:"required,oneof=Present Absent Late" example:"Present"`
 	Notes     string `json:"notes"                                                   example:"Arrived 5 mins late"`
@@ -78,9 +83,13 @@ type BulkGradeInput struct {
 }
 
 type CreateClassInput struct {
-	Name      string `json:"name"       binding:"required" example:"Grade 10A"`
-	Year      int    `json:"year"       binding:"required" example:"2025"`
-	TeacherID uint   `json:"teacher_id"                    example:"1"`
+	Name       string `json:"name"        example:"Grade 10A Natural"`
+	GradeLevel int    `json:"grade_level" binding:"required,min=9,max=12" example:"10"`
+	Section    string `json:"section"     binding:"required" example:"A"`
+	Stream     string `json:"stream"      example:"Natural Science"`
+	Status     string `json:"status"      example:"Active"`
+	Year       int    `json:"year"        binding:"required" example:"2025"`
+	TeacherID  uint   `json:"teacher_id"  example:"1"`
 }
 
 // UpdateClassInput allows changing the homeroom teacher or year after creation.
@@ -91,9 +100,12 @@ type UpdateClassInput struct {
 }
 
 type CreateSubjectInput struct {
-	Name      string `json:"name"       binding:"required" example:"Mathematics"`
-	Code      string `json:"code"       binding:"required" example:"MATH-101"`
-	TeacherID uint   `json:"teacher_id"                    example:"1"`
+	Name       string `json:"name"        binding:"required" example:"Mathematics"`
+	Code       string `json:"code"        binding:"required" example:"MATH-G9"`
+	GradeLevel int    `json:"grade_level" example:"9"`
+	Stream     string `json:"stream"      example:""`
+	Status     string `json:"status"      example:"Active"`
+	TeacherID  uint   `json:"teacher_id"  example:"1"`
 }
 
 // UpdateSubjectInput allows renaming a subject or reassigning its teacher.
@@ -117,12 +129,12 @@ type UnenrollStudentInput struct {
 // ── Pagination helper ─────────────────────────────────────────────────────────
 func parsePage(c *gin.Context) (offset, limit int) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	size, _ := strconv.Atoi(c.DefaultQuery("page_size", "50"))
+	size, _ := strconv.Atoi(c.DefaultQuery("page_size", "25"))
 	if page < 1 {
 		page = 1
 	}
-	if size < 1 || size > 200 {
-		size = 50
+	if size < 1 || size > 100 {
+		size = 25
 	}
 	return (page - 1) * size, size
 }
@@ -154,6 +166,21 @@ func CreateStudent(c *gin.Context) {
 
 	input.Email = strings.ToLower(strings.TrimSpace(input.Email))
 
+	// Grades 9-10: common curriculum, no stream differentiation
+	// Grades 11-12: stream is required and must be Natural or Social Science
+	if input.GradeLevel <= 10 {
+		input.Stream = "" // enforce no stream for grades 9-10
+	} else {
+		if input.Stream != models.StreamNatural && input.Stream != models.StreamSocial {
+			helpers.Error(c, http.StatusBadRequest, "stream must be 'Natural Science' or 'Social Science' for grades 11–12")
+			return
+		}
+	}
+	if input.GradeLevel < 9 {
+		helpers.Error(c, http.StatusBadRequest, "grade_level must be 9 or higher")
+		return
+	}
+
 	var parent models.User
 	if err := config.DB.First(&parent, input.ParentID).Error; err != nil {
 		helpers.Error(c, http.StatusBadRequest, "invalid parent_id: user not found")
@@ -171,10 +198,14 @@ func CreateStudent(c *gin.Context) {
 		return
 	}
 
+	studentCode := strings.TrimSpace(input.StudentCode)
+	if studentCode == "" {
+		studentCode = generateStudentCode(input.GradeLevel)
+	}
 	var codeCount int64
 	config.DB.Unscoped().
 		Model(&models.Student{}).
-		Where("student_code = ?", input.StudentCode).
+		Where("student_code = ?", studentCode).
 		Count(&codeCount)
 
 	if codeCount > 0 {
@@ -213,17 +244,24 @@ func CreateStudent(c *gin.Context) {
 			return err
 		}
 		student = models.Student{
-			UserID:      user.ID,
-			ParentID:    input.ParentID,
-			ClassID:     input.ClassID,
-			StudentCode: input.StudentCode,
-			ParentName:  input.ParentName,
-			ParentEmail: input.ParentEmail,
-			ParentPhone: input.ParentPhone,
-			DateOfBirth: dob,
-			EnrolledAt:  time.Now(),
+			UserID:          user.ID,
+			ParentID:        input.ParentID,
+			ClassID:         input.ClassID,
+			StudentCode:     studentCode,
+			ParentName:      input.ParentName,
+			ParentEmail:     input.ParentEmail,
+			ParentPhone:     input.ParentPhone,
+			DateOfBirth:     dob,
+			EnrolledAt:      time.Now(),
+			Stream:          input.Stream,
+			GradeLevel:      input.GradeLevel,
+			PromotionStatus: models.PromotionNormal,
+			AcademicYear:    time.Now().Year(),
 		}
-		return tx.Create(&student).Error
+		if err := tx.Create(&student).Error; err != nil {
+			return err
+		}
+		return autoEnrollStudentSubjects(tx, &student)
 	})
 
 	if txErr != nil {
@@ -264,6 +302,17 @@ func GetStudents(c *gin.Context) {
 	// Previously, scope was built then discarded — a new config.DB chain was used
 	// for Find, which could diverge from the count in edge cases.
 	db := config.DB.Model(&models.Student{})
+	if q := strings.TrimSpace(c.Query("search")); q != "" {
+		like := "%" + q + "%"
+		db = db.Joins("JOIN users ON users.id = students.user_id").
+			Where("users.name ILIKE ? OR students.student_code ILIKE ? OR users.email ILIKE ?", like, like, like)
+	}
+	if stream := c.Query("stream"); stream != "" {
+		db = db.Where("students.stream = ?", stream)
+	}
+	if gl := c.Query("grade_level"); gl != "" {
+		db = db.Where("students.grade_level = ?", gl)
+	}
 	db.Count(&total)
 	if err := db.Preload("User").Preload("Class").
 		Offset(offset).Limit(limit).Find(&students).Error; err != nil {
@@ -343,6 +392,29 @@ func UpdateStudent(c *gin.Context) {
 			return
 		}
 		updates["date_of_birth"] = parsed
+	}
+	if input.GradeLevel != nil {
+		if *input.GradeLevel < 9 || *input.GradeLevel > 12 {
+			helpers.Error(c, http.StatusBadRequest, "grade_level must be 9–12")
+			return
+		}
+		updates["grade_level"] = *input.GradeLevel
+		// Enforce stream rules when grade changes
+		if *input.GradeLevel <= 10 {
+			updates["stream"] = "" // grades 9-10 have no stream
+		} else if input.Stream != "" {
+			if input.Stream != models.StreamNatural && input.Stream != models.StreamSocial {
+				helpers.Error(c, http.StatusBadRequest, "stream must be 'Natural Science' or 'Social Science' for grades 11–12")
+				return
+			}
+			updates["stream"] = input.Stream
+		}
+	} else if input.Stream != "" {
+		if input.Stream != models.StreamNatural && input.Stream != models.StreamSocial {
+			helpers.Error(c, http.StatusBadRequest, "stream must be 'Natural Science' or 'Social Science'")
+			return
+		}
+		updates["stream"] = input.Stream
 	}
 
 	if len(updates) == 0 {
@@ -456,6 +528,7 @@ func CreateTeacher(c *gin.Context) {
 			Name:     input.Name,
 			Email:    input.Email,
 			Password: string(hashed),
+			Phone:    input.Phone,
 			Role:     models.RoleTeacher,
 			IsActive: true,
 		}
@@ -553,9 +626,21 @@ func UpdateTeacher(c *gin.Context) {
 		helpers.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	if err := config.DB.Model(&teacher).Update("qualification", input.Qualification).Error; err != nil {
-		helpers.Error(c, http.StatusInternalServerError, "failed to update teacher")
-		return
+	updates := map[string]interface{}{}
+	if input.Qualification != "" {
+		updates["qualification"] = input.Qualification
+	}
+	if len(updates) > 0 {
+		if err := config.DB.Model(&teacher).Updates(updates).Error; err != nil {
+			helpers.Error(c, http.StatusInternalServerError, "failed to update teacher")
+			return
+		}
+	}
+	if input.Phone != "" {
+		if err := config.DB.Model(&models.User{}).Where("id = ?", teacher.UserID).Update("phone", input.Phone).Error; err != nil {
+			helpers.Error(c, http.StatusInternalServerError, "failed to update phone")
+			return
+		}
 	}
 	// reload the record after update — GORM does not refresh the struct in place.
 	config.DB.Preload("User").First(&teacher, teacher.ID)
@@ -619,7 +704,39 @@ func CreateClass(c *gin.Context) {
 		helpers.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	class := models.Class{Name: input.Name, Year: input.Year, TeacherID: input.TeacherID}
+	section := strings.ToUpper(strings.TrimSpace(input.Section))
+	if section == "" {
+		helpers.Error(c, http.StatusBadRequest, "section is required")
+		return
+	}
+	var dup int64
+	dupQ := config.DB.Model(&models.Class{}).
+		Where("grade_level = ? AND section = ? AND year = ?", input.GradeLevel, section, input.Year)
+	if input.Stream != "" {
+		dupQ = dupQ.Where("stream = ?", input.Stream)
+	} else {
+		dupQ = dupQ.Where("stream = '' OR stream IS NULL")
+	}
+	dupQ.Count(&dup)
+	if dup > 0 {
+		helpers.Error(c, http.StatusConflict, fmt.Sprintf("class %d%s already exists for this year", input.GradeLevel, section))
+		return
+	}
+	name := input.Name
+	if name == "" {
+		name = fmt.Sprintf("%d%s", input.GradeLevel, section)
+		if input.Stream != "" {
+			name += " " + input.Stream
+		}
+	}
+	status := input.Status
+	if status == "" {
+		status = "Active"
+	}
+	class := models.Class{
+		Name: name, GradeLevel: input.GradeLevel, Section: section,
+		Stream: input.Stream, Status: status, Year: input.Year, TeacherID: input.TeacherID,
+	}
 
 	if err := config.DB.Create(&class).Error; err != nil {
 		helpers.Error(c, http.StatusInternalServerError, "failed to create class: "+err.Error())
@@ -647,7 +764,7 @@ func GetClasses(c *gin.Context) {
 	// oversized response.
 	db := config.DB.Model(&models.Class{})
 	db.Count(&total)
-	if err := db.Preload("Teacher").Preload("Students").Offset(offset).Limit(limit).Find(&classes).Error; err != nil {
+	if err := db.Preload("Teacher.User").Offset(offset).Limit(limit).Find(&classes).Error; err != nil {
 		helpers.Error(c, http.StatusInternalServerError, "failed to fetch classes")
 		return
 	}
@@ -709,7 +826,7 @@ func UpdateClass(c *gin.Context) {
 		return
 	}
 
-	config.DB.Preload("Teacher").First(&class, class.ID)
+	config.DB.Preload("Teacher.User").First(&class, class.ID)
 	helpers.Success(c, http.StatusOK, "class updated", class)
 }
 
@@ -778,7 +895,14 @@ func CreateSubject(c *gin.Context) {
 		return
 	}
 
-	subject := models.Subject{Name: input.Name, Code: input.Code, TeacherID: input.TeacherID}
+	st := input.Status
+	if st == "" {
+		st = "Active"
+	}
+	subject := models.Subject{
+		Name: input.Name, Code: input.Code, GradeLevel: input.GradeLevel,
+		Stream: input.Stream, Status: st, TeacherID: input.TeacherID,
+	}
 	if err := config.DB.Create(&subject).Error; err != nil {
 		// Any remaining error is a genuine server/DB failure.
 		helpers.Error(c, http.StatusInternalServerError, "failed to create subject: "+err.Error())
@@ -803,8 +927,18 @@ func GetSubjects(c *gin.Context) {
 
 	// FIX #8: apply pagination — same as GetClasses fix above.
 	db := config.DB.Model(&models.Subject{})
+	if stream := strings.TrimSpace(c.Query("stream")); stream != "" {
+		if stream == "Common" {
+			db = db.Where("stream = '' OR stream IS NULL")
+		} else {
+			db = db.Where("stream = ?", stream)
+		}
+	}
+	if gl := c.Query("grade_level"); gl != "" {
+		db = db.Where("grade_level = ?", gl)
+	}
 	db.Count(&total)
-	if err := db.Preload("Teacher").Offset(offset).Limit(limit).Find(&subjects).Error; err != nil {
+	if err := db.Preload("Teacher.User").Offset(offset).Limit(limit).Find(&subjects).Error; err != nil {
 		helpers.Error(c, http.StatusInternalServerError, "failed to fetch subjects")
 		return
 	}
@@ -878,7 +1012,7 @@ func UpdateSubject(c *gin.Context) {
 		return
 	}
 
-	config.DB.Preload("Teacher").First(&subject, subject.ID)
+	config.DB.Preload("Teacher.User").First(&subject, subject.ID)
 	helpers.Success(c, http.StatusOK, "subject updated", subject)
 }
 
@@ -1029,7 +1163,11 @@ func UnenrollStudent(c *gin.Context) {
 // @Failure      403   {object}  helpers.APIResponse  "Forbidden — not your subject"
 // @Router       /api/academics/attendance [post]
 func RecordAttendance(c *gin.Context) {
-	teacherUserID := c.GetUint("userID")
+	role := c.GetString("role")
+	if role != models.RoleTeacher && role != models.RoleAdmin {
+		helpers.Error(c, http.StatusForbidden, "only teachers and admins can record attendance")
+		return
+	}
 
 	var input AttendanceInput
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -1037,32 +1175,26 @@ func RecordAttendance(c *gin.Context) {
 		return
 	}
 
-	var subject models.Subject
-	if err := config.DB.First(&subject, input.SubjectID).Error; err != nil {
-		helpers.Error(c, http.StatusBadRequest, "subject not found")
-		return
-	}
-	var teacher models.Teacher
-	if err := config.DB.Where("user_id = ?", teacherUserID).First(&teacher).Error; err != nil {
-		helpers.Error(c, http.StatusForbidden, "teacher profile not found")
-		return
-	}
-	// subject.TeacherID stores the Teacher table PK (not User PK).
-	if subject.TeacherID != teacher.ID {
-		helpers.Error(c, http.StatusForbidden, "you are not assigned to this subject")
+	var student models.Student
+	if err := config.DB.First(&student, input.StudentID).Error; err != nil {
+		helpers.Error(c, http.StatusBadRequest, "student not found")
 		return
 	}
 
-	// FIX #3a: Verify the student is actually enrolled in this subject.
-	// Without this check, a teacher could record attendance for a student who has
-	// never been enrolled, creating phantom attendance records with no enrollment.
-	var enrollCount int64
-	config.DB.Model(&models.Enrollment{}).
-		Where("student_id = ? AND subject_id = ?", input.StudentID, input.SubjectID).
-		Count(&enrollCount)
-	if enrollCount == 0 {
-		helpers.Error(c, http.StatusBadRequest, "student is not enrolled in this subject")
-		return
+	if role == models.RoleTeacher {
+		teacherUserID := c.GetUint("userID")
+		var teacher models.Teacher
+		if err := config.DB.Where("user_id = ?", teacherUserID).First(&teacher).Error; err != nil {
+			helpers.Error(c, http.StatusForbidden, "teacher profile not found")
+			return
+		}
+		if student.ClassID != 0 {
+			var class models.Class
+			if err := config.DB.First(&class, student.ClassID).Error; err == nil && class.TeacherID != teacher.ID {
+				helpers.Error(c, http.StatusForbidden, "you can only record attendance for your homeroom class")
+				return
+			}
+		}
 	}
 
 	date, err := time.Parse("2006-01-02", input.Date)
@@ -1076,8 +1208,8 @@ func RecordAttendance(c *gin.Context) {
 	dayStart := date
 	dayEnd := date.Add(24 * time.Hour)
 	result := config.DB.Where(
-		"student_id = ? AND subject_id = ? AND date >= ? AND date < ?",
-		input.StudentID, input.SubjectID, dayStart, dayEnd,
+		"student_id = ? AND subject_id IS NULL AND date >= ? AND date < ?",
+		input.StudentID, dayStart, dayEnd,
 	).First(&existing)
 
 	if result.Error == nil {
@@ -1088,13 +1220,14 @@ func RecordAttendance(c *gin.Context) {
 			helpers.Error(c, http.StatusInternalServerError, "failed to update attendance")
 			return
 		}
+		config.DB.Preload("Student.User").First(&existing, existing.ID)
 		helpers.Success(c, http.StatusOK, "attendance updated", existing)
 		return
 	}
 
 	attendance := models.Attendance{
 		StudentID: input.StudentID,
-		SubjectID: input.SubjectID,
+		SubjectID: nil,
 		Date:      date,
 		Status:    input.Status,
 		Notes:     input.Notes,
@@ -1103,6 +1236,7 @@ func RecordAttendance(c *gin.Context) {
 		helpers.Error(c, http.StatusInternalServerError, "failed to record attendance")
 		return
 	}
+	config.DB.Preload("Student.User").First(&attendance, attendance.ID)
 	helpers.Success(c, http.StatusCreated, "attendance recorded", attendance)
 }
 
@@ -1133,8 +1267,8 @@ func GetClassAttendance(c *gin.Context) {
 	config.DB.
 		Joins("JOIN students ON attendances.student_id = students.id").
 		Preload("Student.User").
-		Preload("Subject").
 		Where("students.class_id = ?", classID).
+		Where("attendances.subject_id IS NULL").
 		Where("DATE(attendances.date) = ?", date).
 		Find(&records)
 
@@ -1169,9 +1303,9 @@ func GetAttendancePercentage(c *gin.Context) {
 	}
 	var total, present int64
 
-	config.DB.Model(&models.Attendance{}).Where("student_id = ?", studentID).Count(&total)
+	config.DB.Model(&models.Attendance{}).Where("student_id = ? AND subject_id IS NULL", studentID).Count(&total)
 	config.DB.Model(&models.Attendance{}).
-		Where("student_id = ? AND status IN ('Present','Late')", studentID).
+		Where("student_id = ? AND subject_id IS NULL AND status IN ('Present','Late')", studentID).
 		Count(&present)
 
 	percentage := 0.0
@@ -1179,30 +1313,30 @@ func GetAttendancePercentage(c *gin.Context) {
 		percentage = float64(present) / float64(total) * 100
 	}
 
-	type SubjectStat struct {
-		SubjectName string  `json:"subject_name"`
-		Total       int64   `json:"total"`
-		Present     int64   `json:"present"`
-		Percentage  float64 `json:"percentage"`
+	type MonthStat struct {
+		Month      string  `json:"month"`
+		Total      int64   `json:"total"`
+		Present    int64   `json:"present"`
+		Percentage float64 `json:"percentage"`
 	}
-	breakdown := []SubjectStat{}
+	breakdown := []MonthStat{}
 	config.DB.Raw(`
-		SELECT s.name as subject_name,
+		SELECT TO_CHAR(a.date, 'Mon YYYY') as month,
 		       COUNT(a.id) as total,
 		       SUM(CASE WHEN a.status IN ('Present','Late') THEN 1 ELSE 0 END) as present,
-		       ROUND(SUM(CASE WHEN a.status IN ('Present','Late') THEN 1 ELSE 0 END) * 100.0 / COUNT(a.id), 2) as percentage
+		       ROUND(SUM(CASE WHEN a.status IN ('Present','Late') THEN 1 ELSE 0 END) * 100.0 / NULLIF(COUNT(a.id), 0), 2) as percentage
 		FROM attendances a
-		JOIN subjects s ON a.subject_id = s.id
-		WHERE a.student_id = ?
-		GROUP BY s.name
+		WHERE a.student_id = ? AND a.subject_id IS NULL
+		GROUP BY TO_CHAR(a.date, 'Mon YYYY'), EXTRACT(YEAR FROM a.date), EXTRACT(MONTH FROM a.date)
+		ORDER BY EXTRACT(YEAR FROM a.date), EXTRACT(MONTH FROM a.date)
 	`, studentID).Scan(&breakdown)
 
 	helpers.Success(c, http.StatusOK, "attendance summary", gin.H{
 		"student_id":         studentID,
 		"overall_percentage": percentage,
-		"total_classes":      total,
+		"total_days":         total,
 		"attended":           present,
-		"by_subject":         breakdown,
+		"by_month":           breakdown,
 	})
 }
 
@@ -1217,33 +1351,50 @@ func GetAttendancePercentage(c *gin.Context) {
 // @Router       /api/admin/attendance/summary [get]
 func GetAttendanceSummary(c *gin.Context) {
 	type Summary struct {
-		StudentID   uint    `json:"student_id"`
-		StudentName string  `json:"student_name"`
-		ClassName   string  `json:"class_name"`
-		Total       int64   `json:"total"`
-		Absences    int64   `json:"absences"`
-		Percentage  float64 `json:"attendance_percentage"`
+		StudentName string `json:"student_name"`
+		StudentCode string `json:"student_code"`
+		ClassName   string `json:"class_name"`
+		GradeLevel  int    `json:"grade_level"`
+		Section     string `json:"section"`
+		Date        string `json:"date"`
+		Status      string `json:"status"`
 	}
-	var summary []Summary
-	// FIX #5: Use NULLIF(COUNT(a.id), 0) to prevent division-by-zero for students
-	// who have zero attendance records. Previously COUNT(a.id) = 0 caused a DB error.
-	// HAVING COUNT(a.id) > 0 also excludes students with no records from the report.
-	config.DB.Raw(`
+	dateFilter := c.Query("date")
+	gradeFilter := c.Query("grade_level")
+	sectionFilter := c.Query("section")
+
+	query := `
 		SELECT
-			st.id as student_id,
-			u.name as student_name,
-			cl.name as class_name,
-			COUNT(a.id) as total,
-			SUM(CASE WHEN a.status = 'Absent' THEN 1 ELSE 0 END) as absences,
-			ROUND(SUM(CASE WHEN a.status IN ('Present','Late') THEN 1 ELSE 0 END) * 100.0 / NULLIF(COUNT(a.id), 0), 2) as percentage
+			u.name AS student_name,
+			st.student_code AS student_code,
+			COALESCE(cl.name, '') AS class_name,
+			COALESCE(cl.grade_level, st.grade_level) AS grade_level,
+			COALESCE(cl.section, '') AS section,
+			TO_CHAR(a.date, 'YYYY-MM-DD') AS date,
+			a.status AS status
 		FROM attendances a
 		JOIN students st ON a.student_id = st.id
 		JOIN users u ON st.user_id = u.id
-		JOIN classes cl ON st.class_id = cl.id
-		GROUP BY st.id, u.name, cl.name
-		HAVING COUNT(a.id) > 0
-		ORDER BY percentage ASC
-	`).Scan(&summary)
+		LEFT JOIN classes cl ON st.class_id = cl.id
+		WHERE a.subject_id IS NULL
+	`
+	args := []any{}
+	if dateFilter != "" {
+		query += " AND DATE(a.date) = DATE(?)"
+		args = append(args, dateFilter)
+	}
+	if gradeFilter != "" {
+		query += " AND COALESCE(cl.grade_level, st.grade_level) = ?"
+		args = append(args, gradeFilter)
+	}
+	if sectionFilter != "" {
+		query += " AND UPPER(COALESCE(cl.section, '')) = UPPER(?)"
+		args = append(args, sectionFilter)
+	}
+	query += " ORDER BY a.date DESC, u.name LIMIT 500"
+
+	var summary []Summary
+	config.DB.Raw(query, args...).Scan(&summary)
 	helpers.Success(c, http.StatusOK, "attendance summary", summary)
 }
 
@@ -1718,8 +1869,186 @@ func DownloadReportCard(c *gin.Context) {
 }
 
 // ══════════════════════════════════════════════════════
-//  PARENT
+//  PARENT (admin + portal)
 // ══════════════════════════════════════════════════════
+
+// GetParents lists parent user accounts for admin
+func GetParents(c *gin.Context) {
+	offset, limit := parsePage(c)
+	var parents []models.User
+	var total int64
+	db := config.DB.Model(&models.User{}).Where("role = ?", models.RoleParent)
+	if q := strings.TrimSpace(c.Query("search")); q != "" {
+		like := "%" + q + "%"
+		db = db.Where("name ILIKE ? OR email ILIKE ?", like, like)
+	}
+	db.Count(&total)
+	if err := db.Offset(offset).Limit(limit).Find(&parents).Error; err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "failed to fetch parents")
+		return
+	}
+
+	type parentRow struct {
+		ID            uint   `json:"id"`
+		Name          string `json:"name"`
+		Email         string `json:"email"`
+		Phone         string `json:"phone"`
+		IsActive      bool   `json:"is_active"`
+		Status        string `json:"status"`
+		ChildrenCount int64  `json:"children_count"`
+		CreatedAt     string `json:"created_at"`
+	}
+	type countRow struct {
+		ParentID uint  `gorm:"column:parent_id"`
+		Cnt      int64 `gorm:"column:cnt"`
+	}
+	var counts []countRow
+	config.DB.Model(&models.Student{}).Select("parent_id, COUNT(*) as cnt").Group("parent_id").Scan(&counts)
+	countMap := map[uint]int64{}
+	for _, c := range counts {
+		countMap[c.ParentID] = c.Cnt
+	}
+
+	var rows []parentRow
+	for _, p := range parents {
+		st := "Active"
+		if !p.IsActive {
+			st = "Inactive"
+		}
+		rows = append(rows, parentRow{
+			ID: p.ID, Name: p.Name, Email: p.Email, Phone: p.Phone,
+			IsActive: p.IsActive, Status: st, ChildrenCount: countMap[p.ID],
+			CreatedAt: p.CreatedAt.Format(time.RFC3339),
+		})
+	}
+	helpers.Success(c, http.StatusOK, "parents fetched", gin.H{"total": total, "data": rows})
+}
+
+// GetAdmins lists admin accounts
+func GetAdmins(c *gin.Context) {
+	offset, limit := parsePage(c)
+	var admins []models.User
+	var total int64
+	db := config.DB.Model(&models.User{}).Where("role = ?", models.RoleAdmin)
+	db.Count(&total)
+	if err := db.Offset(offset).Limit(limit).Find(&admins).Error; err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "failed to fetch admins")
+		return
+	}
+	type row struct {
+		ID        uint   `json:"id"`
+		Name      string `json:"name"`
+		Email     string `json:"email"`
+		Phone     string `json:"phone"`
+		IsActive  bool   `json:"is_active"`
+		Status    string `json:"status"`
+		CreatedAt string `json:"created_at"`
+	}
+	var out []row
+	for _, a := range admins {
+		st := "Active"
+		if !a.IsActive {
+			st = "Inactive"
+		}
+		out = append(out, row{
+			ID: a.ID, Name: a.Name, Email: a.Email, Phone: a.Phone,
+			IsActive: a.IsActive, Status: st, CreatedAt: a.CreatedAt.Format(time.RFC3339),
+		})
+	}
+	helpers.Success(c, http.StatusOK, "admins fetched", gin.H{"total": total, "data": out})
+}
+
+type UpdateUserAccountInput struct {
+	Name  string `json:"name"  binding:"required,min=2"`
+	Email string `json:"email" binding:"required,email"`
+	Phone string `json:"phone"`
+}
+
+// UpdateAdmin updates an admin account
+func UpdateAdmin(c *gin.Context) {
+	id := c.Param("id")
+	var user models.User
+	if err := config.DB.Where("id = ? AND role = ?", id, models.RoleAdmin).First(&user).Error; err != nil {
+		helpers.Error(c, http.StatusNotFound, "admin not found")
+		return
+	}
+	var input UpdateUserAccountInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		helpers.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	input.Email = strings.ToLower(strings.TrimSpace(input.Email))
+	var dup int64
+	config.DB.Model(&models.User{}).Where("email = ? AND id != ?", input.Email, user.ID).Count(&dup)
+	if dup > 0 {
+		helpers.Error(c, http.StatusConflict, "email already in use")
+		return
+	}
+	config.DB.Model(&user).Updates(map[string]any{
+		"name": input.Name, "email": input.Email, "phone": input.Phone,
+	})
+	helpers.Success(c, http.StatusOK, "admin updated", gin.H{
+		"id": user.ID, "name": input.Name, "email": input.Email, "phone": input.Phone,
+	})
+}
+
+// ArchiveAdmin deactivates an admin account (soft-delete)
+func ArchiveAdmin(c *gin.Context) {
+	id := c.Param("id")
+	if fmt.Sprintf("%d", c.GetUint("userID")) == id {
+		helpers.Error(c, http.StatusBadRequest, "cannot archive your own account")
+		return
+	}
+	var user models.User
+	if err := config.DB.Where("id = ? AND role = ?", id, models.RoleAdmin).First(&user).Error; err != nil {
+		helpers.Error(c, http.StatusNotFound, "admin not found")
+		return
+	}
+	config.DB.Model(&user).Update("is_active", false)
+	config.DB.Delete(&user)
+	helpers.Success(c, http.StatusOK, "admin archived", nil)
+}
+
+// UpdateParent updates a parent account
+func UpdateParent(c *gin.Context) {
+	id := c.Param("id")
+	var user models.User
+	if err := config.DB.Where("id = ? AND role = ?", id, models.RoleParent).First(&user).Error; err != nil {
+		helpers.Error(c, http.StatusNotFound, "parent not found")
+		return
+	}
+	var input UpdateUserAccountInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		helpers.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	input.Email = strings.ToLower(strings.TrimSpace(input.Email))
+	var dup int64
+	config.DB.Model(&models.User{}).Where("email = ? AND id != ?", input.Email, user.ID).Count(&dup)
+	if dup > 0 {
+		helpers.Error(c, http.StatusConflict, "email already in use")
+		return
+	}
+	config.DB.Model(&user).Updates(map[string]any{
+		"name": input.Name, "email": input.Email, "phone": input.Phone,
+	})
+	helpers.Success(c, http.StatusOK, "parent updated", gin.H{
+		"id": user.ID, "name": input.Name, "email": input.Email, "phone": input.Phone,
+	})
+}
+
+// ArchiveParent deactivates a parent account (soft-delete user)
+func ArchiveParent(c *gin.Context) {
+	id := c.Param("id")
+	var user models.User
+	if err := config.DB.Where("id = ? AND role = ?", id, models.RoleParent).First(&user).Error; err != nil {
+		helpers.Error(c, http.StatusNotFound, "parent not found")
+		return
+	}
+	config.DB.Model(&user).Update("is_active", false)
+	config.DB.Delete(&user)
+	helpers.Success(c, http.StatusOK, "parent archived", nil)
+}
 
 // GetMyChildren godoc
 // @Summary      Get parent's children (Parent only)
@@ -1745,6 +2074,24 @@ func GetMyChildren(c *gin.Context) {
 	}
 
 	helpers.Success(c, http.StatusOK, "children fetched", students)
+}
+
+func generateStudentCode(gradeLevel int) string {
+	year := time.Now().Year()
+	prefix := fmt.Sprintf("STU-%d-", year)
+	var codes []string
+	config.DB.Model(&models.Student{}).
+		Where("student_code LIKE ?", prefix+"%").
+		Pluck("student_code", &codes)
+	maxSeq := 0
+	for _, code := range codes {
+		var seq int
+		if _, err := fmt.Sscanf(code, prefix+"%d", &seq); err == nil && seq > maxSeq {
+			maxSeq = seq
+		}
+	}
+	_ = gradeLevel
+	return fmt.Sprintf("%s%03d", prefix, maxSeq+1)
 }
 
 // ── scoreToLetter converts a numeric score to a letter grade.

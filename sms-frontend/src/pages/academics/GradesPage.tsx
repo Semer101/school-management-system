@@ -29,7 +29,7 @@ function TeacherView() {
   const [message, setMessage] = useState('')
 
   useEffect(() => {
-    Promise.all([getStudents(), getSubjects()]).then(([s, sub]) => {
+    Promise.all([getStudents({ page_size: 50 }), getSubjects({ page_size: 50 })]).then(([s, sub]) => {
       setStudents(listFromApi(s.data)); setSubjects(listFromApi(sub.data))
     })
   }, [])

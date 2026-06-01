@@ -31,12 +31,14 @@ export function statusVariant(status: string): BadgeProps['variant'] {
     case 'Verified':
     case 'Paid':
     case 'Present':
+    case 'Active':
       return 'success'
     case 'Pending':
     case 'Late':
       return 'warning'
     case 'Rejected':
     case 'Absent':
+    case 'Inactive':
       return 'danger'
     default:
       return 'default'

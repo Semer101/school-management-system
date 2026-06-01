@@ -21,7 +21,7 @@ export default function StudentLockerPage() {
   const [files, setFiles] = useState<LockerFile[]>([])
   const [loading, setLoading] = useState(false)
 
-  useEffect(() => { getStudents().then((r) => setStudents(listFromApi(r.data))) }, [])
+  useEffect(() => { getStudents({ page_size: 50 }).then((r) => setStudents(listFromApi(r.data))) }, [])
 
   const loadFiles = async (id: number) => {
     setSelectedId(id); setLoading(true)

@@ -9,25 +9,32 @@ import (
 // Class represents a school class/grade level (e.g. "Grade 10A")
 // Covers FE-04, FE-05
 type Class struct {
-	ID        uint           `gorm:"primaryKey" json:"id"`
-	Name      string         `gorm:"not null" json:"name"` // e.g. "Grade 10A"
-	Year      int            `gorm:"not null" json:"year"` // academic year e.g. 2024
-	TeacherID uint           `json:"teacher_id"`           // homeroom teacher
-	Teacher   User           `gorm:"foreignKey:TeacherID" json:"teacher,omitempty"`
-	Students  []Student      `gorm:"foreignKey:ClassID" json:"students,omitempty"`
+	ID         uint           `gorm:"primaryKey" json:"id"`
+	Name       string         `gorm:"not null" json:"name"` // e.g. "Grade 10A Natural"
+	GradeLevel int            `gorm:"default:9" json:"grade_level"`
+	Section    string         `gorm:"default:'A'" json:"section"` // A, B, C
+	Stream     string         `json:"stream"`                     // Natural Science, Social Science, or empty
+	Status     string         `gorm:"default:Active" json:"status"` // Active, Inactive
+	Year       int            `gorm:"not null" json:"year"`
+	TeacherID  uint           `json:"teacher_id"`
+	Teacher    Teacher        `gorm:"foreignKey:TeacherID" json:"teacher,omitempty"`
+	Students   []Student      `gorm:"foreignKey:ClassID" json:"students,omitempty"`
 	CreatedAt time.Time      `json:"created_at"`
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-" swaggertype:"string" example:"null"` // soft delete — omitted from API responses
 }
 
 // Subject represents a course/subject taught (e.g. "Mathematics")
 type Subject struct {
-	ID        uint           `gorm:"primaryKey" json:"id"`
-	Name      string         `gorm:"not null" json:"name"`
-	Code      string         `gorm:"uniqueIndex;not null" json:"code"` // e.g. "MATH101"
-	TeacherID uint           `json:"teacher_id"`
-	Teacher   User           `gorm:"foreignKey:TeacherID" json:"teacher,omitempty"`
-	CreatedAt time.Time      `json:"created_at"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"-" swaggertype:"string" example:"null"` // soft delete — omitted from API responses
+	ID         uint           `gorm:"primaryKey" json:"id"`
+	Name       string         `gorm:"not null" json:"name"`
+	Code       string         `gorm:"uniqueIndex;not null" json:"code"` // e.g. "MATH-G9"
+	GradeLevel int            `gorm:"default:0" json:"grade_level"`    // 9–12, 0 = all grades
+	Stream     string         `json:"stream"`
+	Status     string         `gorm:"default:Active" json:"status"` // Active, Inactive
+	TeacherID  uint           `json:"teacher_id"`
+	Teacher    Teacher        `gorm:"foreignKey:TeacherID" json:"teacher,omitempty"`
+	CreatedAt  time.Time      `json:"created_at"`
+	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-" swaggertype:"string" example:"null"`
 }
 
 // Student links a User account to academic data
@@ -43,9 +50,13 @@ type Student struct {
 	ParentName  string         `json:"parent_name"`
 	ParentEmail string         `json:"parent_email"`
 	ParentPhone string         `json:"parent_phone"`
-	DateOfBirth time.Time      `json:"date_of_birth"`
-	EnrolledAt  time.Time      `json:"enrolled_at"`
-	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"` // soft delete
+	DateOfBirth      time.Time      `json:"date_of_birth"`
+	EnrolledAt       time.Time      `json:"enrolled_at"`
+	Stream           string         `gorm:"not null;default:''" json:"stream"`            // Natural Science | Social Science (required from G9)
+	GradeLevel       int            `gorm:"default:9" json:"grade_level"`                 // current grade 9–12
+	PromotionStatus  string         `gorm:"default:'normal'" json:"promotion_status"`     // normal | conditional | repeat
+	AcademicYear     int            `gorm:"default:2025" json:"academic_year"`
+	DeletedAt        gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // Teacher links a User account to teaching data
@@ -69,13 +80,14 @@ type Enrollment struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// Attendance records daily attendance per student per subject (FE-06, FE-07)
+// Attendance records one status per student per calendar day (homeroom / daily).
+// SubjectID is optional legacy data; new records use NULL subject_id.
 type Attendance struct {
 	ID        uint      `gorm:"primaryKey" json:"id"`
 	StudentID uint      `gorm:"not null" json:"student_id"`
 	Student   Student   `gorm:"foreignKey:StudentID" json:"student,omitempty"`
-	SubjectID uint      `gorm:"not null" json:"subject_id"`
-	Subject   Subject   `gorm:"foreignKey:SubjectID" json:"subject,omitempty"`
+	SubjectID *uint     `json:"subject_id,omitempty"`
+	Subject   *Subject  `gorm:"foreignKey:SubjectID" json:"subject,omitempty"`
 	Date      time.Time `gorm:"not null" json:"date"`
 	Status    string    `gorm:"not null" json:"status"` // "Present", "Absent", "Late"
 	Notes     string    `json:"notes"`

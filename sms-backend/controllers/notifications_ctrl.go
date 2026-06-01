@@ -406,7 +406,6 @@ func NotifyParentsAbsentStudents(c *gin.Context) {
 	type AbsentRecord struct {
 		StudentName string
 		ParentEmail string
-		SubjectName string
 		Date        string
 	}
 
@@ -415,14 +414,13 @@ func NotifyParentsAbsentStudents(c *gin.Context) {
 		SELECT
 			u.name AS student_name,
 			COALESCE(NULLIF(pu.email, ''), NULLIF(st.parent_email, '')) AS parent_email,
-			s.name AS subject_name,
 			TO_CHAR(a.date, 'YYYY-MM-DD') AS date
 		FROM attendances a
 		JOIN students st ON a.student_id = st.id
 		JOIN users u ON st.user_id = u.id
-		JOIN subjects s ON a.subject_id = s.id
 		LEFT JOIN users pu ON st.parent_id = pu.id AND pu.role = ?
 		WHERE a.status = 'Absent'
+		  AND a.subject_id IS NULL
 		  AND DATE(a.date) = DATE(?)
 		  AND (
 				(st.parent_id IS NOT NULL AND st.parent_id != 0)
@@ -430,9 +428,8 @@ func NotifyParentsAbsentStudents(c *gin.Context) {
 		  )
 	`, models.RoleParent, date).Scan(&records)
 
-	// parentEmail -> studentName -> subjects
 	type childAbsence struct {
-		subjects []string
+		dates []string
 	}
 
 	parentMap := make(map[string]map[string]*childAbsence)
@@ -447,13 +444,10 @@ func NotifyParentsAbsentStudents(c *gin.Context) {
 		}
 
 		if parentMap[r.ParentEmail][r.StudentName] == nil {
-			parentMap[r.ParentEmail][r.StudentName] = &childAbsence{
-				subjects: []string{},
-			}
+			parentMap[r.ParentEmail][r.StudentName] = &childAbsence{dates: []string{}}
 		}
-
-		parentMap[r.ParentEmail][r.StudentName].subjects =
-			append(parentMap[r.ParentEmail][r.StudentName].subjects, r.SubjectName)
+		parentMap[r.ParentEmail][r.StudentName].dates =
+			append(parentMap[r.ParentEmail][r.StudentName].dates, r.Date)
 	}
 
 	// Send notifications
@@ -465,10 +459,9 @@ func NotifyParentsAbsentStudents(c *gin.Context) {
 		var studentSummaries []string
 
 		for studentName, data := range children {
-			subjectList := strings.Join(data.subjects, ", ")
 			studentSummaries = append(
 				studentSummaries,
-				studentName+": "+subjectList,
+				studentName+" (absent "+strings.Join(data.dates, ", ")+")",
 			)
 		}
 

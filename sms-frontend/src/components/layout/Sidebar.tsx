@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import { BarChart3, Trash2 } from 'lucide-react'
 import { useRole } from '../../hooks/useRole'
 import { navIcons, type NavIconKey } from '../../lib/nav-icons'
 import { cn } from '../../lib/utils'
@@ -6,22 +7,24 @@ import { cn } from '../../lib/utils'
 interface NavItem {
   to: string
   label: string
-  icon: NavIconKey
+  icon: NavIconKey | 'analytics' | 'trash'
   roles?: string[]
 }
 
 const navItems: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
   { to: '/profile', label: 'Profile', icon: 'profile' },
-  { to: '/admin/users', label: 'Users', icon: 'users', roles: ['Admin'] },
+  { to: '/admin/admins', label: 'Admins', icon: 'users', roles: ['Admin'] },
+  { to: '/admin/parents', label: 'Parents', icon: 'users', roles: ['Admin'] },
   { to: '/admin/students', label: 'Students', icon: 'students', roles: ['Admin'] },
   { to: '/admin/teachers', label: 'Teachers', icon: 'teachers', roles: ['Admin'] },
   { to: '/admin/classes', label: 'Classes', icon: 'classes', roles: ['Admin'] },
   { to: '/admin/subjects', label: 'Subjects', icon: 'subjects', roles: ['Admin'] },
-  { to: '/admin/enrollment', label: 'Enrollment', icon: 'enrollment', roles: ['Admin'] },
+  { to: '/admin/analytics', label: 'Analytics', icon: 'analytics', roles: ['Admin'] },
   { to: '/admin/attendance-summary', label: 'Attendance', icon: 'attendance', roles: ['Admin'] },
   { to: '/admin/finance', label: 'Finance', icon: 'finance', roles: ['Admin'] },
   { to: '/admin/notify', label: 'Broadcast', icon: 'notify', roles: ['Admin'] },
+  { to: '/admin/trash', label: 'Trash', icon: 'trash', roles: ['Admin'] },
   { to: '/academics/attendance', label: 'Attendance', icon: 'attendanceCheck', roles: ['Teacher'] },
   { to: '/academics/grades', label: 'Grades', icon: 'grades', roles: ['Teacher'] },
   { to: '/academics/attendance', label: 'My Attendance', icon: 'attendanceCheck', roles: ['Student'] },
@@ -39,7 +42,7 @@ export function Sidebar() {
   const visible = navItems.filter((item) => !item.roles || (role && item.roles.includes(role)))
 
   return (
-    <aside className="w-60 shrink-0 border-r border-surface-border bg-surface/50 backdrop-blur-xl flex flex-col min-h-screen">
+    <aside className="w-60 shrink-0 border-r border-surface-border bg-surface/80 backdrop-blur-xl flex flex-col min-h-screen">
       <div className="px-5 py-6 border-b border-surface-border">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-accent/20 border border-accent/40 flex items-center justify-center">
@@ -47,14 +50,14 @@ export function Sidebar() {
           </div>
           <div>
             <p className="text-sm font-semibold text-foreground tracking-wide">SMS</p>
-            <p className="text-[10px] uppercase tracking-widest text-muted">Control</p>
+            <p className="text-[10px] uppercase tracking-widest text-muted">Ethiopia G9–12</p>
           </div>
         </div>
       </div>
 
       <nav className="flex-1 px-2 py-4 space-y-0.5 overflow-y-auto">
         {visible.map((item) => {
-          const Icon = navIcons[item.icon]
+          const Icon = item.icon === 'analytics' ? BarChart3 : item.icon === 'trash' ? Trash2 : navIcons[item.icon as NavIconKey]
           return (
             <NavLink
               key={item.to + (item.roles?.join('') ?? '')}
