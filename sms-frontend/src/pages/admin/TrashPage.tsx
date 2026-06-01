@@ -4,6 +4,7 @@ import { DataTable } from '../../components/ui/DataTable'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Button } from '../../components/ui/Button'
 import { ConfirmModal } from '../../components/ui/ConfirmModal'
+import { AlertModal } from '../../components/ui/AlertModal'
 
 const entities: { id: TrashEntity; label: string }[] = [
   { id: 'students', label: 'Students' },
@@ -20,6 +21,12 @@ export default function TrashPage() {
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; label: string } | null>(null)
   const [password, setPassword] = useState('')
   const [deleting, setDeleting] = useState(false)
+  const [alertState, setAlertState] = useState<{ open: boolean; title: string; message: string; type: 'success' | 'error' }>({
+    open: false,
+    title: '',
+    message: '',
+    type: 'success',
+  })
 
   const fetchTrash = async () => {
     setLoading(true)
@@ -41,8 +48,9 @@ export default function TrashPage() {
     try {
       await restoreTrash(entity, id)
       fetchTrash()
+      setAlertState({ open: true, title: 'Success', message: 'Record restored successfully', type: 'success' })
     } catch {
-      alert('Restore failed')
+      setAlertState({ open: true, title: 'Restore Failed', message: 'Failed to restore archived record', type: 'error' })
     }
   }
 
@@ -54,8 +62,9 @@ export default function TrashPage() {
       setDeleteTarget(null)
       setPassword('')
       fetchTrash()
+      setAlertState({ open: true, title: 'Success', message: 'Record permanently deleted', type: 'success' })
     } catch {
-      alert('Delete failed — check your password')
+      setAlertState({ open: true, title: 'Delete Failed', message: 'Delete failed — check your password', type: 'error' })
     } finally {
       setDeleting(false)
     }
@@ -130,6 +139,14 @@ export default function TrashPage() {
         password={password}
         onPasswordChange={setPassword}
         onConfirm={handlePermanentDelete}
+      />
+
+      <AlertModal
+        open={alertState.open}
+        onClose={() => setAlertState({ ...alertState, open: false })}
+        title={alertState.title}
+        message={alertState.message}
+        type={alertState.type}
       />
     </div>
   )

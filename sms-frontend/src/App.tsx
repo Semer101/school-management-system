@@ -9,6 +9,7 @@ import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/dashboard/DashboardPage'
 import ProfilePage from './pages/profile/ProfilePage'
 import StudentsPage from './pages/admin/StudentsPage'
+import PromotionPage from './pages/admin/PromotionPage'
 import AnalyticsPage from './pages/admin/AnalyticsPage'
 import TrashPage from './pages/admin/TrashPage'
 import ParentsPage from './pages/admin/ParentsPage'
@@ -48,6 +49,7 @@ function AnimatedRoutes() {
           <Route path="/notifications" element={<PageTransition><NotificationsPage /></PageTransition>} />
 
           <Route path="/admin/students" element={<ProtectedRoute allowedRoles={['Admin']}><PageTransition><StudentsPage /></PageTransition></ProtectedRoute>} />
+          <Route path="/admin/promotion" element={<ProtectedRoute allowedRoles={['Admin']}><PageTransition><PromotionPage /></PageTransition></ProtectedRoute>} />
           <Route path="/admin/admins" element={<ProtectedRoute allowedRoles={['Admin']}><PageTransition><AdminsPage /></PageTransition></ProtectedRoute>} />
           <Route path="/admin/parents" element={<ProtectedRoute allowedRoles={['Admin']}><PageTransition><ParentsPage /></PageTransition></ProtectedRoute>} />
           <Route path="/admin/analytics" element={<ProtectedRoute allowedRoles={['Admin']}><PageTransition><AnalyticsPage /></PageTransition></ProtectedRoute>} />

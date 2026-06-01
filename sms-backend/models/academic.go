@@ -12,15 +12,15 @@ type Class struct {
 	ID         uint           `gorm:"primaryKey" json:"id"`
 	Name       string         `gorm:"not null" json:"name"` // e.g. "Grade 10A Natural"
 	GradeLevel int            `gorm:"default:9" json:"grade_level"`
-	Section    string         `gorm:"default:'A'" json:"section"` // A, B, C
-	Stream     string         `json:"stream"`                     // Natural Science, Social Science, or empty
+	Section    string         `gorm:"default:'A'" json:"section"`   // A, B, C
+	Stream     string         `json:"stream"`                       // Natural Science, Social Science, or empty
 	Status     string         `gorm:"default:Active" json:"status"` // Active, Inactive
 	Year       int            `gorm:"not null" json:"year"`
-	TeacherID  uint           `json:"teacher_id"`
-	Teacher    Teacher        `gorm:"foreignKey:TeacherID" json:"teacher,omitempty"`
+	TeacherID  *uint          `json:"teacher_id"`
+	Teacher    *Teacher       `gorm:"foreignKey:TeacherID;references:ID" json:"teacher,omitempty"`
 	Students   []Student      `gorm:"foreignKey:ClassID" json:"students,omitempty"`
-	CreatedAt time.Time      `json:"created_at"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"-" swaggertype:"string" example:"null"` // soft delete — omitted from API responses
+	CreatedAt  time.Time      `json:"created_at"`
+	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-" swaggertype:"string" example:"null"` // soft delete — omitted from API responses
 }
 
 // Subject represents a course/subject taught (e.g. "Mathematics")
@@ -28,11 +28,11 @@ type Subject struct {
 	ID         uint           `gorm:"primaryKey" json:"id"`
 	Name       string         `gorm:"not null" json:"name"`
 	Code       string         `gorm:"uniqueIndex;not null" json:"code"` // e.g. "MATH-G9"
-	GradeLevel int            `gorm:"default:0" json:"grade_level"`    // 9–12, 0 = all grades
+	GradeLevel int            `gorm:"default:0" json:"grade_level"`     // 9–12, 0 = all grades
 	Stream     string         `json:"stream"`
 	Status     string         `gorm:"default:Active" json:"status"` // Active, Inactive
-	TeacherID  uint           `json:"teacher_id"`
-	Teacher    Teacher        `gorm:"foreignKey:TeacherID" json:"teacher,omitempty"`
+	TeacherID  *uint          `json:"teacher_id"`
+	Teacher    *Teacher       `gorm:"foreignKey:TeacherID;references:ID" json:"teacher,omitempty"`
 	CreatedAt  time.Time      `json:"created_at"`
 	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-" swaggertype:"string" example:"null"`
 }
@@ -40,23 +40,23 @@ type Subject struct {
 // Student links a User account to academic data
 // Covers FE-04
 type Student struct {
-	ID          uint           `gorm:"primaryKey" json:"id"`
-	UserID      uint           `gorm:"uniqueIndex;not null" json:"user_id"`
-	ParentID    uint           `json:"parent_id"`
-	User        User           `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	ClassID     uint           `json:"class_id"`
-	Class       Class          `gorm:"foreignKey:ClassID" json:"class,omitempty"`
-	StudentCode string         `gorm:"uniqueIndex;not null" json:"student_code"` // e.g. "STU-2024-001"
-	ParentName  string         `json:"parent_name"`
-	ParentEmail string         `json:"parent_email"`
-	ParentPhone string         `json:"parent_phone"`
-	DateOfBirth      time.Time      `json:"date_of_birth"`
-	EnrolledAt       time.Time      `json:"enrolled_at"`
-	Stream           string         `gorm:"not null;default:''" json:"stream"`            // Natural Science | Social Science (required from G9)
-	GradeLevel       int            `gorm:"default:9" json:"grade_level"`                 // current grade 9–12
-	PromotionStatus  string         `gorm:"default:'normal'" json:"promotion_status"`     // normal | conditional | repeat
-	AcademicYear     int            `gorm:"default:2025" json:"academic_year"`
-	DeletedAt        gorm.DeletedAt `gorm:"index" json:"-"`
+	ID              uint           `gorm:"primaryKey" json:"id"`
+	UserID          uint           `gorm:"uniqueIndex;not null" json:"user_id"`
+	ParentID        uint           `json:"parent_id"`
+	User            User           `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	ClassID         *uint          `json:"class_id"`
+	Class           *Class         `gorm:"foreignKey:ClassID;references:ID" json:"class,omitempty"`
+	StudentCode     string         `gorm:"uniqueIndex;not null" json:"student_code"` // e.g. "STU-2024-001"
+	ParentName      string         `json:"parent_name"`
+	ParentEmail     string         `json:"parent_email"`
+	ParentPhone     string         `json:"parent_phone"`
+	DateOfBirth     time.Time      `json:"date_of_birth"`
+	EnrolledAt      time.Time      `json:"enrolled_at"`
+	Stream          string         `gorm:"not null;default:''" json:"stream"`        // Natural Science | Social Science (required from G9)
+	GradeLevel      int            `gorm:"default:9" json:"grade_level"`             // current grade 9–12
+	PromotionStatus string         `gorm:"default:'normal'" json:"promotion_status"` // normal | conditional | repeat
+	AcademicYear    int            `gorm:"default:2025" json:"academic_year"`
+	DeletedAt       gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // Teacher links a User account to teaching data

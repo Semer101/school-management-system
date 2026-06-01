@@ -243,10 +243,26 @@ func CreateStudent(c *gin.Context) {
 		if err := tx.Create(&user).Error; err != nil {
 			return err
 		}
+		var classIDPtr *uint
+		studentYear := 2025
+		if input.ClassID != 0 {
+			var class models.Class
+			if err := tx.First(&class, input.ClassID).Error; err != nil {
+				return fmt.Errorf("class not found: %w", err)
+			}
+			if class.GradeLevel != input.GradeLevel {
+				return fmt.Errorf("student grade level %d does not match class grade level %d", input.GradeLevel, class.GradeLevel)
+			}
+			if class.Stream != input.Stream {
+				return fmt.Errorf("student stream '%s' does not match class stream '%s'", input.Stream, class.Stream)
+			}
+			classIDPtr = &input.ClassID
+			studentYear = class.Year
+		}
 		student = models.Student{
 			UserID:          user.ID,
 			ParentID:        input.ParentID,
-			ClassID:         input.ClassID,
+			ClassID:         classIDPtr,
 			StudentCode:     studentCode,
 			ParentName:      input.ParentName,
 			ParentEmail:     input.ParentEmail,
@@ -256,7 +272,7 @@ func CreateStudent(c *gin.Context) {
 			Stream:          input.Stream,
 			GradeLevel:      input.GradeLevel,
 			PromotionStatus: models.PromotionNormal,
-			AcademicYear:    time.Now().Year(),
+			AcademicYear:    studentYear,
 		}
 		if err := tx.Create(&student).Error; err != nil {
 			return err
@@ -369,9 +385,54 @@ func UpdateStudent(c *gin.Context) {
 		return
 	}
 
+	var targetGradeLevel = student.GradeLevel
+	if input.GradeLevel != nil {
+		targetGradeLevel = *input.GradeLevel
+	}
+	var targetStream = student.Stream
+	if input.Stream != "" {
+		targetStream = input.Stream
+	}
+	if targetGradeLevel <= 10 {
+		targetStream = ""
+	}
+
+	var finalClassID *uint
+	if input.ClassID != nil {
+		if *input.ClassID != 0 {
+			finalClassID = input.ClassID
+		}
+	} else {
+		finalClassID = student.ClassID
+	}
+
+	if finalClassID != nil {
+		var class models.Class
+		if err := config.DB.First(&class, *finalClassID).Error; err != nil {
+			helpers.Error(c, http.StatusBadRequest, "class not found")
+			return
+		}
+		if class.GradeLevel != targetGradeLevel {
+			helpers.Error(c, http.StatusBadRequest, fmt.Sprintf("student grade level %d does not match class grade level %d", targetGradeLevel, class.GradeLevel))
+			return
+		}
+		if class.Stream != targetStream {
+			helpers.Error(c, http.StatusBadRequest, fmt.Sprintf("student stream '%s' does not match class stream '%s'", targetStream, class.Stream))
+			return
+		}
+		if class.Year != student.AcademicYear {
+			helpers.Error(c, http.StatusBadRequest, fmt.Sprintf("student academic year %d does not match class academic year %d", student.AcademicYear, class.Year))
+			return
+		}
+	}
+
 	updates := map[string]any{}
 	if input.ClassID != nil {
-		updates["class_id"] = *input.ClassID
+		if *input.ClassID == 0 {
+			updates["class_id"] = nil
+		} else {
+			updates["class_id"] = *input.ClassID
+		}
 	}
 	if input.ParentID != nil {
 		updates["parent_id"] = *input.ParentID
@@ -704,6 +765,17 @@ func CreateClass(c *gin.Context) {
 		helpers.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
+	if input.GradeLevel <= 10 {
+		if input.Stream != "" {
+			helpers.Error(c, http.StatusBadRequest, "stream must be empty for grades 9 and 10")
+			return
+		}
+	} else {
+		if input.Stream != models.StreamNatural && input.Stream != models.StreamSocial {
+			helpers.Error(c, http.StatusBadRequest, "stream must be 'Natural Science' or 'Social Science' for grades 11 and 12")
+			return
+		}
+	}
 	section := strings.ToUpper(strings.TrimSpace(input.Section))
 	if section == "" {
 		helpers.Error(c, http.StatusBadRequest, "section is required")
@@ -733,9 +805,13 @@ func CreateClass(c *gin.Context) {
 	if status == "" {
 		status = "Active"
 	}
+	var teacherIDPtr *uint
+	if input.TeacherID != 0 {
+		teacherIDPtr = &input.TeacherID
+	}
 	class := models.Class{
 		Name: name, GradeLevel: input.GradeLevel, Section: section,
-		Stream: input.Stream, Status: status, Year: input.Year, TeacherID: input.TeacherID,
+		Stream: input.Stream, Status: status, Year: input.Year, TeacherID: teacherIDPtr,
 	}
 
 	if err := config.DB.Create(&class).Error; err != nil {
@@ -885,6 +961,17 @@ func CreateSubject(c *gin.Context) {
 		helpers.Error(c, http.StatusBadRequest, err.Error())
 		return
 	}
+	if input.GradeLevel > 0 && input.GradeLevel <= 10 {
+		if input.Stream != "" {
+			helpers.Error(c, http.StatusBadRequest, "stream must be empty for grades 9 and 10")
+			return
+		}
+	} else if input.GradeLevel >= 11 {
+		if input.Stream != models.StreamNatural && input.Stream != models.StreamSocial {
+			helpers.Error(c, http.StatusBadRequest, "stream must be 'Natural Science' or 'Social Science' for grades 11 and 12")
+			return
+		}
+	}
 
 	// check for duplicate code BEFORE the insert so we can return the correct status.
 	// The old code caught ALL DB errors and reported them as 409 (even network errors).
@@ -899,9 +986,13 @@ func CreateSubject(c *gin.Context) {
 	if st == "" {
 		st = "Active"
 	}
+	var teacherIDPtr *uint
+	if input.TeacherID != 0 {
+		teacherIDPtr = &input.TeacherID
+	}
 	subject := models.Subject{
 		Name: input.Name, Code: input.Code, GradeLevel: input.GradeLevel,
-		Stream: input.Stream, Status: st, TeacherID: input.TeacherID,
+		Stream: input.Stream, Status: st, TeacherID: teacherIDPtr,
 	}
 	if err := config.DB.Create(&subject).Error; err != nil {
 		// Any remaining error is a genuine server/DB failure.
@@ -1091,6 +1182,14 @@ func EnrollStudent(c *gin.Context) {
 		helpers.Error(c, http.StatusBadRequest, "subject not found")
 		return
 	}
+	if subject.GradeLevel != 0 && subject.GradeLevel != student.GradeLevel {
+		helpers.Error(c, http.StatusBadRequest, fmt.Sprintf("student grade level %d does not match subject grade level %d", student.GradeLevel, subject.GradeLevel))
+		return
+	}
+	if subject.Stream != "" && student.Stream != subject.Stream {
+		helpers.Error(c, http.StatusBadRequest, fmt.Sprintf("student stream '%s' does not match subject stream '%s'", student.Stream, subject.Stream))
+		return
+	}
 	var count int64
 	config.DB.Model(&models.Enrollment{}).
 		Where("student_id = ? AND subject_id = ?", input.StudentID, input.SubjectID).
@@ -1188,9 +1287,9 @@ func RecordAttendance(c *gin.Context) {
 			helpers.Error(c, http.StatusForbidden, "teacher profile not found")
 			return
 		}
-		if student.ClassID != 0 {
+		if student.ClassID != nil {
 			var class models.Class
-			if err := config.DB.First(&class, student.ClassID).Error; err == nil && class.TeacherID != teacher.ID {
+			if err := config.DB.First(&class, *student.ClassID).Error; err == nil && (class.TeacherID == nil || *class.TeacherID != teacher.ID) {
 				helpers.Error(c, http.StatusForbidden, "you can only record attendance for your homeroom class")
 				return
 			}
@@ -1440,7 +1539,7 @@ func BulkGradeEntry(c *gin.Context) {
 	}
 
 	// subject.TeacherID stores Teacher table PK
-	if subject.TeacherID != teacher.ID {
+	if subject.TeacherID == nil || *subject.TeacherID != teacher.ID {
 		helpers.Error(c, http.StatusForbidden, "you are not assigned to this subject")
 		return
 	}
@@ -1984,9 +2083,12 @@ func UpdateAdmin(c *gin.Context) {
 		helpers.Error(c, http.StatusConflict, "email already in use")
 		return
 	}
-	config.DB.Model(&user).Updates(map[string]any{
+	if err := config.DB.Model(&user).Updates(map[string]any{
 		"name": input.Name, "email": input.Email, "phone": input.Phone,
-	})
+	}).Error; err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "failed to update administrator in DB: "+err.Error())
+		return
+	}
 	helpers.Success(c, http.StatusOK, "admin updated", gin.H{
 		"id": user.ID, "name": input.Name, "email": input.Email, "phone": input.Phone,
 	})
@@ -2004,8 +2106,14 @@ func ArchiveAdmin(c *gin.Context) {
 		helpers.Error(c, http.StatusNotFound, "admin not found")
 		return
 	}
-	config.DB.Model(&user).Update("is_active", false)
-	config.DB.Delete(&user)
+	if err := config.DB.Model(&user).Update("is_active", false).Error; err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "failed to deactivate administrator: "+err.Error())
+		return
+	}
+	if err := config.DB.Delete(&user).Error; err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "failed to soft-delete administrator: "+err.Error())
+		return
+	}
 	helpers.Success(c, http.StatusOK, "admin archived", nil)
 }
 

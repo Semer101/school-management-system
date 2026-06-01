@@ -11,6 +11,7 @@ import { Modal } from '../../components/ui/Modal'
 import { ConfirmModal } from '../../components/ui/ConfirmModal'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Badge } from '../../components/ui/Badge'
+import { AlertModal } from '../../components/ui/AlertModal'
 
 export default function SubjectsPage() {
   const [subjects, setSubjects] = useState<Subject[]>([])
@@ -25,6 +26,12 @@ export default function SubjectsPage() {
     name: '', code: '', grade_level: 9, stream: '', teacher_id: 0, status: 'Active',
   })
   const [apiStream, setApiStream] = useState<string | undefined>(undefined)
+  const [alertState, setAlertState] = useState<{ open: boolean; title: string; message: string; type: 'success' | 'error' }>({
+    open: false,
+    title: '',
+    message: '',
+    type: 'success',
+  })
 
   const fetchAll = () => {
     setLoading(true)
@@ -48,8 +55,9 @@ export default function SubjectsPage() {
       setModalOpen(false)
       setForm({ name: '', code: '', grade_level: 9, stream: '', teacher_id: 0, status: 'Active' })
       fetchAll()
+      setAlertState({ open: true, title: 'Success', message: 'Subject created successfully', type: 'success' })
     } catch {
-      alert('Create failed — check unique code')
+      setAlertState({ open: true, title: 'Create Failed', message: 'Subject code must be unique, check code or details', type: 'error' })
     } finally {
       setSaving(false)
     }
@@ -63,8 +71,9 @@ export default function SubjectsPage() {
       await updateSubject(updateSubject_.id, editForm)
       setUpdateSubject(null)
       fetchAll()
+      setAlertState({ open: true, title: 'Success', message: 'Subject details updated successfully', type: 'success' })
     } catch {
-      alert('Update failed')
+      setAlertState({ open: true, title: 'Update Failed', message: 'Failed to update subject details', type: 'error' })
     } finally {
       setSaving(false)
     }
@@ -77,8 +86,9 @@ export default function SubjectsPage() {
       await archiveSubject(archiveId)
       setArchiveId(null)
       fetchAll()
+      setAlertState({ open: true, title: 'Success', message: 'Subject archived successfully', type: 'success' })
     } catch {
-      alert('Archive failed')
+      setAlertState({ open: true, title: 'Archive Failed', message: 'Failed to archive subject', type: 'error' })
     } finally {
       setSaving(false)
     }
@@ -158,18 +168,25 @@ export default function SubjectsPage() {
           <div className="grid grid-cols-2 gap-3">
             <label className="text-sm text-muted">Grade level
               <select className="w-full mt-1 px-3 py-2 rounded-lg border border-surface-border bg-surface" value={form.grade_level}
-                onChange={(e) => setForm((f) => ({ ...f, grade_level: Number(e.target.value) }))}>
+                onChange={(e) => setForm((f) => ({
+                  ...f,
+                  grade_level: Number(e.target.value),
+                  stream: Number(e.target.value) >= 11 ? 'Natural Science' : '',
+                }))}>
                 {[9, 10, 11, 12].map((g) => <option key={g} value={g}>{g}</option>)}
               </select>
             </label>
-            <label className="text-sm text-muted">Stream (optional)
-              <select className="w-full mt-1 px-3 py-2 rounded-lg border border-surface-border bg-surface" value={form.stream}
-                onChange={(e) => setForm((f) => ({ ...f, stream: e.target.value }))}>
-                <option value="">Common (both)</option>
-                <option value="Natural Science">Natural Science</option>
-                <option value="Social Science">Social Science</option>
-              </select>
-            </label>
+            {form.grade_level >= 11 ? (
+              <label className="text-sm text-muted">Stream
+                <select className="w-full mt-1 px-3 py-2 rounded-lg border border-surface-border bg-surface" value={form.stream}
+                  onChange={(e) => setForm((f) => ({ ...f, stream: e.target.value }))}>
+                  <option value="Natural Science">Natural Science</option>
+                  <option value="Social Science">Social Science</option>
+                </select>
+              </label>
+            ) : (
+              <p className="text-xs text-muted mt-8">Common curriculum — no stream applies.</p>
+            )}
           </div>
           <label className="text-sm text-muted">Teacher
             <select className="w-full mt-1 px-3 py-2 rounded-lg border border-surface-border bg-surface" value={form.teacher_id}
@@ -204,6 +221,14 @@ export default function SubjectsPage() {
 
       <ConfirmModal open={!!archiveId} onClose={() => setArchiveId(null)} title="Archive Subject"
         message="Subject will be moved to Trash." confirmLabel="Archive" variant="danger" loading={saving} onConfirm={handleArchive} />
+
+      <AlertModal
+        open={alertState.open}
+        onClose={() => setAlertState({ ...alertState, open: false })}
+        title={alertState.title}
+        message={alertState.message}
+        type={alertState.type}
+      />
     </div>
   )
 }

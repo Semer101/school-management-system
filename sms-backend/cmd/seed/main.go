@@ -98,9 +98,10 @@ func seedSampleData() {
 		} else {
 			name = fmt.Sprintf("%d%s", cd.Grade, cd.Section)
 		}
+		tID := teachers[i%len(teachers)].ID
 		c := models.Class{
 			Name: name, GradeLevel: cd.Grade, Section: cd.Section, Stream: cd.Stream,
-			Status: "Active", Year: academicYear, TeacherID: teachers[i%len(teachers)].ID,
+			Status: "Active", Year: academicYear, TeacherID: &tID,
 		}
 		config.DB.Where("name = ? AND year = ?", name, academicYear).FirstOrCreate(&c)
 		classes = append(classes, c)
@@ -125,9 +126,10 @@ func seedSampleData() {
 	}
 	var subjects []models.Subject
 	for _, sd := range subjectDefs {
+		tID := teachers[sd.TIdx%len(teachers)].ID
 		sub := models.Subject{
 			Name: sd.Name, Code: sd.Code, GradeLevel: sd.Grade, Stream: sd.Stream,
-			Status: "Active", TeacherID: teachers[sd.TIdx%len(teachers)].ID,
+			Status: "Active", TeacherID: &tID,
 		}
 		config.DB.Where("code = ?", sd.Code).FirstOrCreate(&sub)
 		subjects = append(subjects, sub)
@@ -145,47 +147,26 @@ func seedSampleData() {
 		parents = append(parents, p)
 	}
 
-	// Build a grade→classes lookup so students are assigned to matching classes
-	classByGrade := map[int][]models.Class{}
-	for _, c := range classes {
-		classByGrade[c.GradeLevel] = append(classByGrade[c.GradeLevel], c)
-	}
-
 	studentNames := []string{
 		"Abinet Tadesse", "Bemnet Girma", "Cherenet Haile", "Daniel Bekele", "Eyerusalem Alemu",
 		"Fikir Mengistu", "Gelila Worku", "Henok Tesfaye", "Iman Kebede", "Jonas Hailu",
 	}
-	streams := []string{models.StreamNatural, models.StreamSocial}
 	var students []models.Student
 	for i, name := range studentNames {
-		grade := 9 + (i % 4)
-		// Grades 9-10: no stream (common curriculum)
-		// Grades 11-12: assign Natural or Social Science
-		stream := ""
-		if grade >= 11 {
-			stream = streams[i%2]
-		}
+		assignedClass := classes[i%len(classes)]
+		classID := assignedClass.ID
+		grade := assignedClass.GradeLevel
+		stream := assignedClass.Stream
 
-		// Pick a class whose grade (and stream for 11-12) matches the student
-		var candidates []models.Class
-		for _, c := range classByGrade[grade] {
-			if grade >= 11 && c.Stream != stream {
-				continue
-			}
-			candidates = append(candidates, c)
-		}
-		classID := classes[0].ID // fallback
-		if len(candidates) > 0 {
-			classID = candidates[i%len(candidates)].ID
-		}
 		email := fmt.Sprintf("student%d@school.et", i+1)
-		user := models.User{Name: name, Email: email, Password: hashPwd("Student@1234"), Role: models.RoleStudent, IsActive: true}
+		user := models.User{Name: name, Email: email, Password: hashPwd("Student@1234"), Role: models.RoleStudent, IsActive: true, Phone: fmt.Sprintf("0911500%03d", i+1)}
 		config.DB.Where("email = ?", email).FirstOrCreate(&user)
 		st := models.Student{
-			UserID: user.ID, ParentID: parents[i].ID, ClassID: classID,
+			UserID: user.ID, ParentID: parents[i].ID, ClassID: &classID,
 			StudentCode: fmt.Sprintf("STU-%d-%03d", academicYear, i+1),
 			ParentName:  parents[i].Name, ParentEmail: parents[i].Email,
 			ParentPhone: parents[i].Phone,
+			DateOfBirth: time.Now().AddDate(-15, 0, 0),
 			Stream:      stream, GradeLevel: grade, PromotionStatus: models.PromotionNormal,
 			AcademicYear: academicYear, EnrolledAt: time.Now(),
 		}
@@ -246,15 +227,27 @@ func seedSampleData() {
 		for _, sub := range subs {
 			for _, gt := range []string{"Midterm", "Final"} {
 				score := 72.0 + float64((st.ID+sub.ID)%25)
-				if i == 3 && gt == "Final" {
+				if i == 0 {
+					// Abinet Tadesse (Student 1) - Repeat (fail all G9 subjects)
+					score = 40.0
+				} else if i == 1 {
+					// Bemnet Girma (Student 2) - Conditional (fail 1 G9 subject, pass others)
+					if len(subs) > 0 && sub.ID == subs[0].ID {
+						score = 42.0
+					}
+				} else if i == 3 && gt == "Final" {
 					score = 42.0
 				}
 				var gc int64
 				config.DB.Model(&models.Grade{}).Where("student_id = ? AND subject_id = ? AND type = ? AND term = ? AND academic_year = ?",
 					st.ID, sub.ID, gt, "Term1", academicYear).Count(&gc)
 				if gc == 0 {
+					var teacherID uint
+					if sub.TeacherID != nil {
+						teacherID = *sub.TeacherID
+					}
 					config.DB.Create(&models.Grade{
-						StudentID: st.ID, SubjectID: sub.ID, TeacherID: sub.TeacherID,
+						StudentID: st.ID, SubjectID: sub.ID, TeacherID: teacherID,
 						Score: score, MaxScore: 100, Type: gt, Term: "Term1", AcademicYear: academicYear,
 					})
 				}
@@ -317,6 +310,33 @@ func seedSampleData() {
 				}
 				config.DB.Create(&p)
 			}
+		}
+	}
+
+	for _, student := range students {
+		var lfc int64
+		config.DB.Model(&models.LockerFile{}).Where("student_id = ?", student.ID).Count(&lfc)
+		if lfc == 0 {
+			config.DB.Create(&models.LockerFile{
+				StudentID:  student.ID,
+				FileName:   "Grade_" + fmt.Sprintf("%d", student.GradeLevel) + "_Portfolio.pdf",
+				FilePath:   "./uploads/locker/portfolio_" + fmt.Sprintf("%d", student.ID) + ".pdf",
+				FileSize:   102400,
+				FileType:   "pdf",
+				Category:   "Portfolio",
+				IsPublic:   true,
+				UploadedAt: time.Now(),
+			})
+			config.DB.Create(&models.LockerFile{
+				StudentID:  student.ID,
+				FileName:   "Community_Service_Certificate.jpg",
+				FilePath:   "./uploads/locker/cert_" + fmt.Sprintf("%d", student.ID) + ".jpg",
+				FileSize:   204800,
+				FileType:   "jpg",
+				Category:   "Certificate",
+				IsPublic:   false,
+				UploadedAt: time.Now(),
+			})
 		}
 	}
 

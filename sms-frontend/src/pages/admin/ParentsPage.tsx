@@ -9,6 +9,7 @@ import { Input } from '../../components/ui/Input'
 import { ConfirmModal } from '../../components/ui/ConfirmModal'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Badge } from '../../components/ui/Badge'
+import { AlertModal } from '../../components/ui/AlertModal'
 import type { Role } from '../../types/user'
 
 export default function ParentsPage() {
@@ -20,6 +21,12 @@ export default function ParentsPage() {
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ name: '', email: '', password: 'Parent@1234', phone: '' })
   const [editForm, setEditForm] = useState({ name: '', email: '', phone: '' })
+  const [alertState, setAlertState] = useState<{ open: boolean; title: string; message: string; type: 'success' | 'error' }>({
+    open: false,
+    title: '',
+    message: '',
+    type: 'success',
+  })
 
   const fetchParents = () => {
     setLoading(true)
@@ -42,8 +49,9 @@ export default function ParentsPage() {
       setCreateOpen(false)
       setForm({ name: '', email: '', password: 'Parent@1234', phone: '' })
       fetchParents()
+      setAlertState({ open: true, title: 'Success', message: 'Parent account created successfully', type: 'success' })
     } catch {
-      alert('Create failed')
+      setAlertState({ open: true, title: 'Create Failed', message: 'Failed to create parent account', type: 'error' })
     } finally {
       setSaving(false)
     }
@@ -57,8 +65,9 @@ export default function ParentsPage() {
       await updateParent(updateRow.id, editForm)
       setUpdateRow(null)
       fetchParents()
+      setAlertState({ open: true, title: 'Success', message: 'Parent account updated successfully', type: 'success' })
     } catch {
-      alert('Update failed')
+      setAlertState({ open: true, title: 'Update Failed', message: 'Failed to update parent details', type: 'error' })
     } finally {
       setSaving(false)
     }
@@ -71,8 +80,9 @@ export default function ParentsPage() {
       await archiveParent(archiveId)
       setArchiveId(null)
       fetchParents()
+      setAlertState({ open: true, title: 'Success', message: 'Parent account archived successfully', type: 'success' })
     } catch {
-      alert('Archive failed')
+      setAlertState({ open: true, title: 'Archive Failed', message: 'Failed to archive parent account', type: 'error' })
     } finally {
       setSaving(false)
     }
@@ -127,6 +137,14 @@ export default function ParentsPage() {
 
       <ConfirmModal open={!!archiveId} onClose={() => setArchiveId(null)} title="Archive Parent"
         message="Parent will be deactivated and moved to Trash." confirmLabel="Archive" variant="danger" loading={saving} onConfirm={handleArchive} />
+
+      <AlertModal
+        open={alertState.open}
+        onClose={() => setAlertState({ ...alertState, open: false })}
+        title={alertState.title}
+        message={alertState.message}
+        type={alertState.type}
+      />
     </div>
   )
 }

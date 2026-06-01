@@ -30,7 +30,7 @@ export type CreateStudentPayload = {
   parent_email?: string
   parent_phone?: string
   date_of_birth?: string
-  stream: 'Natural Science' | 'Social Science'
+  stream: 'Natural Science' | 'Social Science' | ''
   grade_level: number
 }
 

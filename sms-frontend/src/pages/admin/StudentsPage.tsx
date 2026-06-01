@@ -15,6 +15,7 @@ import { Input } from '../../components/ui/Input'
 import { ConfirmModal } from '../../components/ui/ConfirmModal'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Badge } from '../../components/ui/Badge'
+import { AlertModal } from '../../components/ui/AlertModal'
 
 export default function StudentsPage() {
   const [students, setStudents] = useState<Student[]>([])
@@ -32,6 +33,12 @@ export default function StudentsPage() {
     name: '', email: '', password: 'Student@1234',
     class_id: 0, parent_id: 0, parent_name: '', parent_email: '', parent_phone: '',
     stream: '', grade_level: 9, newParent: false, parentPassword: 'Parent@1234',
+  })
+  const [alertState, setAlertState] = useState<{ open: boolean; title: string; message: string; type: 'success' | 'error' }>({
+    open: false,
+    title: '',
+    message: '',
+    type: 'success',
   })
 
   const fetchStudents = async () => {
@@ -101,12 +108,15 @@ export default function StudentsPage() {
         })
         parentId = (pr.data.data as { id: number }).id
       }
-      const { student_code: _omit, ...payload } = form
+      const payload = { ...form }
+      delete (payload as Partial<CreateStudentPayload>).student_code
       await createStudent({ ...payload, parent_id: parentId })
       setCreateOpen(false)
       fetchStudents()
+      setAlertState({ open: true, title: 'Success', message: 'Student created successfully', type: 'success' })
     } catch (err: unknown) {
-      alert((err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Create failed')
+      const errMsg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Create failed'
+      setAlertState({ open: true, title: 'Create Failed', message: errMsg, type: 'error' })
     } finally {
       setSaving(false)
     }
@@ -119,8 +129,9 @@ export default function StudentsPage() {
       await archiveStudent(archiveId)
       setArchiveId(null)
       fetchStudents()
+      setAlertState({ open: true, title: 'Success', message: 'Student archived successfully', type: 'success' })
     } catch {
-      alert('Archive failed')
+      setAlertState({ open: true, title: 'Archive Failed', message: 'Failed to archive student profile', type: 'error' })
     } finally {
       setSaving(false)
     }
@@ -131,8 +142,9 @@ export default function StudentsPage() {
     try {
       await enrollStudent(enrollStudent_.id, subjectId)
       openEnroll(enrollStudent_)
-    } catch {
-      alert('Enroll failed')
+    } catch (err: unknown) {
+      const errMsg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Enroll failed'
+      setAlertState({ open: true, title: 'Enrollment Failed', message: errMsg, type: 'error' })
     }
   }
 
@@ -141,8 +153,9 @@ export default function StudentsPage() {
     try {
       await unenrollStudent(enrollStudent_.id, subjectId)
       openEnroll(enrollStudent_)
-    } catch {
-      alert('Unenroll failed')
+    } catch (err: unknown) {
+      const errMsg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Unenroll failed'
+      setAlertState({ open: true, title: 'Unenrollment Failed', message: errMsg, type: 'error' })
     }
   }
 
@@ -158,8 +171,10 @@ export default function StudentsPage() {
       })
       setUpdateStudent(null)
       fetchStudents()
-    } catch {
-      alert('Update failed')
+      setAlertState({ open: true, title: 'Success', message: 'Student details updated successfully', type: 'success' })
+    } catch (err: unknown) {
+      const errMsg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Update failed'
+      setAlertState({ open: true, title: 'Update Failed', message: errMsg, type: 'error' })
     } finally {
       setSaving(false)
     }
@@ -172,9 +187,10 @@ export default function StudentsPage() {
       await promoteStudent(promoteId)
       setPromoteId(null)
       fetchStudents()
-      alert('Promotion processed — student enrolled in new year subjects if eligible.')
+      setAlertState({ open: true, title: 'Success', message: 'Promotion processed — student enrolled in new year subjects if eligible.', type: 'success' })
     } catch (err: unknown) {
-      alert((err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Promotion failed')
+      const errMsg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Promotion failed'
+      setAlertState({ open: true, title: 'Promotion Failed', message: errMsg, type: 'error' })
     } finally {
       setSaving(false)
     }
@@ -209,7 +225,6 @@ export default function StudentsPage() {
         columns={[
           { key: 'student_code', header: 'Code' },
           { key: 'user', header: 'Name', render: (s) => s.user?.name ?? '—' },
-          { key: 'grade_level', header: 'Grade', render: (s) => s.grade_level ?? '—' },
           { key: 'stream', header: 'Stream', render: (s) => s.stream || '—' },
           { key: 'class', header: 'Class', render: (s) => s.class?.name ?? '—' },
           {
@@ -392,6 +407,14 @@ export default function StudentsPage() {
       <ConfirmModal open={!!promoteId} onClose={() => setPromoteId(null)} title="Year-End Promotion"
         message="Checks all subject averages from the current year. Students with 3+ failures repeat; 1–2 get conditional promotion; others advance and are auto-enrolled in next grade subjects."
         confirmLabel="Run promotion" loading={saving} onConfirm={handlePromote} />
+
+      <AlertModal
+        open={alertState.open}
+        onClose={() => setAlertState({ ...alertState, open: false })}
+        title={alertState.title}
+        message={alertState.message}
+        type={alertState.type}
+      />
     </div>
   )
 }

@@ -84,8 +84,6 @@ export default function AttendanceSummary() {
                   <th className="text-left px-4 py-3 text-muted font-medium">Student</th>
                   <th className="text-left px-4 py-3 text-muted font-medium">Code</th>
                   <th className="text-left px-4 py-3 text-muted font-medium">Class</th>
-                  <th className="text-left px-4 py-3 text-muted font-medium">Grade</th>
-                  <th className="text-left px-4 py-3 text-muted font-medium">Section</th>
                   <th className="text-left px-4 py-3 text-muted font-medium">Date</th>
                   <th className="text-left px-4 py-3 text-muted font-medium">Status</th>
                 </tr>
@@ -96,8 +94,6 @@ export default function AttendanceSummary() {
                     <td className="px-4 py-3 text-foreground">{r.student_name}</td>
                     <td className="px-4 py-3 text-muted font-mono text-xs">{r.student_code}</td>
                     <td className="px-4 py-3 text-muted">{r.class_name || '—'}</td>
-                    <td className="px-4 py-3 text-muted">{r.grade_level ?? '—'}</td>
-                    <td className="px-4 py-3 text-muted">{r.section || '—'}</td>
                     <td className="px-4 py-3 text-muted">{r.date}</td>
                     <td className="px-4 py-3"><Badge label={r.status} variant={statusVariant(r.status)} /></td>
                   </tr>

@@ -10,6 +10,7 @@ import { Modal } from '../../components/ui/Modal'
 import { Input } from '../../components/ui/Input'
 import { ConfirmModal } from '../../components/ui/ConfirmModal'
 import { PageHeader } from '../../components/ui/PageHeader'
+import { AlertModal } from '../../components/ui/AlertModal'
 
 export default function TeachersPage() {
   const [teachers, setTeachers] = useState<Teacher[]>([])
@@ -22,6 +23,12 @@ export default function TeachersPage() {
     name: '', email: '', password: 'Teacher@1234', teacher_code: '', qualification: '', phone: '',
   })
   const [editForm, setEditForm] = useState({ qualification: '', phone: '' })
+  const [alertState, setAlertState] = useState<{ open: boolean; title: string; message: string; type: 'success' | 'error' }>({
+    open: false,
+    title: '',
+    message: '',
+    type: 'success',
+  })
 
   const fetchTeachers = () => {
     setLoading(true)
@@ -40,8 +47,9 @@ export default function TeachersPage() {
       await createTeacher(form)
       setCreateOpen(false)
       fetchTeachers()
+      setAlertState({ open: true, title: 'Success', message: 'Teacher profile created successfully', type: 'success' })
     } catch {
-      alert('Create failed')
+      setAlertState({ open: true, title: 'Create Failed', message: 'Failed to create teacher account', type: 'error' })
     } finally {
       setSaving(false)
     }
@@ -55,8 +63,9 @@ export default function TeachersPage() {
       await updateTeacher(updateTeacher_.id, { qualification: editForm.qualification, phone: editForm.phone })
       setUpdateTeacher(null)
       fetchTeachers()
+      setAlertState({ open: true, title: 'Success', message: 'Teacher profile updated successfully', type: 'success' })
     } catch {
-      alert('Update failed')
+      setAlertState({ open: true, title: 'Update Failed', message: 'Failed to update teacher details', type: 'error' })
     } finally {
       setSaving(false)
     }
@@ -69,8 +78,9 @@ export default function TeachersPage() {
       await archiveTeacher(archiveId)
       setArchiveId(null)
       fetchTeachers()
+      setAlertState({ open: true, title: 'Success', message: 'Teacher archived successfully', type: 'success' })
     } catch {
-      alert('Archive failed')
+      setAlertState({ open: true, title: 'Archive Failed', message: 'Failed to archive teacher profile', type: 'error' })
     } finally {
       setSaving(false)
     }
@@ -129,6 +139,14 @@ export default function TeachersPage() {
 
       <ConfirmModal open={!!archiveId} onClose={() => setArchiveId(null)} title="Archive Teacher"
         message="Teacher will be moved to Trash." confirmLabel="Archive" variant="danger" loading={saving} onConfirm={handleArchive} />
+
+      <AlertModal
+        open={alertState.open}
+        onClose={() => setAlertState({ ...alertState, open: false })}
+        title={alertState.title}
+        message={alertState.message}
+        type={alertState.type}
+      />
     </div>
   )
 }

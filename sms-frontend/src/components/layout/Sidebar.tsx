@@ -17,6 +17,7 @@ const navItems: NavItem[] = [
   { to: '/admin/admins', label: 'Admins', icon: 'users', roles: ['Admin'] },
   { to: '/admin/parents', label: 'Parents', icon: 'users', roles: ['Admin'] },
   { to: '/admin/students', label: 'Students', icon: 'students', roles: ['Admin'] },
+  { to: '/admin/promotion', label: 'Promotion', icon: 'promotion', roles: ['Admin'] },
   { to: '/admin/teachers', label: 'Teachers', icon: 'teachers', roles: ['Admin'] },
   { to: '/admin/classes', label: 'Classes', icon: 'classes', roles: ['Admin'] },
   { to: '/admin/subjects', label: 'Subjects', icon: 'subjects', roles: ['Admin'] },

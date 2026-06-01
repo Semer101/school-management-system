@@ -16,6 +16,7 @@ import {
   FolderLock,
   UsersRound,
   Bell,
+  TrendingUp,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -38,6 +39,7 @@ export const navIcons = {
   locker: FolderLock,
   children: UsersRound,
   notifications: Bell,
+  promotion: TrendingUp,
 } satisfies Record<string, LucideIcon>
 
 export type NavIconKey = keyof typeof navIcons

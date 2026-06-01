@@ -9,8 +9,9 @@ import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
 import { ConfirmModal } from '../../components/ui/ConfirmModal'
 import { PageHeader } from '../../components/ui/PageHeader'
-import { Badge } from '../../components/ui/Badge'
 import { Input } from '../../components/ui/Input'
+import { Badge } from '../../components/ui/Badge'
+import { AlertModal } from '../../components/ui/AlertModal'
 
 const SECTION_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 
@@ -34,6 +35,12 @@ export default function ClassesPage() {
     year: new Date().getFullYear(), teacher_id: 0, status: 'Active',
   })
   const [editForm, setEditForm] = useState({ teacher_id: 0, year: new Date().getFullYear(), status: 'Active' })
+  const [alertState, setAlertState] = useState<{ open: boolean; title: string; message: string; type: 'success' | 'error' }>({
+    open: false,
+    title: '',
+    message: '',
+    type: 'success',
+  })
 
   const fetchAll = () => {
     setLoading(true)
@@ -68,7 +75,7 @@ export default function ClassesPage() {
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault()
     if (!availableSection) {
-      alert('All sections (A–Z) already exist for this grade and year.')
+      setAlertState({ open: true, title: 'Validation Error', message: 'All sections (A–Z) already exist for this grade and year.', type: 'error' })
       return
     }
     const stream = form.grade_level >= 11 ? form.stream : ''
@@ -86,7 +93,7 @@ export default function ClassesPage() {
       fetchAll()
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
-      alert(msg ?? 'Create failed — class may already exist')
+      setAlertState({ open: true, title: 'Create Failed', message: msg ?? 'Class may already exist', type: 'error' })
     } finally {
       setSaving(false)
     }
@@ -103,8 +110,9 @@ export default function ClassesPage() {
       })
       setUpdateClass(null)
       fetchAll()
+      setAlertState({ open: true, title: 'Success', message: 'Class updated successfully', type: 'success' })
     } catch {
-      alert('Update failed')
+      setAlertState({ open: true, title: 'Update Failed', message: 'Failed to update class details', type: 'error' })
     } finally {
       setSaving(false)
     }
@@ -117,8 +125,9 @@ export default function ClassesPage() {
       await archiveClass(archiveId)
       setArchiveId(null)
       fetchAll()
+      setAlertState({ open: true, title: 'Success', message: 'Class archived successfully', type: 'success' })
     } catch {
-      alert('Archive failed — ensure no students are assigned')
+      setAlertState({ open: true, title: 'Archive Failed', message: 'Ensure no students are assigned to this class.', type: 'error' })
     } finally {
       setSaving(false)
     }
@@ -229,6 +238,14 @@ export default function ClassesPage() {
 
       <ConfirmModal open={!!archiveId} onClose={() => setArchiveId(null)} title="Archive Class"
         message="Class moves to Trash. All students must be reassigned first." confirmLabel="Archive" variant="danger" loading={saving} onConfirm={handleArchive} />
+
+      <AlertModal
+        open={alertState.open}
+        onClose={() => setAlertState({ ...alertState, open: false })}
+        title={alertState.title}
+        message={alertState.message}
+        type={alertState.type}
+      />
     </div>
   )
 }

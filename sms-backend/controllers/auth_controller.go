@@ -26,7 +26,8 @@ type RegisterInput struct {
 
 	Password string `json:"password" binding:"required,min=8"         example:"secret123"`
 	// Valid roles: Admin, Teacher, Student, Parent
-	Role string `json:"role" binding:"required,oneof=Admin Teacher Student Parent" example:"Student"`
+	Role  string `json:"role" binding:"required,oneof=Admin Teacher Student Parent" example:"Student"`
+	Phone string `json:"phone" example:"09xxxxxxxx"`
 }
 
 type LoginInput struct {
@@ -62,6 +63,7 @@ type RefreshTokenInput struct {
 // @Failure      403   {object}  helpers.APIResponse  "Forbidden — Admin only"
 // @Failure      409   {object}  helpers.APIResponse  "Email already registered"
 // @Router       /api/admin/register [post]
+// func Register(c *gin.Context) {
 func Register(c *gin.Context) {
 	var input RegisterInput
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -88,6 +90,7 @@ func Register(c *gin.Context) {
 		Email:    input.Email,
 		Password: string(hashedPassword),
 		Role:     input.Role,
+		Phone:    input.Phone,
 		IsActive: true,
 	}
 

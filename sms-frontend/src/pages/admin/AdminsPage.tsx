@@ -9,6 +9,7 @@ import { Input } from '../../components/ui/Input'
 import { ConfirmModal } from '../../components/ui/ConfirmModal'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { Badge } from '../../components/ui/Badge'
+import { AlertModal } from '../../components/ui/AlertModal'
 import type { Role } from '../../types/user'
 import type { AdminRow } from '../../api/admin'
 
@@ -21,6 +22,12 @@ export default function AdminsPage() {
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ name: '', email: '', password: 'Admin@1234', phone: '' })
   const [editForm, setEditForm] = useState({ name: '', email: '', phone: '' })
+  const [alertState, setAlertState] = useState<{ open: boolean; title: string; message: string; type: 'success' | 'error' }>({
+    open: false,
+    title: '',
+    message: '',
+    type: 'success',
+  })
 
   const fetchAdmins = () => {
     setLoading(true)
@@ -43,8 +50,9 @@ export default function AdminsPage() {
       setCreateOpen(false)
       setForm({ name: '', email: '', password: 'Admin@1234', phone: '' })
       fetchAdmins()
+      setAlertState({ open: true, title: 'Success', message: 'Administrator created successfully', type: 'success' })
     } catch {
-      alert('Create failed — email may already exist')
+      setAlertState({ open: true, title: 'Create Failed', message: 'Email may already exist or is invalid', type: 'error' })
     } finally {
       setSaving(false)
     }
@@ -58,8 +66,10 @@ export default function AdminsPage() {
       await updateAdmin(updateRow.id, editForm)
       setUpdateRow(null)
       fetchAdmins()
-    } catch {
-      alert('Update failed')
+      setAlertState({ open: true, title: 'Success', message: 'Administrator updated successfully', type: 'success' })
+    } catch (err: any) {
+      const errMsg = err?.response?.data?.error || 'Failed to update administrator details'
+      setAlertState({ open: true, title: 'Update Failed', message: errMsg, type: 'error' })
     } finally {
       setSaving(false)
     }
@@ -72,8 +82,10 @@ export default function AdminsPage() {
       await archiveAdmin(archiveId)
       setArchiveId(null)
       fetchAdmins()
-    } catch {
-      alert('Archive failed')
+      setAlertState({ open: true, title: 'Success', message: 'Administrator archived successfully', type: 'success' })
+    } catch (err: any) {
+      const errMsg = err?.response?.data?.error || 'Failed to archive administrator account'
+      setAlertState({ open: true, title: 'Archive Failed', message: errMsg, type: 'error' })
     } finally {
       setSaving(false)
     }
@@ -135,6 +147,14 @@ export default function AdminsPage() {
 
       <ConfirmModal open={!!archiveId} onClose={() => setArchiveId(null)} title="Archive Administrator"
         message="This admin will be deactivated and moved to Trash." confirmLabel="Archive" variant="danger" loading={saving} onConfirm={handleArchive} />
+
+      <AlertModal
+        open={alertState.open}
+        onClose={() => setAlertState({ ...alertState, open: false })}
+        title={alertState.title}
+        message={alertState.message}
+        type={alertState.type}
+      />
     </div>
   )
 }
