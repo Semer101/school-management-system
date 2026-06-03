@@ -19,7 +19,7 @@ export default function SubjectsPage() {
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [updateSubject_, setUpdateSubject] = useState<Subject | null>(null)
-  const [editForm, setEditForm] = useState({ name: '', code: '', teacher_id: 0 })
+  const [editForm, setEditForm] = useState({ name: '', code: '', grade_level: 9, teacher_id: 0 })
   const [archiveId, setArchiveId] = useState<number | null>(null)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({
@@ -45,7 +45,21 @@ export default function SubjectsPage() {
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { fetchAll() }, [apiStream])
+  useEffect(() => {
+    async function load() {
+      setLoading(true)
+      try {
+        const subParams: { page_size: number; stream?: string } = { page_size: 50 }
+        if (apiStream) subParams.stream = apiStream
+        const [s, t] = await Promise.all([getSubjects(subParams), getTeachers({ page_size: 50 })])
+        setSubjects(listFromApi(s.data))
+        setTeachers(listFromApi(t.data))
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [apiStream])
 
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault()
@@ -151,7 +165,7 @@ export default function SubjectsPage() {
               <RowActions
                 onUpdate={() => {
                   setUpdateSubject(s)
-                  setEditForm({ name: s.name, code: s.code, teacher_id: s.teacher_id })
+                  setEditForm({ name: s.name, code: s.code, grade_level: s.grade_level || 9, teacher_id: s.teacher_id || 0 })
                 }}
                 onArchive={() => setArchiveId(s.id)}
               />
@@ -210,6 +224,12 @@ export default function SubjectsPage() {
         <form id="subject-update-form" onSubmit={handleUpdate} className="space-y-3">
           <Input label="Subject name" value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} required />
           <Input label="Code" value={editForm.code} onChange={(e) => setEditForm((f) => ({ ...f, code: e.target.value }))} required />
+          <label className="text-sm text-muted">Grade level
+            <select className="w-full mt-1 px-3 py-2 rounded-lg border border-surface-border bg-surface" value={editForm.grade_level}
+              onChange={(e) => setEditForm((f) => ({ ...f, grade_level: Number(e.target.value) }))}>
+              {[9, 10, 11, 12].map((g) => <option key={g} value={g}>{g}</option>)}
+            </select>
+          </label>
           <label className="text-sm text-muted">Teacher
             <select className="w-full mt-1 px-3 py-2 rounded-lg border border-surface-border bg-surface" value={editForm.teacher_id}
               onChange={(e) => setEditForm((f) => ({ ...f, teacher_id: Number(e.target.value) }))} required>

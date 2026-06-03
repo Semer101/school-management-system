@@ -39,6 +39,8 @@ type Subject struct {
 
 // Student links a User account to academic data
 // Covers FE-04
+// NOTE: GradeLevel is kept on the Student record for backward compatibility and performance.
+// It MUST always match the Class.GradeLevel. Use ValidateGradeClassConsistency() to enforce.
 type Student struct {
 	ID              uint           `gorm:"primaryKey" json:"id"`
 	UserID          uint           `gorm:"uniqueIndex;not null" json:"user_id"`
@@ -66,6 +68,7 @@ type Teacher struct {
 	User          User           `gorm:"foreignKey:UserID" json:"user,omitempty"`
 	TeacherCode   string         `gorm:"uniqueIndex;not null" json:"teacher_code"`
 	Qualification string         `json:"qualification"`
+	Department    string         `json:"department"`
 	JoinedAt      time.Time      `json:"joined_at"`
 	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-" swaggertype:"string" example:"null"` // soft delete — omitted from API responses
 }
@@ -110,7 +113,7 @@ type Grade struct {
 	MaxScore float64 `gorm:"not null;default:100" json:"max_score"`
 
 	Type string `gorm:"not null;uniqueIndex:uq_grade" json:"type"` // Midterm, Final, etc
-	Term string `gorm:"not null;uniqueIndex:uq_grade" json:"term"` // Term1, Term2, Term3
+	Semester string `gorm:"not null;uniqueIndex:uq_grade" json:"semester"` // Semester 1, Semester 2, Semester 3
 
 	AcademicYear int `gorm:"not null;uniqueIndex:uq_grade" json:"academic_year"`
 

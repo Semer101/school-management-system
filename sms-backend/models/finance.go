@@ -15,6 +15,8 @@ type Transaction struct {
 	CreatedBy   uint       `json:"created_by"`  // UserID of who created this record
 	VerifiedBy  uint       `json:"verified_by"` // Admin UserID who verified
 	VerifiedAt  *time.Time `json:"verified_at"` // pointer = nullable
+	AcademicYear int        `json:"academic_year"`
+	Semester     string     `json:"semester"`
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
 }

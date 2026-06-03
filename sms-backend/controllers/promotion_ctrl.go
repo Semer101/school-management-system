@@ -13,20 +13,28 @@ import (
 	"sms-backend/models"
 )
 
-// autoEnrollStudentSubjects enrolls a student in all subjects for their stream and grade
+func subjectsForGradeStream(db *gorm.DB, gradeLevel int, stream string) *gorm.DB {
+	q := db.Where("grade_level = ? AND status = ?", gradeLevel, "Active")
+	if gradeLevel >= 11 {
+		return q.Where("stream = '' OR stream IS NULL OR stream = ?", stream)
+	}
+	return q.Where("stream = '' OR stream IS NULL")
+}
+
+// autoEnrollStudentSubjects enrolls a student in all active subjects for their grade/stream.
 func autoEnrollStudentSubjects(tx *gorm.DB, student *models.Student) error {
-	if student.Stream == "" || student.GradeLevel < 9 {
+	if student.GradeLevel < 9 {
 		return nil
 	}
 	codes := models.SubjectCodesForStreamGrade(student.Stream, student.GradeLevel)
 	var subjects []models.Subject
-	if err := tx.Where("code IN ? AND (grade_level = ? OR grade_level = 0)", codes, student.GradeLevel).Find(&subjects).Error; err != nil {
+	if err := subjectsForGradeStream(tx, student.GradeLevel, student.Stream).
+		Where("code IN ?", codes).
+		Order("name ASC").
+		Find(&subjects).Error; err != nil {
 		return err
 	}
 	for _, sub := range subjects {
-		if sub.Stream != "" && sub.Stream != student.Stream {
-			continue
-		}
 		var count int64
 		tx.Model(&models.Enrollment{}).Where("student_id = ? AND subject_id = ?", student.ID, sub.ID).Count(&count)
 		if count == 0 {
@@ -36,6 +44,73 @@ func autoEnrollStudentSubjects(tx *gorm.DB, student *models.Student) error {
 		}
 	}
 	return nil
+}
+
+// validateStudentPromotion verifies that the student is eligible to be evaluated for promotion
+//
+// FIX #4: returns (isIneligible bool, err error) so callers can map the "not yet eligible" case to
+// HTTP 409 instead of HTTP 400. Previously the only error path was 400, conflating "bad client
+// request" with "student's grade data isn't complete yet".
+func validateStudentPromotion(student *models.Student) (bool, error) {
+	// 1. Checks current academic year and enrollment year.
+	enrollYear := student.EnrolledAt.Year()
+	if enrollYear > student.AcademicYear {
+		return false, fmt.Errorf("promotion blocked: enrollment year (%d) cannot be after the current academic year (%d)", enrollYear, student.AcademicYear)
+	}
+
+	// 2. Fetch all enrolled subjects for this student
+	var enrollments []models.Enrollment
+	if err := config.DB.Where("student_id = ?", student.ID).Find(&enrollments).Error; err != nil {
+		return false, fmt.Errorf("failed to retrieve student enrollments: %w", err)
+	}
+
+	if len(enrollments) == 0 {
+		return false, fmt.Errorf("promotion blocked: student is not enrolled in any subjects for the current academic year")
+	}
+
+	// 3. Fetch all grades for this student and academic year
+	var grades []models.Grade
+	if err := config.DB.Where("student_id = ? AND academic_year = ?", student.ID, student.AcademicYear).Find(&grades).Error; err != nil {
+		return false, fmt.Errorf("failed to retrieve grades: %w", err)
+	}
+
+	// Group student grades by subject, then by semester
+	subjectSemesters := make(map[uint]map[string]bool)
+	for _, enrollment := range enrollments {
+		subjectSemesters[enrollment.SubjectID] = make(map[string]bool)
+	}
+
+	for _, g := range grades {
+		if _, exists := subjectSemesters[g.SubjectID]; exists {
+			subjectSemesters[g.SubjectID][g.Semester] = true
+		}
+	}
+
+	// For each enrolled subject, check if Semester 1 and Semester 2 are completed.
+	// FIX #4: Semester 3 is OPTIONAL (not all curricula have a 3rd semester — Ethiopian system
+	// typically uses Sem 1 + Sem 2, with Sem 3 being an exit/preparatory window that may not
+	// be fully graded). Students missing only Sem 3 can still be evaluated.
+	for _, enrollment := range enrollments {
+		var subject models.Subject
+		if err := config.DB.First(&subject, enrollment.SubjectID).Error; err != nil {
+			return false, fmt.Errorf("failed to retrieve subject details for ID %d: %w", enrollment.SubjectID, err)
+		}
+
+		sems := subjectSemesters[enrollment.SubjectID]
+		if !sems["Semester 1"] || !sems["Semester 2"] {
+			var missing []string
+			if !sems["Semester 1"] {
+				missing = append(missing, "Semester 1")
+			}
+			if !sems["Semester 2"] {
+				missing = append(missing, "Semester 2")
+			}
+			// isIneligible = true so the caller can return 409 (not 400).
+			return true, fmt.Errorf("promotion blocked: student is missing grades for %v in subject %s", missing, subject.Name)
+		}
+	}
+
+	return false, nil
 }
 
 // evaluatePromotion checks previous-year grades and returns promotion status + failed count
@@ -48,23 +123,62 @@ func evaluatePromotion(studentID uint, academicYear int) (status string, failed 
 	if err = q.Find(&grades).Error; err != nil {
 		return "", 0, nil, err
 	}
-	// Average score per subject (best attempt)
-	subjectScores := map[uint][]float64{}
+
+	// Group scores by subject, and then by semester
+	// subjectID -> semester -> slice of percentage scores
+	subjectSemScores := make(map[uint]map[string][]float64)
+
 	for _, g := range grades {
-		pct := (g.Score / g.MaxScore) * 100
-		subjectScores[g.SubjectID] = append(subjectScores[g.SubjectID], pct)
-	}
-	for subID, scores := range subjectScores {
-		var sum float64
-		for _, s := range scores {
-			sum += s
+		if subjectSemScores[g.SubjectID] == nil {
+			subjectSemScores[g.SubjectID] = make(map[string][]float64)
 		}
-		avg := sum / float64(len(scores))
+		pct := (g.Score / g.MaxScore) * 100
+		subjectSemScores[g.SubjectID][g.Semester] = append(subjectSemScores[g.SubjectID][g.Semester], pct)
+	}
+
+	// For each subject, calculate Sem1, Sem2 averages, and then overall average.
+	// FIX #4: only count semesters that have at least one grade, so Sem 3 missing
+	// data doesn't drag the average to 0/fail.
+	for subID, sems := range subjectSemScores {
+		var sem1Sum, sem2Sum float64
+		var sem1Count, sem2Count float64
+
+		for _, s := range sems["Semester 1"] {
+			sem1Sum += s
+			sem1Count++
+		}
+		for _, s := range sems["Semester 2"] {
+			sem2Sum += s
+			sem2Count++
+		}
+
+		sem1Avg := 0.0
+		if sem1Count > 0 {
+			sem1Avg = sem1Sum / sem1Count
+		}
+		sem2Avg := 0.0
+		if sem2Count > 0 {
+			sem2Avg = sem2Sum / sem2Count
+		}
+
+		// Final score is the average of the completed semesters (Sem 1 + Sem 2).
+		// If both exist, normalise by 2; if only one, use that one directly.
+		var avg float64
+		switch {
+		case sem1Count > 0 && sem2Count > 0:
+			avg = (sem1Avg + sem2Avg) / 2.0
+		case sem1Count > 0:
+			avg = sem1Avg
+		case sem2Count > 0:
+			avg = sem2Avg
+		}
+
 		if avg < 50 {
 			failed++
 			failedSubjectIDs = append(failedSubjectIDs, subID)
 		}
 	}
+
 	switch {
 	case failed >= 3:
 		status = models.PromotionRepeat
@@ -73,6 +187,7 @@ func evaluatePromotion(studentID uint, academicYear int) (status string, failed 
 	default:
 		status = models.PromotionNormal
 	}
+
 	return status, failed, failedSubjectIDs, nil
 }
 
@@ -85,6 +200,17 @@ func PromoteStudent(c *gin.Context) {
 		return
 	}
 
+	// Run validation first
+	if ineligible, err := validateStudentPromotion(&student); err != nil {
+		if ineligible {
+			// 409 Conflict: student isn't yet eligible (e.g. grades missing)
+			helpers.Error(c, http.StatusConflict, err.Error())
+		} else {
+			helpers.Error(c, http.StatusBadRequest, err.Error())
+		}
+		return
+	}
+
 	prevYear := student.AcademicYear
 	status, failed, failedSubjectIDs, err := evaluatePromotion(student.ID, prevYear)
 	if err != nil {
@@ -93,15 +219,19 @@ func PromoteStudent(c *gin.Context) {
 	}
 
 	if status == models.PromotionRepeat {
+		// FIX #3: do NOT bump academic_year for a repeating student.
+		// A repeat means "stay in the same year and re-attempt the failed subjects".
+		// Bumping the year would (a) misrepresent the year they're in, (b) cause
+		// report cards to be misattributed, and (c) invalidate the
+		// enrollYear > academicYear guard in validateStudentPromotion.
 		txErr := config.DB.Transaction(func(tx *gorm.DB) error {
 			if err := tx.Model(&student).Updates(map[string]any{
 				"promotion_status": models.PromotionRepeat,
-				"academic_year":    prevYear + 1,
+				// academic_year intentionally NOT changed
 			}).Error; err != nil {
 				return err
 			}
 			student.PromotionStatus = models.PromotionRepeat
-			student.AcademicYear = prevYear + 1
 			// Repeat current grade: reset enrollments for current subjects
 			tx.Where("student_id = ?", student.ID).Delete(&models.Enrollment{})
 			return autoEnrollStudentSubjects(tx, &student)
@@ -144,8 +274,18 @@ func PromoteStudent(c *gin.Context) {
 		}
 		// Enroll in failed subjects as retakes
 		for _, fsID := range failedSubjectIDs {
-			if err := tx.Create(&models.Enrollment{StudentID: student.ID, SubjectID: fsID}).Error; err != nil {
+			// Skip duplicates if a retake subject is already in the new grade's
+			// subject set (FIX: prevents unique-constraint failures for some curricula).
+			var existing int64
+			if err := tx.Model(&models.Enrollment{}).
+				Where("student_id = ? AND subject_id = ?", student.ID, fsID).
+				Count(&existing).Error; err != nil {
 				return err
+			}
+			if existing == 0 {
+				if err := tx.Create(&models.Enrollment{StudentID: student.ID, SubjectID: fsID}).Error; err != nil {
+					return err
+				}
 			}
 		}
 		return nil
@@ -178,9 +318,10 @@ func GetStudentEnrollmentStatus(c *gin.Context) {
 		return
 	}
 
-	codes := models.SubjectCodesForStreamGrade(student.Stream, student.GradeLevel)
 	var subjects []models.Subject
-	config.DB.Where("code IN ?", codes).Find(&subjects)
+	config.DB.Scopes(func(db *gorm.DB) *gorm.DB {
+		return subjectsForGradeStream(db, student.GradeLevel, student.Stream)
+	}).Order("name ASC").Find(&subjects)
 
 	var enrolled []models.Enrollment
 	config.DB.Where("student_id = ?", student.ID).Find(&enrolled)
@@ -197,12 +338,6 @@ func GetStudentEnrollmentStatus(c *gin.Context) {
 	}
 	var rows []row
 	for _, s := range subjects {
-		if s.Stream != "" && s.Stream != student.Stream {
-			continue
-		}
-		if s.GradeLevel != 0 && s.GradeLevel != student.GradeLevel {
-			continue
-		}
 		rows = append(rows, row{
 			SubjectID: s.ID, SubjectName: s.Name, SubjectCode: s.Code,
 			Enrolled: enrolledMap[s.ID],
@@ -219,6 +354,17 @@ func CheckPromotionPreview(c *gin.Context) {
 		helpers.Error(c, http.StatusNotFound, "student not found")
 		return
 	}
+
+	// Run validation first
+	if ineligible, err := validateStudentPromotion(&student); err != nil {
+		if ineligible {
+			helpers.Error(c, http.StatusConflict, err.Error())
+		} else {
+			helpers.Error(c, http.StatusBadRequest, err.Error())
+		}
+		return
+	}
+
 	status, failed, _, err := evaluatePromotion(student.ID, student.AcademicYear)
 	if err != nil {
 		helpers.Error(c, http.StatusInternalServerError, "evaluation failed")

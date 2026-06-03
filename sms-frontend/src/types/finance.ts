@@ -13,6 +13,8 @@ export interface Transaction {
   created_by: number
   verified_by: number
   verified_at: string | null
+  academic_year: number
+  semester: string
   created_at: string
   updated_at: string
 }

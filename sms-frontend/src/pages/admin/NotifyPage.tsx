@@ -3,6 +3,8 @@ import { Megaphone, Bell } from 'lucide-react'
 import { broadcastAnnouncement, notifyAbsentParents } from '../../api/admin'
 import { Input } from '../../components/ui/Input'
 import { Button } from '../../components/ui/Button'
+import { Modal } from '../../components/ui/Modal'
+import { Spinner } from '../../components/ui/Spinner'
 import type { Role } from '../../types/user'
 
 const ALL_ROLES: Role[] = ['Admin', 'Teacher', 'Student', 'Parent']
@@ -12,9 +14,12 @@ export default function NotifyPage() {
   const [body, setBody] = useState('')
   const [roles, setRoles] = useState<Role[]>(['Student', 'Parent'])
   const [sending, setSending] = useState(false)
-  const [absentSending, setAbsentSending] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+
+  // Modal state: closed, confirm, sending, success, error
+  const [modalState, setModalState] = useState<'closed' | 'confirm' | 'sending' | 'success' | 'error'>('closed')
+  const [modalError, setModalError] = useState('')
 
   const toggleRole = (role: Role) =>
     setRoles((prev) =>
@@ -39,16 +44,14 @@ export default function NotifyPage() {
     }
   }
 
-  const handleNotifyAbsent = async () => {
-    if (!confirm('Send absence notifications to all parents of absent students today?')) return
-    setAbsentSending(true)
+  const handleConfirmNotifyAbsent = async () => {
+    setModalState('sending')
     try {
       await notifyAbsentParents()
-      setMessage('Absence notifications sent.')
+      setModalState('success')
     } catch {
-      setError('Failed to notify absent parents.')
-    } finally {
-      setAbsentSending(false)
+      setModalState('error')
+      setModalError('Failed to send daily absence alerts.')
     }
   }
 
@@ -116,10 +119,56 @@ export default function NotifyPage() {
         <p className="text-sm text-[var(--text)] mb-4">
           Automatically send notifications to parents of all students marked absent today.
         </p>
-        <Button variant="secondary" loading={absentSending} onClick={handleNotifyAbsent}>
+        <Button variant="secondary" onClick={() => setModalState('confirm')}>
           Send Absence Alerts
         </Button>
       </div>
+
+      <Modal
+        open={modalState !== 'closed'}
+        onClose={() => setModalState('closed')}
+        title="Daily Absence Alerts"
+        footer={
+          modalState === 'confirm' ? (
+            <>
+              <Button variant="ghost" onClick={() => setModalState('closed')}>Cancel</Button>
+              <Button onClick={handleConfirmNotifyAbsent}>Send Alerts</Button>
+            </>
+          ) : modalState === 'success' || modalState === 'error' ? (
+            <Button onClick={() => setModalState('closed')}>Close</Button>
+          ) : null
+        }
+      >
+        {modalState === 'confirm' && (
+          <p className="text-sm text-[var(--text)]">
+            Are you sure you want to send absence notifications to all parents of students marked absent today?
+          </p>
+        )}
+        {modalState === 'sending' && (
+          <div className="flex flex-col items-center gap-3 py-4">
+            <Spinner />
+            <p className="text-sm text-[var(--text)]">Sending notifications, please wait...</p>
+          </div>
+        )}
+        {modalState === 'success' && (
+          <div className="space-y-2 py-2">
+            <p className="text-sm text-green-600 font-semibold flex items-center gap-2">
+              ✓ Alerts Sent Successfully
+            </p>
+            <p className="text-sm text-[var(--text)]">
+              Absence notifications have been successfully dispatched to all parents of absent students.
+            </p>
+          </div>
+        )}
+        {modalState === 'error' && (
+          <div className="space-y-2 py-2">
+            <p className="text-sm text-red-500 font-semibold flex items-center gap-2">
+              ✗ Failed to Send Alerts
+            </p>
+            <p className="text-sm text-[var(--text)]">{modalError}</p>
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }

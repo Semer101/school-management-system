@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { getAttendanceSummary, type AttendanceSummaryRow } from '../../api/admin'
+import { getAttendanceSummary, getClasses, type AttendanceSummaryRow } from '../../api/admin'
+import type { Class } from '../../types/academic'
 import { Badge, statusVariant } from '../../components/ui/Badge'
 import { Spinner } from '../../components/ui/Spinner'
 import { BarChart3 } from 'lucide-react'
@@ -14,14 +15,17 @@ export default function AttendanceSummary() {
   const [date, setDate] = useState('')
   const [grade, setGrade] = useState('')
   const [section, setSection] = useState('')
+  const [classes, setClasses] = useState<Class[]>([])
+  const [classId, setClassId] = useState('')
 
   const load = useCallback(() => {
     setLoading(true)
     setError('')
-    const params: { date?: string; grade_level?: string; section?: string } = {}
+    const params: { date?: string; grade_level?: string; section?: string; class_id?: string } = {}
     if (date) params.date = date
     if (grade) params.grade_level = grade
     if (section) params.section = section
+    if (classId) params.class_id = classId
     getAttendanceSummary(params)
       .then((r) => {
         const payload = r.data?.data
@@ -29,7 +33,15 @@ export default function AttendanceSummary() {
       })
       .catch(() => setError('Failed to load attendance summary.'))
       .finally(() => setLoading(false))
-  }, [date, grade, section])
+  }, [date, grade, section, classId])
+
+  useEffect(() => {
+    getClasses({ page_size: 100 })
+      .then((res) => {
+        setClasses(listFromApi(res.data))
+      })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => { load() }, [load])
 
@@ -47,7 +59,17 @@ export default function AttendanceSummary() {
             className="px-3 py-2 rounded-lg border border-surface-border bg-surface text-sm" />
         </label>
         <label className="text-sm text-muted flex flex-col gap-1">
-          Grade
+          Class
+          <select value={classId} onChange={(e) => setClassId(e.target.value)}
+            className="px-3 py-2 rounded-lg border border-surface-border bg-surface text-sm">
+            <option value="">All</option>
+            {classes.map((c) => (
+              <option key={c.id} value={String(c.id)}>{c.name}</option>
+            ))}
+          </select>
+        </label>
+        <label className="text-sm text-muted flex flex-col gap-1">
+          Grade Level
           <select value={grade} onChange={(e) => setGrade(e.target.value)}
             className="px-3 py-2 rounded-lg border border-surface-border bg-surface text-sm">
             <option value="">All</option>
@@ -65,8 +87,8 @@ export default function AttendanceSummary() {
           </select>
         </label>
         <Button size="sm" variant="secondary" onClick={load}>Apply</Button>
-        {(date || grade || section) && (
-          <Button size="sm" variant="ghost" onClick={() => { setDate(''); setGrade(''); setSection('') }}>Clear</Button>
+        {(date || grade || section || classId) && (
+          <Button size="sm" variant="ghost" onClick={() => { setDate(''); setGrade(''); setSection(''); setClassId('') }}>Clear</Button>
         )}
       </div>
 

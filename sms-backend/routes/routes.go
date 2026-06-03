@@ -124,12 +124,13 @@ func SetupRoutes(r *gin.Engine) {
 			// new endpoint — previously enrollments could only be created, never removed.
 			admin.DELETE("/unenroll", controllers.UnenrollStudent)
 
-			// Finance — admin actions
 			admin.GET("/finance/summary", controllers.GetAllTransactions)
 			admin.PATCH("/finance/receipt/:id/verify", controllers.VerifyReceipt)
 			admin.GET("/finance/payroll", controllers.GetPayrolls)
 			admin.POST("/finance/payroll", controllers.CreatePayroll)
 			admin.PATCH("/finance/payroll/:id/pay", controllers.MarkPayrollPaid)
+			admin.GET("/finance/overdue", controllers.GetOverduePayments)
+			admin.POST("/finance/remind", controllers.SendPaymentReminder)
 
 			// Notifications
 			admin.POST("/notify/broadcast", controllers.BroadcastAnnouncement)

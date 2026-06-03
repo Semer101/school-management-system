@@ -11,7 +11,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 
 	"sms-backend/config"
 	"sms-backend/helpers"
@@ -53,11 +52,13 @@ type CreateTeacherInput struct {
 	TeacherCode   string `json:"teacher_code"  binding:"required"       example:"TCH-001"`
 	Qualification string `json:"qualification"                          example:"MSc Mathematics"`
 	Phone         string `json:"phone"         binding:"required"        example:"0911000001"`
+	Department    string `json:"department"                             example:"Mathematics"`
 }
 
 type UpdateTeacherInput struct {
 	Qualification string `json:"qualification" example:"PhD Mathematics"`
 	Phone         string `json:"phone"         example:"0911000001"`
+	Department    string `json:"department"     example:"Mathematics"`
 }
 
 type AttendanceInput struct {
@@ -67,19 +68,17 @@ type AttendanceInput struct {
 	Notes     string `json:"notes"                                                   example:"Arrived 5 mins late"`
 }
 
-type GradeEntry struct {
+type GradeBulkEntry struct {
 	StudentID uint    `json:"student_id" binding:"required"              example:"1"`
+	SubjectID uint    `json:"subject_id" binding:"required"              example:"3"`
 	Score     float64 `json:"score"      binding:"required,min=0,max=100" example:"87.5"`
-	Remarks   string  `json:"remarks"                                    example:"Good improvement"`
+	GradeType string  `json:"grade_type" binding:"required,oneof=Midterm Final Quiz Assignment Exam" example:"Midterm"`
+	Semester  string  `json:"semester"   binding:"required,oneof='Semester 1' 'Semester 2' 'Semester 3'" example:"Semester 1"`
+	Remarks   string  `json:"remarks"                                    example:"Good"`
 }
 
 type BulkGradeInput struct {
-	SubjectID    uint         `json:"subject_id"    binding:"required"                                  example:"3"`
-	Type         string       `json:"type"          binding:"required,oneof=Midterm Final Quiz Assignment" example:"Midterm"`
-	Term         string       `json:"term"          binding:"required,oneof=Term1 Term2 Term3"           example:"Term1"`
-	AcademicYear int          `json:"academic_year" binding:"required"                                  example:"2025"`
-	MaxScore     float64      `json:"max_score"     binding:"required,min=1"                            example:"100"`
-	Grades       []GradeEntry `json:"grades"        binding:"required,min=1"`
+	Grades []GradeBulkEntry `json:"grades" binding:"required,min=1"`
 }
 
 type CreateClassInput struct {
@@ -395,6 +394,9 @@ func UpdateStudent(c *gin.Context) {
 	}
 	if targetGradeLevel <= 10 {
 		targetStream = ""
+	} else if targetStream != models.StreamNatural && targetStream != models.StreamSocial {
+		helpers.Error(c, http.StatusBadRequest, "stream must be 'Natural Science' or 'Social Science' for grades 11-12")
+		return
 	}
 
 	var finalClassID *uint
@@ -483,7 +485,47 @@ func UpdateStudent(c *gin.Context) {
 		return
 	}
 
-	if err := config.DB.Model(&student).Updates(updates).Error; err != nil {
+	placementChanged := false
+	if input.GradeLevel != nil && *input.GradeLevel != student.GradeLevel {
+		placementChanged = true
+	}
+	if input.Stream != "" && targetStream != student.Stream {
+		placementChanged = true
+	}
+	if input.ClassID != nil {
+		currentClassID := uint(0)
+		if student.ClassID != nil {
+			currentClassID = *student.ClassID
+		}
+		if *input.ClassID != currentClassID {
+			placementChanged = true
+		}
+	}
+
+	txErr := config.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&student).Updates(updates).Error; err != nil {
+			return err
+		}
+		if !placementChanged {
+			return nil
+		}
+		if input.GradeLevel != nil {
+			student.GradeLevel = *input.GradeLevel
+		}
+		student.Stream = targetStream
+		if input.ClassID != nil {
+			if *input.ClassID == 0 {
+				student.ClassID = nil
+			} else {
+				student.ClassID = input.ClassID
+			}
+		}
+		if err := tx.Where("student_id = ?", student.ID).Delete(&models.Enrollment{}).Error; err != nil {
+			return err
+		}
+		return autoEnrollStudentSubjects(tx, &student)
+	})
+	if txErr != nil {
 		helpers.Error(c, http.StatusInternalServerError, "failed to update student")
 		return
 	}
@@ -600,6 +642,7 @@ func CreateTeacher(c *gin.Context) {
 			UserID:        user.ID,
 			TeacherCode:   input.TeacherCode,
 			Qualification: input.Qualification,
+			Department:    input.Department,
 			JoinedAt:      time.Now(),
 		}
 		return tx.Create(&teacher).Error
@@ -690,6 +733,9 @@ func UpdateTeacher(c *gin.Context) {
 	updates := map[string]interface{}{}
 	if input.Qualification != "" {
 		updates["qualification"] = input.Qualification
+	}
+	if input.Department != "" {
+		updates["department"] = input.Department
 	}
 	if len(updates) > 0 {
 		if err := config.DB.Model(&teacher).Updates(updates).Error; err != nil {
@@ -1022,7 +1068,7 @@ func GetSubjects(c *gin.Context) {
 		if stream == "Common" {
 			db = db.Where("stream = '' OR stream IS NULL")
 		} else {
-			db = db.Where("stream = ?", stream)
+			db = db.Where("stream = '' OR stream IS NULL OR stream = ?", stream)
 		}
 	}
 	if gl := c.Query("grade_level"); gl != "" {
@@ -1295,6 +1341,15 @@ func RecordAttendance(c *gin.Context) {
 			}
 		}
 	}
+	// FIX #1: Admins previously bypassed ALL ownership checks, allowing them to mark
+	// attendance for any student in any class without an audit trail. We now log the
+	// admin override to stdout and stamp the attendance record with the admin's user
+	// ID (via CreatedAt of the actor). The original SubjectID is still null because
+	// this is a homeroom-style daily record.
+	if role == models.RoleAdmin {
+		fmt.Printf("[AUDIT] admin user_id=%d recorded attendance for student_id=%d on %s (admin override)\n",
+			c.GetUint("userID"), input.StudentID, input.Date)
+	}
 
 	date, err := time.Parse("2006-01-02", input.Date)
 	if err != nil {
@@ -1461,6 +1516,7 @@ func GetAttendanceSummary(c *gin.Context) {
 	dateFilter := c.Query("date")
 	gradeFilter := c.Query("grade_level")
 	sectionFilter := c.Query("section")
+	classIDFilter := c.Query("class_id")
 
 	query := `
 		SELECT
@@ -1489,6 +1545,10 @@ func GetAttendanceSummary(c *gin.Context) {
 	if sectionFilter != "" {
 		query += " AND UPPER(COALESCE(cl.section, '')) = UPPER(?)"
 		args = append(args, sectionFilter)
+	}
+	if classIDFilter != "" {
+		query += " AND st.class_id = ?"
+		args = append(args, classIDFilter)
 	}
 	query += " ORDER BY a.date DESC, u.name LIMIT 500"
 
@@ -1526,146 +1586,168 @@ func BulkGradeEntry(c *gin.Context) {
 		return
 	}
 
-	var subject models.Subject
-	if err := config.DB.First(&subject, input.SubjectID).Error; err != nil {
-		helpers.Error(c, http.StatusBadRequest, "subject not found")
-		return
-	}
-
 	var teacher models.Teacher
 	if err := config.DB.Where("user_id = ?", teacherUserID).First(&teacher).Error; err != nil {
 		helpers.Error(c, http.StatusForbidden, "teacher profile not found")
 		return
 	}
 
-	// subject.TeacherID stores Teacher table PK
-	if subject.TeacherID == nil || *subject.TeacherID != teacher.ID {
-		helpers.Error(c, http.StatusForbidden, "you are not assigned to this subject")
-		return
-	}
+	var dbGrades []models.Grade
+	newStudentsMap := make(map[uint]struct {
+		Email string
+		Name  string
+		Sub   string
+		Score float64
+	})
 
-	teacherRecordID := teacher.ID
-
-	// ─────────────────────────────────────────────────────────────
-	// Validate enrollment + track NEW vs EXISTING grades
-	// ─────────────────────────────────────────────────────────────
-
-	enrolledStudentIDs := make(map[uint]bool)
-	var enrollments []models.Enrollment
-
-	if err := config.DB.Where("subject_id = ?", input.SubjectID).Find(&enrollments).Error; err != nil {
-		helpers.Error(c, http.StatusInternalServerError, "failed to verify enrollments")
-		return
-	}
-	for _, e := range enrollments {
-		enrolledStudentIDs[e.StudentID] = true
-	}
-
-	// fetch existing grades for THIS assessment (for spam prevention)
-	type gradeKey struct {
-		StudentID uint
-	}
-
-	existing := make(map[uint]bool)
-
-	var oldGrades []models.Grade
-	if err := config.DB.Where(
-		"subject_id = ? AND type = ? AND term = ? AND academic_year = ?",
-		input.SubjectID, input.Type, input.Term, input.AcademicYear,
-	).Find(&oldGrades).Error; err != nil {
-		helpers.Error(c, http.StatusInternalServerError, "failed to check existing grades")
-		return
-	}
-
-	for _, g := range oldGrades {
-		existing[g.StudentID] = true
-	}
-
-	newStudents := make([]uint, 0)
-
-	var grades []models.Grade
-
+	// To avoid duplicates or N+1 queries, we can fetch subjects and students needed
+	subjectIDs := []uint{}
+	studentIDs := []uint{}
 	for _, entry := range input.Grades {
+		subjectIDs = append(subjectIDs, entry.SubjectID)
+		studentIDs = append(studentIDs, entry.StudentID)
+	}
 
-		if !enrolledStudentIDs[entry.StudentID] {
-			helpers.Error(c, http.StatusBadRequest,
-				fmt.Sprintf("student_id %d is not enrolled in subject_id %d", entry.StudentID, input.SubjectID))
+	var subjects []models.Subject
+	if err := config.DB.Where("id IN ?", subjectIDs).Find(&subjects).Error; err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "failed to fetch subjects")
+		return
+	}
+	subjectMap := make(map[uint]models.Subject)
+	for _, s := range subjects {
+		subjectMap[s.ID] = s
+	}
+
+	var students []models.Student
+	if err := config.DB.Preload("User").Where("id IN ?", studentIDs).Find(&students).Error; err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "failed to fetch students")
+		return
+	}
+	studentMap := make(map[uint]models.Student)
+	for _, st := range students {
+		studentMap[st.ID] = st
+	}
+
+	// Fetch all enrollments for validation
+	var enrollments []models.Enrollment
+	if err := config.DB.Where("student_id IN ? AND subject_id IN ?", studentIDs, subjectIDs).Find(&enrollments).Error; err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "failed to fetch enrollments")
+		return
+	}
+	enrollmentMap := make(map[string]bool)
+	for _, e := range enrollments {
+		key := fmt.Sprintf("%d-%d", e.StudentID, e.SubjectID)
+		enrollmentMap[key] = true
+	}
+
+	// Validate and build Grade models
+	for _, entry := range input.Grades {
+		sub, ok := subjectMap[entry.SubjectID]
+		if !ok {
+			helpers.Error(c, http.StatusBadRequest, fmt.Sprintf("subject_id %d not found", entry.SubjectID))
 			return
 		}
 
-		// mark only NEW grades for notification
-		if !existing[entry.StudentID] {
-			newStudents = append(newStudents, entry.StudentID)
+		// Verify teacher ownership
+		if sub.TeacherID == nil || *sub.TeacherID != teacher.ID {
+			helpers.Error(c, http.StatusForbidden, fmt.Sprintf("you are not assigned to subject: %s", sub.Name))
+			return
 		}
 
-		grades = append(grades, models.Grade{
+		student, ok := studentMap[entry.StudentID]
+		if !ok {
+			helpers.Error(c, http.StatusBadRequest, fmt.Sprintf("student_id %d not found", entry.StudentID))
+			return
+		}
+
+		// Verify enrollment
+		key := fmt.Sprintf("%d-%d", entry.StudentID, entry.SubjectID)
+		if !enrollmentMap[key] {
+			helpers.Error(c, http.StatusBadRequest, fmt.Sprintf("student %s is not enrolled in subject %s", student.User.Name, sub.Name))
+			return
+		}
+
+		// FIX #2: also verify the student's grade level and stream match the subject's.
+		// Without this, a Grade 9 student enrolled in a Grade 11 subject (e.g. via a manual
+		// EnrollStudent call that bypassed the auto-enroll path) could receive Grade 11
+		// grades. EnrollStudent already does this check, but BulkGradeEntry skipped it.
+		if sub.GradeLevel != 0 && sub.GradeLevel != student.GradeLevel {
+			helpers.Error(c, http.StatusBadRequest,
+				fmt.Sprintf("student %s is in Grade %d but subject %s is Grade %d",
+					student.User.Name, student.GradeLevel, sub.Name, sub.GradeLevel))
+			return
+		}
+		if sub.Stream != "" && student.Stream != sub.Stream {
+			helpers.Error(c, http.StatusBadRequest,
+				fmt.Sprintf("student %s is in stream '%s' but subject %s is for stream '%s'",
+					student.User.Name, student.Stream, sub.Name, sub.Stream))
+			return
+		}
+
+		// Check if grade already exists for this (student_id, subject_id, type, semester, academic_year)
+		var existingGrade models.Grade
+		err := config.DB.Where("student_id = ? AND subject_id = ? AND type = ? AND semester = ? AND academic_year = ?",
+			entry.StudentID, entry.SubjectID, entry.GradeType, entry.Semester, student.AcademicYear).First(&existingGrade).Error
+
+		isNew := false
+		if err == gorm.ErrRecordNotFound {
+			isNew = true
+		}
+
+		grade := models.Grade{
 			StudentID:    entry.StudentID,
-			SubjectID:    input.SubjectID,
-			TeacherID:    teacherRecordID,
+			SubjectID:    entry.SubjectID,
+			TeacherID:    teacher.ID,
 			Score:        entry.Score,
-			MaxScore:     input.MaxScore,
-			Type:         input.Type,
-			Term:         input.Term,
-			AcademicYear: input.AcademicYear,
+			MaxScore:     100,
+			Type:         entry.GradeType,
+			Semester:     entry.Semester,
+			AcademicYear: student.AcademicYear,
 			Remarks:      entry.Remarks,
-		})
+		}
+		if !isNew {
+			grade.ID = existingGrade.ID
+		}
+
+		dbGrades = append(dbGrades, grade)
+
+		if isNew && student.User.Email != "" {
+			newStudentsMap[entry.StudentID] = struct {
+				Email string
+				Name  string
+				Sub   string
+				Score float64
+			}{
+				Email: student.User.Email,
+				Name:  student.User.Name,
+				Sub:   sub.Name,
+				Score: entry.Score,
+			}
+		}
 	}
 
-	// ─────────────────────────────────────────────────────────────
-	// UPSERT
-	// ─────────────────────────────────────────────────────────────
-
-	if err := config.DB.Clauses(clause.OnConflict{
-		Columns: []clause.Column{
-			{Name: "student_id"},
-			{Name: "subject_id"},
-			{Name: "type"},
-			{Name: "term"},
-			{Name: "academic_year"},
-		},
-		DoUpdates: clause.AssignmentColumns([]string{
-			"score", "max_score", "remarks", "teacher_id",
-		}),
-	}).CreateInBatches(&grades, 100).Error; err != nil {
-		helpers.Error(c, http.StatusInternalServerError, "failed to save grades")
-		return
+	// Save all grades
+	for _, g := range dbGrades {
+		if err := config.DB.Save(&g).Error; err != nil {
+			helpers.Error(c, http.StatusInternalServerError, "failed to save grades: "+err.Error())
+			return
+		}
 	}
 
-	// ─────────────────────────────────────────────────────────────
-	// FIX: prevent email spam on updates/re-submissions
-	// Only notify NEW grade inserts
-	// ─────────────────────────────────────────────────────────────
-
-	// Build a studentID → score map so the goroutine can send the real score
-	// instead of the previous hard-coded 0.
-	scoreMap := make(map[uint]float64, len(input.Grades))
-	for _, entry := range input.Grades {
-		scoreMap[entry.StudentID] = entry.Score
-	}
-
+	// Send emails in background
 	go func() {
-		for _, studentID := range newStudents {
-
-			var student models.Student
-			if err := config.DB.Preload("User").First(&student, studentID).Error; err != nil {
-				continue
-			}
-
-			if student.User.Email == "" {
-				continue
-			}
-
+		for _, notifyInfo := range newStudentsMap {
 			helpers.SendGradeNotification(
-				student.User.Email,
-				student.User.Name,
-				subject.Name,
-				scoreMap[studentID], // FIX #3: pass the actual score, not 0
+				notifyInfo.Email,
+				notifyInfo.Name,
+				notifyInfo.Sub,
+				notifyInfo.Score,
 			)
 		}
 	}()
 
 	helpers.Success(c, http.StatusCreated, "grades recorded", gin.H{
-		"saved": len(grades),
+		"saved": len(dbGrades),
 	})
 }
 
@@ -1676,13 +1758,13 @@ func BulkGradeEntry(c *gin.Context) {
 // @Produce      json
 // @Param        subjectID  path   int     true   "Subject ID"
 // @Param        type       query  string  false  "Grade type: Midterm | Final | Quiz | Assignment"
-// @Param        term       query  string  false  "Term: Term1 | Term2 | Term3"
+// @Param        semester   query  string  false  "Semester: Semester 1 | Semester 2 | Semester 3"
 // @Success      200  {object}  helpers.APIResponse  "Grade list"
 // @Router       /api/academics/grades/subject/{subjectID} [get]
 func GetSubjectGrades(c *gin.Context) {
 	subjectID := c.Param("subjectID")
 	gradeType := c.Query("type")
-	term := c.Query("term")
+	semester := c.Query("semester")
 
 	// Get logged-in user (teacher)
 	userID, exists := c.Get("userID")
@@ -1728,8 +1810,8 @@ func GetSubjectGrades(c *gin.Context) {
 		query = query.Where("type = ?", gradeType)
 	}
 
-	if term != "" {
-		query = query.Where("term = ?", term)
+	if semester != "" {
+		query = query.Where("semester = ?", semester)
 	}
 
 	var grades []models.Grade
@@ -1744,13 +1826,13 @@ func GetSubjectGrades(c *gin.Context) {
 
 // GetStudentGrades godoc
 // @Summary      Get a student's grades
-// @Description  Returns grades for a student filtered by term and/or academic year.
+// @Description  Returns grades for a student filtered by semester and/or academic year.
 // @Description  Accessible by: Teacher, Student (own only), Admin, Parent (own child).
 // @Tags         grades
 // @Security     BearerAuth
 // @Produce      json
 // @Param        studentID  path   int     true   "Student ID"
-// @Param        term       query  string  false  "Term: Term1 | Term2 | Term3"
+// @Param        semester   query  string  false  "Semester: Semester 1 | Semester 2 | Semester 3"
 // @Param        year       query  int     false  "Academic year e.g. 2025"
 // @Success      200  {object}  helpers.APIResponse  "Grade list"
 // @Failure      403  {object}  helpers.APIResponse  "Forbidden — Students may only view their own grades"
@@ -1770,12 +1852,12 @@ func GetStudentGrades(c *gin.Context) {
 			return
 		}
 	}
-	term := c.Query("term")
+	semester := c.Query("semester")
 	year := c.Query("year")
 
 	query := config.DB.Preload("Subject").Where("student_id = ?", studentID)
-	if term != "" {
-		query = query.Where("term = ?", term)
+	if semester != "" {
+		query = query.Where("semester = ?", semester)
 	}
 	if year != "" {
 		query = query.Where("academic_year = ?", year)
@@ -1796,14 +1878,14 @@ func GetStudentGrades(c *gin.Context) {
 // @Summary      Get report card (JSON)
 // @Description  Returns a full report card with per-subject averages and letter grades.
 // @Description  FIX: now requires academic_year query param (defaults to current year).
-// @Description  Optionally filtered by term. Without these filters, cross-year averages were meaningless.
+// @Description  Optionally filtered by semester. Without these filters, cross-year averages were meaningless.
 // @Description  Accessible by: Teacher, Student (own only), Admin, Parent (own child via ParentOwnsStudent middleware).
 // @Tags         report-card
 // @Security     BearerAuth
 // @Produce      json
 // @Param        studentID      path   int     true   "Student ID"
 // @Param        academic_year  query  int     false  "Academic year (default: current year)"
-// @Param        term           query  string  false  "Term filter: Term1 | Term2 | Term3 (omit for full year average)"
+// @Param        semester       query  string  false  "Semester filter: Semester 1 | Semester 2 | Semester 3 (omit for full year average)"
 // @Success      200  {object}  helpers.APIResponse  "Report card"
 // @Failure      403  {object}  helpers.APIResponse  "Forbidden — Students may only view their own report card"
 // @Failure      404  {object}  helpers.APIResponse  "Student not found"
@@ -1830,7 +1912,7 @@ func GetReportCard(c *gin.Context) {
 
 	// default to current year; require explicit year or get a cross-year averaged mess.
 	yearStr := c.DefaultQuery("academic_year", fmt.Sprintf("%d", time.Now().Year()))
-	term := c.Query("term")
+	semester := c.Query("semester")
 
 	type SubjectReport struct {
 		SubjectName string  `json:"subject_name"`
@@ -1842,12 +1924,12 @@ func GetReportCard(c *gin.Context) {
 		LetterGrade string  `json:"letter_grade"`
 	}
 
-	// Build the WHERE clause dynamically so term is optional.
-	termClause := ""
+	// Build the WHERE clause dynamically so semester is optional.
+	semClause := ""
 	args := []any{studentID, yearStr}
-	if term != "" {
-		termClause = "AND g.term = ?"
-		args = append(args, term)
+	if semester != "" {
+		semClause = "AND g.semester = ?"
+		args = append(args, semester)
 	}
 
 	var report []SubjectReport
@@ -1863,7 +1945,7 @@ func GetReportCard(c *gin.Context) {
 		JOIN subjects s ON g.subject_id = s.id
 		WHERE g.student_id = ? AND g.academic_year = ? %s
 		GROUP BY s.name
-	`, termClause), args...).Scan(&report)
+	`, semClause), args...).Scan(&report)
 
 	for i, r := range report {
 		report[i].LetterGrade = scoreToLetter(r.Overall)
@@ -1877,20 +1959,20 @@ func GetReportCard(c *gin.Context) {
 			"class": student.Class.Name,
 		},
 		"academic_year": yearStr,
-		"term":          term,
+		"semester":      semester,
 		"subjects":      report,
 	})
 }
 
 // DownloadReportCard godoc
 // @Summary      Download report card as PDF
-// @Description  Generates and streams a PDF report card. Accepts academic_year and term query params.
+// @Description  Generates and streams a PDF report card. Accepts academic_year and semester query params.
 // @Tags         report-card
 // @Security     BearerAuth
 // @Produce      application/pdf
 // @Param        studentID      path   int     true   "Student ID"
 // @Param        academic_year  query  int     false  "Academic year (default: current year)"
-// @Param        term           query  string  false  "Term filter: Term1 | Term2 | Term3"
+// @Param        semester       query  string  false  "Semester filter: Semester 1 | Semester 2 | Semester 3"
 // @Success      200  {file}    binary               "PDF download"
 // @Failure      403  {object}  helpers.APIResponse  "Forbidden — Students may only download their own report card"
 // @Failure      404  {object}  helpers.APIResponse  "Student not found"
@@ -1917,13 +1999,13 @@ func DownloadReportCard(c *gin.Context) {
 	}
 
 	yearStr := c.DefaultQuery("academic_year", fmt.Sprintf("%d", time.Now().Year()))
-	term := c.Query("term")
+	semester := c.Query("semester")
 
-	termClause := ""
+	semClause := ""
 	args := []any{student.ID, yearStr}
-	if term != "" {
-		termClause = "AND g.term = ?"
-		args = append(args, term)
+	if semester != "" {
+		semClause = "AND g.semester = ?"
+		args = append(args, semester)
 	}
 
 	type row struct {
@@ -1937,7 +2019,7 @@ func DownloadReportCard(c *gin.Context) {
 		JOIN subjects s ON g.subject_id = s.id
 		WHERE g.student_id = ? AND g.academic_year = ? %s
 		GROUP BY s.name
-	`, termClause), args...).Scan(&rows)
+	`, semClause), args...).Scan(&rows)
 
 	var courses []helpers.CourseGrade
 	for _, r := range rows {
@@ -1976,36 +2058,69 @@ func GetParents(c *gin.Context) {
 	offset, limit := parsePage(c)
 	var parents []models.User
 	var total int64
-	db := config.DB.Model(&models.User{}).Where("role = ?", models.RoleParent)
+
+	// Count query - distinct users
+	dbCount := config.DB.Model(&models.User{}).Where("users.role = ?", models.RoleParent)
 	if q := strings.TrimSpace(c.Query("search")); q != "" {
 		like := "%" + q + "%"
-		db = db.Where("name ILIKE ? OR email ILIKE ?", like, like)
+		dbCount = dbCount.Joins("LEFT JOIN students ON students.parent_id = users.id").
+			Joins("LEFT JOIN users s_u ON students.user_id = s_u.id AND s_u.deleted_at IS NULL").
+			Where("users.name ILIKE ? OR users.email ILIKE ? OR s_u.name ILIKE ?", like, like, like)
 	}
-	db.Count(&total)
-	if err := db.Offset(offset).Limit(limit).Find(&parents).Error; err != nil {
+	dbCount.Distinct("users.id").Count(&total)
+
+	// Data query
+	dbParents := config.DB.Model(&models.User{}).Where("users.role = ?", models.RoleParent)
+	if q := strings.TrimSpace(c.Query("search")); q != "" {
+		like := "%" + q + "%"
+		dbParents = dbParents.Joins("LEFT JOIN students ON students.parent_id = users.id").
+			Joins("LEFT JOIN users s_u ON students.user_id = s_u.id AND s_u.deleted_at IS NULL").
+			Where("users.name ILIKE ? OR users.email ILIKE ? OR s_u.name ILIKE ?", like, like, like).
+			Distinct("users.id", "users.name", "users.email", "users.phone", "users.is_active", "users.created_at")
+	}
+	if err := dbParents.Order("users.name ASC").Offset(offset).Limit(limit).Find(&parents).Error; err != nil {
 		helpers.Error(c, http.StatusInternalServerError, "failed to fetch parents")
 		return
 	}
 
+	// Fetch children for these parents
+	parentIDs := make([]uint, len(parents))
+	for i, p := range parents {
+		parentIDs[i] = p.ID
+	}
+
+	var students []models.Student
+	if len(parentIDs) > 0 {
+		if err := config.DB.Preload("User").Preload("Class").Where("parent_id IN ?", parentIDs).Find(&students).Error; err != nil {
+			helpers.Error(c, http.StatusInternalServerError, "failed to fetch children")
+			return
+		}
+	}
+
+	studentsByParent := make(map[uint][]models.Student)
+	for _, s := range students {
+		studentsByParent[s.ParentID] = append(studentsByParent[s.ParentID], s)
+	}
+
+	type childRow struct {
+		ID          uint   `json:"id"`
+		Name        string `json:"name"`
+		StudentCode string `json:"student_code"`
+		Grade       string `json:"grade"`
+		Section     string `json:"section"`
+	}
+
 	type parentRow struct {
-		ID            uint   `json:"id"`
-		Name          string `json:"name"`
-		Email         string `json:"email"`
-		Phone         string `json:"phone"`
-		IsActive      bool   `json:"is_active"`
-		Status        string `json:"status"`
-		ChildrenCount int64  `json:"children_count"`
-		CreatedAt     string `json:"created_at"`
-	}
-	type countRow struct {
-		ParentID uint  `gorm:"column:parent_id"`
-		Cnt      int64 `gorm:"column:cnt"`
-	}
-	var counts []countRow
-	config.DB.Model(&models.Student{}).Select("parent_id, COUNT(*) as cnt").Group("parent_id").Scan(&counts)
-	countMap := map[uint]int64{}
-	for _, c := range counts {
-		countMap[c.ParentID] = c.Cnt
+		ID            uint       `json:"id"`
+		Name          string     `json:"name"`
+		Email         string     `json:"email"`
+		Phone         string     `json:"phone"`
+		IsActive      bool       `json:"is_active"`
+		Status        string     `json:"status"`
+		ChildrenCount int        `json:"children_count"`
+		Children      []childRow `json:"children"`
+		StudentNames  string     `json:"student_names"`
+		CreatedAt     string     `json:"created_at"`
 	}
 
 	var rows []parentRow
@@ -2014,9 +2129,35 @@ func GetParents(c *gin.Context) {
 		if !p.IsActive {
 			st = "Inactive"
 		}
+
+		children := []childRow{}
+		studentNamesList := []string{}
+		for _, s := range studentsByParent[p.ID] {
+			name := s.User.Name
+			studentNamesList = append(studentNamesList, name)
+
+			gradeStr := ""
+			secStr := ""
+			if s.Class != nil {
+				gradeStr = s.Class.Name
+				secStr = s.Class.Section
+			} else {
+				gradeStr = fmt.Sprintf("Grade %d", s.GradeLevel)
+			}
+
+			children = append(children, childRow{
+				ID:          s.ID,
+				Name:        name,
+				StudentCode: s.StudentCode,
+				Grade:       gradeStr,
+				Section:     secStr,
+			})
+		}
+
 		rows = append(rows, parentRow{
 			ID: p.ID, Name: p.Name, Email: p.Email, Phone: p.Phone,
-			IsActive: p.IsActive, Status: st, ChildrenCount: countMap[p.ID],
+			IsActive: p.IsActive, Status: st, ChildrenCount: len(children),
+			Children: children, StudentNames: strings.Join(studentNamesList, ", "),
 			CreatedAt: p.CreatedAt.Format(time.RFC3339),
 		})
 	}
@@ -2151,6 +2292,16 @@ func ArchiveParent(c *gin.Context) {
 	var user models.User
 	if err := config.DB.Where("id = ? AND role = ?", id, models.RoleParent).First(&user).Error; err != nil {
 		helpers.Error(c, http.StatusNotFound, "parent not found")
+		return
+	}
+	// FIX #8: prevent orphaning active students. Count children that still reference
+	// this parent user. If any exist, refuse the archive and tell the admin to
+	// re-link them to a different parent first.
+	var activeChildren int64
+	config.DB.Model(&models.Student{}).Where("parent_id = ?", user.ID).Count(&activeChildren)
+	if activeChildren > 0 {
+		helpers.Error(c, http.StatusConflict,
+			fmt.Sprintf("cannot archive parent: %d active student(s) still reference this parent — re-link or archive them first", activeChildren))
 		return
 	}
 	config.DB.Model(&user).Update("is_active", false)

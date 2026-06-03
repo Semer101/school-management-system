@@ -30,7 +30,7 @@ export const bulkGradeEntry = (grades: {
   subject_id: number
   score: number
   grade_type: string
-  term: string
+  semester: string
   remarks?: string
 }[]) => api.post<APIResponse>('/api/academics/grades/bulk', { grades })
 

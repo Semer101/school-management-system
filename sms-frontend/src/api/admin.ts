@@ -82,6 +82,14 @@ export const createClass = (data: {
   teacher_id: number
 }) => api.post<APIResponse<Class>>('/api/admin/classes', data)
 
+export interface ChildInfo {
+  id: number
+  name: string
+  student_code: string
+  grade: string
+  section: string
+}
+
 export interface ParentRow {
   id: number
   name: string
@@ -90,6 +98,8 @@ export interface ParentRow {
   is_active: boolean
   status: string
   children_count: number
+  children: ChildInfo[]
+  student_names: string
 }
 
 export interface AdminRow {
@@ -162,7 +172,7 @@ export type AttendanceSummaryRow = {
   status: string
 }
 
-export const getAttendanceSummary = (params?: { date?: string; grade_level?: string; section?: string }) =>
+export const getAttendanceSummary = (params?: { date?: string; grade_level?: string; section?: string; class_id?: string }) =>
   api.get<APIResponse<AttendanceSummaryRow[] | PaginatedList<AttendanceSummaryRow>>>(
     '/api/admin/attendance/summary',
     { params }

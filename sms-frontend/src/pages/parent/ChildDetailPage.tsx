@@ -106,7 +106,7 @@ export default function ChildDetailPage() {
         <div className="bg-[var(--bg)] border border-[var(--border)] rounded-2xl overflow-hidden">
           <table className="w-full text-sm">
             <thead><tr className="border-b border-[var(--border)] bg-[var(--code-bg)]">
-              {['Subject', 'Type', 'Score', 'Term'].map((h) => (
+              {['Subject', 'Type', 'Score', 'Semester'].map((h) => (
                 <th key={h} className="text-left px-5 py-3 font-semibold text-[var(--text-h)]">{h}</th>
               ))}
             </tr></thead>
@@ -116,7 +116,7 @@ export default function ChildDetailPage() {
                   <td className="px-5 py-2.5 text-[var(--text)]">{g.subject?.name}</td>
                   <td className="px-5 py-2.5 text-[var(--text)]">{g.grade_type}</td>
                   <td className="px-5 py-2.5 font-medium text-[var(--text-h)]">{g.score}</td>
-                  <td className="px-5 py-2.5 text-[var(--text)]">{g.term}</td>
+                  <td className="px-5 py-2.5 text-[var(--text)]">{g.semester}</td>
                 </tr>
               ))}
             </tbody>
@@ -133,7 +133,7 @@ export default function ChildDetailPage() {
               ⬇ PDF
             </Button>
           </div>
-          <p className="text-sm text-[var(--text)]">{report.term} · {report.year}</p>
+          <p className="text-sm text-[var(--text)]">{report.semester} · {report.year}</p>
         </div>
       )}
     </div>

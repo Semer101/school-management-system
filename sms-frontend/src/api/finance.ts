@@ -13,8 +13,8 @@ export const getMyTransactions = () =>
   api.get<APIResponse<Transaction[]>>('/api/finance/transactions')
 
 // ── Admin ────────────────────────────────────────────────
-export const getAllTransactions = () =>
-  api.get<APIResponse<Transaction[]>>('/api/admin/finance/summary')
+export const getAllTransactions = (params?: { academic_year?: string; semester?: string; status?: string; student?: string }) =>
+  api.get<APIResponse<Transaction[]>>('/api/admin/finance/summary', { params })
 
 export const verifyReceipt = (id: number) =>
   api.patch<APIResponse>(`/api/admin/finance/receipt/${id}/verify`)
@@ -29,5 +29,22 @@ export const createPayroll = (data: {
 export const markPayrollPaid = (id: number) =>
   api.patch<APIResponse>(`/api/admin/finance/payroll/${id}/pay`)
 
-export const getPayrolls = () =>
-  api.get<APIResponse<Payroll[]>>('/api/admin/finance/payroll')
+export const getPayrolls = (params?: { month?: string; year?: string; department?: string }) =>
+  api.get<APIResponse<Payroll[]>>('/api/admin/finance/payroll', { params })
+
+export interface OverduePaymentRow {
+  student_id: number
+  student_name: string
+  student_code: string
+  class_name: string
+  academic_year: number
+  semester_1: 'Paid' | 'Pending' | 'Overdue'
+  semester_2: 'Paid' | 'Pending' | 'Overdue'
+  semester_3: 'Paid' | 'Pending' | 'Overdue'
+}
+
+export const getOverduePayments = () =>
+  api.get<APIResponse<OverduePaymentRow[]>>('/api/admin/finance/overdue')
+
+export const sendPaymentReminder = (data: { student_id: number; academic_year: number; semester: string }) =>
+  api.post<APIResponse>('/api/admin/finance/remind', data)

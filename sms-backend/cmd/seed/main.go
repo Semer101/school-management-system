@@ -62,12 +62,14 @@ func seedSampleData() {
 		"0911100001", "0911100002", "0911100003", "0911100004", "0911100005",
 		"0911100006", "0911100007", "0911100008", "0911100009", "0911100010",
 	}
+	departments := []string{"Mathematics", "Physics", "Chemistry", "Biology", "English", "Amharic", "Social Studies", "Civics", "ICT", "Mathematics"}
+	qualifications := []string{"BEd Mathematics", "MSc Physics", "BEd Chemistry", "BSc Biology", "MEd English", "BA Amharic", "BEd Social Studies", "MA Civics", "BSc ICT", "MEd Mathematics"}
 	var teachers []models.Teacher
 	for i, name := range teacherNames {
 		email := fmt.Sprintf("teacher%d@school.et", i+1)
 		user := models.User{Name: name, Email: email, Password: hashPwd("Teacher@1234"), Role: models.RoleTeacher, Phone: teacherPhones[i], IsActive: true}
 		config.DB.Where("email = ?", email).FirstOrCreate(&user)
-		t := models.Teacher{UserID: user.ID, TeacherCode: fmt.Sprintf("TCH-%03d", i+1), Qualification: "BEd", JoinedAt: time.Now()}
+		t := models.Teacher{UserID: user.ID, TeacherCode: fmt.Sprintf("TCH-%03d", i+1), Qualification: qualifications[i%len(qualifications)], Department: departments[i%len(departments)], JoinedAt: time.Now()}
 		config.DB.Where("user_id = ?", user.ID).FirstOrCreate(&t)
 		t.User = user
 		teachers = append(teachers, t)
@@ -107,32 +109,45 @@ func seedSampleData() {
 		classes = append(classes, c)
 	}
 
-	subjectDefs := []struct {
-		Name, Code string
-		Grade      int
-		Stream     string
-		TIdx       int
-	}{
-		{"Amharic", "AMH-G9", 9, "", 2},
-		{"English", "ENG-G9", 9, "", 2},
-		{"Mathematics", "MATH-G9", 9, "", 0},
-		{"Physics", "PHY-NAT-G9", 9, models.StreamNatural, 1},
-		{"Biology", "BIO-NAT-G9", 9, models.StreamNatural, 4},
-		{"History", "HIST-SOC-G10", 10, models.StreamSocial, 5},
-		{"Geography", "GEO-SOC-G10", 10, models.StreamSocial, 5},
-		{"Chemistry", "CHEM-NAT-G11", 11, models.StreamNatural, 3},
-		{"ICT", "ICT-G11", 11, "", 6},
-		{"Civics", "CIV-G12", 12, "", 5},
-	}
 	var subjects []models.Subject
-	for _, sd := range subjectDefs {
-		tID := teachers[sd.TIdx%len(teachers)].ID
-		sub := models.Subject{
-			Name: sd.Name, Code: sd.Code, GradeLevel: sd.Grade, Stream: sd.Stream,
-			Status: "Active", TeacherID: &tID,
+	for _, cur := range models.EthiopianGrades9to12Subjects() {
+		for _, grade := range cur.Grades {
+			if grade <= 10 && cur.Stream != "" {
+				continue
+			}
+			tID := teachers[cur.TeacherIdx%len(teachers)].ID
+			code := models.CurriculumSubjectCode(cur.Code, cur.Stream, grade)
+			subjectName := cur.Name
+			if cur.Stream != "" {
+				subjectName = fmt.Sprintf("%s (%s)", cur.Name, cur.Stream)
+			}
+			sub := models.Subject{
+				Name: subjectName, Code: code, GradeLevel: grade, Stream: cur.Stream,
+				Status: "Active", TeacherID: &tID,
+			}
+			config.DB.Where("code = ?", code).FirstOrCreate(&sub)
+			config.DB.Model(&sub).Updates(map[string]any{
+				"name": subjectName, "grade_level": grade, "stream": cur.Stream,
+				"status": "Active", "teacher_id": tID,
+			})
+			config.DB.First(&sub, sub.ID)
+			subjects = append(subjects, sub)
 		}
-		config.DB.Where("code = ?", sd.Code).FirstOrCreate(&sub)
-		subjects = append(subjects, sub)
+	}
+	var subjectCodes []string
+	for _, sub := range subjects {
+		subjectCodes = append(subjectCodes, sub.Code)
+	}
+
+	// Remove legacy subject rows that used stream-specific Grade 9/10 codes or
+	// incomplete sample-only curriculum codes.
+	var legacySubjectIDs []uint
+	config.DB.Model(&models.Subject{}).Where("code NOT IN ?", subjectCodes).Pluck("id", &legacySubjectIDs)
+	if len(legacySubjectIDs) > 0 {
+		config.DB.Where("subject_id IN ?", legacySubjectIDs).Delete(&models.Enrollment{})
+		config.DB.Where("subject_id IN ?", legacySubjectIDs).Delete(&models.Attendance{})
+		config.DB.Where("subject_id IN ?", legacySubjectIDs).Delete(&models.Grade{})
+		config.DB.Unscoped().Where("id IN ?", legacySubjectIDs).Delete(&models.Subject{})
 	}
 
 	var parents []models.User
@@ -144,6 +159,9 @@ func seedSampleData() {
 			Phone: fmt.Sprintf("0944%06d", 100000+i), IsActive: true,
 		}
 		config.DB.Where("email = ?", email).FirstOrCreate(&p)
+		config.DB.Model(&p).Updates(map[string]any{
+			"name": fmt.Sprintf("Parent %d", i),
+		})
 		parents = append(parents, p)
 	}
 
@@ -161,16 +179,36 @@ func seedSampleData() {
 		email := fmt.Sprintf("student%d@school.et", i+1)
 		user := models.User{Name: name, Email: email, Password: hashPwd("Student@1234"), Role: models.RoleStudent, IsActive: true, Phone: fmt.Sprintf("0911500%03d", i+1)}
 		config.DB.Where("email = ?", email).FirstOrCreate(&user)
+		parentIdx := i
+		if i == 1 {
+			parentIdx = 0 // Student 2 also gets Parent 1
+		} else if i == 3 {
+			parentIdx = 2 // Student 4 also gets Parent 3
+		}
+
 		st := models.Student{
-			UserID: user.ID, ParentID: parents[i].ID, ClassID: &classID,
+			UserID: user.ID, ParentID: parents[parentIdx].ID, ClassID: &classID,
 			StudentCode: fmt.Sprintf("STU-%d-%03d", academicYear, i+1),
-			ParentName:  parents[i].Name, ParentEmail: parents[i].Email,
-			ParentPhone: parents[i].Phone,
+			ParentName:  parents[parentIdx].Name, ParentEmail: parents[parentIdx].Email,
+			ParentPhone: parents[parentIdx].Phone,
 			DateOfBirth: time.Now().AddDate(-15, 0, 0),
 			Stream:      stream, GradeLevel: grade, PromotionStatus: models.PromotionNormal,
-			AcademicYear: academicYear, EnrolledAt: time.Now(),
+			AcademicYear: academicYear, EnrolledAt: time.Date(academicYear, 9, 1, 0, 0, 0, 0, time.UTC),
 		}
 		config.DB.Where("user_id = ?", user.ID).FirstOrCreate(&st)
+		config.DB.Model(&st).Updates(map[string]any{
+			"class_id":         classID,
+			"grade_level":      grade,
+			"stream":           stream,
+			"parent_id":        parents[parentIdx].ID,
+			"parent_name":      parents[parentIdx].Name,
+			"parent_email":     parents[parentIdx].Email,
+			"parent_phone":     parents[parentIdx].Phone,
+			"academic_year":    academicYear,
+			"enrolled_at":      time.Date(academicYear, 9, 1, 0, 0, 0, 0, time.UTC),
+			"promotion_status": models.PromotionNormal,
+		})
+		config.DB.First(&st, st.ID)
 		students = append(students, st)
 	}
 
@@ -225,31 +263,38 @@ func seedSampleData() {
 		config.DB.Joins("JOIN enrollments ON enrollments.subject_id = subjects.id").
 			Where("enrollments.student_id = ?", st.ID).Find(&subs)
 		for _, sub := range subs {
-			for _, gt := range []string{"Midterm", "Final"} {
-				score := 72.0 + float64((st.ID+sub.ID)%25)
-				if i == 0 {
-					// Abinet Tadesse (Student 1) - Repeat (fail all G9 subjects)
-					score = 40.0
-				} else if i == 1 {
-					// Bemnet Girma (Student 2) - Conditional (fail 1 G9 subject, pass others)
-					if len(subs) > 0 && sub.ID == subs[0].ID {
+			semsToSeed := []string{"Semester 1", "Semester 2"}
+			if i <= 2 {
+				semsToSeed = append(semsToSeed, "Semester 3")
+			}
+
+			for _, sem := range semsToSeed {
+				for _, gt := range []string{"Midterm", "Final"} {
+					score := 72.0 + float64((st.ID+sub.ID)%25)
+					if i == 0 {
+						// Abinet Tadesse (Student 1) - Repeat (fail all G9 subjects)
+						score = 40.0
+					} else if i == 1 {
+						// Bemnet Girma (Student 2) - Conditional (fail 1 G9 subject, pass others)
+						if len(subs) > 0 && sub.ID == subs[0].ID {
+							score = 42.0
+						}
+					} else if i == 3 && gt == "Final" {
 						score = 42.0
 					}
-				} else if i == 3 && gt == "Final" {
-					score = 42.0
-				}
-				var gc int64
-				config.DB.Model(&models.Grade{}).Where("student_id = ? AND subject_id = ? AND type = ? AND term = ? AND academic_year = ?",
-					st.ID, sub.ID, gt, "Term1", academicYear).Count(&gc)
-				if gc == 0 {
-					var teacherID uint
-					if sub.TeacherID != nil {
-						teacherID = *sub.TeacherID
+					var gc int64
+					config.DB.Model(&models.Grade{}).Where("student_id = ? AND subject_id = ? AND type = ? AND semester = ? AND academic_year = ?",
+						st.ID, sub.ID, gt, sem, academicYear).Count(&gc)
+					if gc == 0 {
+						var teacherID uint
+						if sub.TeacherID != nil {
+							teacherID = *sub.TeacherID
+						}
+						config.DB.Create(&models.Grade{
+							StudentID: st.ID, SubjectID: sub.ID, TeacherID: teacherID,
+							Score: score, MaxScore: 100, Type: gt, Semester: sem, AcademicYear: academicYear,
+						})
 					}
-					config.DB.Create(&models.Grade{
-						StudentID: st.ID, SubjectID: sub.ID, TeacherID: teacherID,
-						Score: score, MaxScore: 100, Type: gt, Term: "Term1", AcademicYear: academicYear,
-					})
 				}
 			}
 		}
@@ -278,6 +323,7 @@ func seedSampleData() {
 	}
 
 	for i, student := range students {
+		// Semester 1 payment
 		rid := fmt.Sprintf("ETH-CBE-%06d", 300000+i)
 		var tc int64
 		config.DB.Model(&models.Transaction{}).Where("receipt_id = ?", rid).Count(&tc)
@@ -289,7 +335,26 @@ func seedSampleData() {
 			config.DB.Create(&models.Transaction{
 				StudentID: student.ID, Amount: 8500, ReceiptID: rid, Type: "Tuition",
 				Status: txStatus, Description: "Semester 1", CreatedBy: student.UserID,
+				AcademicYear: academicYear, Semester: "Semester 1",
 			})
+		}
+
+		// Semester 2 payment (seeded for a subset to demonstrate overdue states)
+		if i%2 == 0 {
+			rid2 := fmt.Sprintf("ETH-CBE-%06d", 400000+i)
+			var tc2 int64
+			config.DB.Model(&models.Transaction{}).Where("receipt_id = ?", rid2).Count(&tc2)
+			if tc2 == 0 {
+				txStatus := "Pending"
+				if i%4 == 0 {
+					txStatus = "Verified"
+				}
+				config.DB.Create(&models.Transaction{
+					StudentID: student.ID, Amount: 8500, ReceiptID: rid2, Type: "Tuition",
+					Status: txStatus, Description: "Semester 2", CreatedBy: student.UserID,
+					AcademicYear: academicYear, Semester: "Semester 2",
+				})
+			}
 		}
 	}
 
@@ -372,8 +437,15 @@ func trimExcessData() {
 	keepTeacherEmails := emails("teacher", sampleSize, "@school.et")
 	keepParentEmails := emails("parent", sampleSize, "@school.et")
 	keepAdminEmails := []string{"admin@school.et", "selam@school.et"}
-	keepCodes := []string{"AMH-G9", "ENG-G9", "MATH-G9", "PHY-NAT-G9", "BIO-NAT-G9",
-		"HIST-SOC-G10", "GEO-SOC-G10", "CHEM-NAT-G11", "ICT-G11", "CIV-G12"}
+	var keepCodes []string
+	for _, cur := range models.EthiopianGrades9to12Subjects() {
+		for _, grade := range cur.Grades {
+			if grade <= 10 && cur.Stream != "" {
+				continue
+			}
+			keepCodes = append(keepCodes, models.CurriculumSubjectCode(cur.Code, cur.Stream, grade))
+		}
+	}
 
 	// Purge huge legacy attendance/grade tables (old 50-student seed)
 	var attTotal, gradeTotal int64

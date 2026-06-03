@@ -51,6 +51,7 @@ export interface Teacher {
   user?: User
   teacher_code: string
   qualification: string
+  department?: string
   joined_at: string
 }
 
@@ -87,7 +88,7 @@ export interface Grade {
   subject_id: number
   score: number
   grade_type: string
-  term: string
+  semester: string
   remarks: string
   student?: Student
   subject?: Subject
@@ -99,6 +100,6 @@ export interface ReportCard {
   grades: Grade[]
   attendance: AttendancePercentage[]
   average: number
-  term: string
+  semester: string
   year: number
 }

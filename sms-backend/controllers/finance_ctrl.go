@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -13,13 +14,13 @@ import (
 	"sms-backend/models"
 )
 
-// ── Input types ───────────────────────────────────────────────────────────────
-
 type SubmitReceiptRequest struct {
-	StudentID   uint    `json:"student_id"  binding:"required"             example:"1"`
-	Amount      float64 `json:"amount"      binding:"required,min=1"        example:"5000.00"`
-	ReceiptID   string  `json:"receipt_id"  binding:"required,min=5,max=50" example:"CBE-TXN-20250501-001"`
-	Description string  `json:"description"                                example:"Term 1 tuition fee"`
+	StudentID    uint    `json:"student_id"    binding:"required"             example:"1"`
+	Amount       float64 `json:"amount"        binding:"required,min=1"        example:"5000.00"`
+	ReceiptID    string  `json:"receipt_id"    binding:"required,min=5,max=50" example:"CBE-TXN-20250501-001"`
+	Description  string  `json:"description"                                   example:"Semester 1 tuition fee"`
+	AcademicYear int     `json:"academic_year"`
+	Semester     string  `json:"semester"`
 }
 
 type VerifyReceiptRequest struct {
@@ -27,8 +28,6 @@ type VerifyReceiptRequest struct {
 	Remarks string `json:"remarks"                                             example:"Confirmed with bank"`
 }
 
-// Year field now has min=2000 to prevent year 0 / nonsense values being stored.
-// Previously it was only binding:"required" which allowed 0 or 1 to pass validation.
 type CreatePayrollRequest struct {
 	TeacherID uint    `json:"teacher_id" binding:"required"                    example:"2"`
 	Amount    float64 `json:"amount"     binding:"required,min=1"               example:"15000.00"`
@@ -36,24 +35,6 @@ type CreatePayrollRequest struct {
 	Year      int     `json:"year"       binding:"required,min=2000,max=2100"   example:"2025"`
 }
 
-// ══════════════════════════════════════════════════════
-//  SUBMIT BANK RECEIPT — Student or Parent only
-// ══════════════════════════════════════════════════════
-
-// SubmitBankReceipt godoc
-// @Summary      Submit a bank receipt (Student or Parent only)
-// @Description  Submits proof of payment via an Ethiopian bank receipt transaction ID.
-// @Description  Student can only submit for themselves. Parent can submit for any of their linked children.
-// @Tags         finance
-// @Security     BearerAuth
-// @Accept       json
-// @Produce      json
-// @Param        body  body      SubmitReceiptRequest  true  "Receipt data"
-// @Success      201   {object}  helpers.APIResponse   "Receipt submitted"
-// @Failure      400   {object}  helpers.APIResponse   "Validation error"
-// @Failure      403   {object}  helpers.APIResponse   "Forbidden — Student/Parent only, or submitting for wrong student"
-// @Failure      409   {object}  helpers.APIResponse   "Receipt ID already exists"
-// @Router       /api/finance/receipt [post]
 func SubmitBankReceipt(c *gin.Context) {
 	userID := c.GetUint("userID")
 	userRole := c.GetString("role")
@@ -69,37 +50,54 @@ func SubmitBankReceipt(c *gin.Context) {
 		return
 	}
 
+	var student models.Student
+	if err := config.DB.First(&student, input.StudentID).Error; err != nil {
+		helpers.Error(c, http.StatusNotFound, "student profile not found")
+		return
+	}
+
 	if userRole == models.RoleStudent {
-		var student models.Student
-		if err := config.DB.Where("user_id = ?", userID).First(&student).Error; err != nil {
-			helpers.Error(c, http.StatusNotFound, "student profile not found")
-			return
-		}
-		if student.ID != input.StudentID {
+		if student.UserID != userID {
 			helpers.Error(c, http.StatusForbidden, "you can only submit receipts for yourself")
 			return
 		}
 	}
 
 	if userRole == models.RoleParent {
-		var count int64
-		config.DB.Model(&models.Student{}).
-			Where("id = ? AND parent_id = ?", input.StudentID, userID).
-			Count(&count)
-		if count == 0 {
+		if student.ParentID != userID {
 			helpers.Error(c, http.StatusForbidden, "this student is not linked to your account")
 			return
 		}
 	}
 
+	academicYear := input.AcademicYear
+	if academicYear == 0 {
+		academicYear = student.AcademicYear
+	}
+
+	// FIX #5: accept empty semester for non-semester fees; validate canonical labels.
+	semester := strings.TrimSpace(input.Semester)
+	switch semester {
+	case "Semester 1", "Semester 2", "Semester 3":
+		// OK
+	case "":
+		semester = ""
+	default:
+		helpers.Error(c, http.StatusBadRequest,
+			"semester must be one of 'Semester 1', 'Semester 2', 'Semester 3', or omitted for non-semester fees")
+		return
+	}
+
 	tx := models.Transaction{
-		StudentID:   input.StudentID,
-		Amount:      input.Amount,
-		ReceiptID:   input.ReceiptID,
-		Type:        "Tuition",
-		Status:      "Pending",
-		Description: input.Description,
-		CreatedBy:   userID,
+		StudentID:    input.StudentID,
+		Amount:       input.Amount,
+		ReceiptID:    input.ReceiptID,
+		Type:         "Tuition",
+		Status:       "Pending",
+		Description:  input.Description,
+		CreatedBy:    userID,
+		AcademicYear: academicYear,
+		Semester:     semester,
 	}
 
 	err := config.DB.Transaction(func(db *gorm.DB) error {
@@ -112,33 +110,12 @@ func SubmitBankReceipt(c *gin.Context) {
 			helpers.Error(c, http.StatusConflict, "receipt ID already submitted")
 			return
 		}
-
 		helpers.Error(c, http.StatusInternalServerError, "failed to submit receipt")
 		return
 	}
 	helpers.Success(c, http.StatusCreated, "receipt submitted", tx)
 }
 
-// ══════════════════════════════════════════════════════
-//  VERIFY RECEIPT — Admin only
-// ══════════════════════════════════════════════════════
-
-// VerifyReceipt godoc
-// @Summary      Verify or reject a bank receipt (Admin only)
-// @Description  Marks a pending receipt as Verified or Rejected. Can only be done once per receipt.
-// @Description  FIX #6: Admin note is only appended to the description when remarks is non-empty.
-// @Tags         finance
-// @Security     BearerAuth
-// @Accept       json
-// @Produce      json
-// @Param        id    path  int                   true  "Transaction ID"
-// @Param        body  body  VerifyReceiptRequest  true  "Verification data"
-// @Success      200   {object}  helpers.APIResponse  "Receipt processed"
-// @Failure      400   {object}  helpers.APIResponse  "Already processed or validation error"
-// @Failure      403   {object}  helpers.APIResponse  "Forbidden — Admin only"
-// @Failure      404   {object}  helpers.APIResponse  "Transaction not found"
-// @Failure      500   {object}  helpers.APIResponse  "Database error"
-// @Router       /api/admin/finance/receipt/{id}/verify [patch]
 func VerifyReceipt(c *gin.Context) {
 	if c.GetString("role") != models.RoleAdmin {
 		helpers.Error(c, http.StatusForbidden, "admin only")
@@ -165,10 +142,6 @@ func VerifyReceipt(c *gin.Context) {
 	}
 
 	now := time.Now()
-
-	// FIX #6: Only append the admin note when remarks is non-empty.
-	// Previously, submitting with an empty remarks field still appended " | Admin note: "
-	// to the description, polluting it with a trailing label and no content.
 	description := tx.Description
 	if input.Remarks != "" {
 		description = tx.Description + " | Admin note: " + input.Remarks
@@ -188,24 +161,6 @@ func VerifyReceipt(c *gin.Context) {
 	helpers.Success(c, http.StatusOK, "transaction "+input.Status, tx)
 }
 
-// ══════════════════════════════════════════════════════
-//  PAYROLL — Admin only
-// ══════════════════════════════════════════════════════
-
-// CreatePayroll godoc
-// @Summary      Create a payroll entry (Admin only)
-// @Description  Creates a payroll record for a teacher for a specific month and year.
-// @Description  FIX: Year is now validated with min=2000 — previously 0 or 1 were accepted.
-// @Tags         finance
-// @Security     BearerAuth
-// @Accept       json
-// @Produce      json
-// @Param        body  body  CreatePayrollRequest  true  "Payroll data"
-// @Success      201   {object}  helpers.APIResponse  "Payroll created"
-// @Failure      400   {object}  helpers.APIResponse  "Validation error (including invalid year) or teacher not found"
-// @Failure      403   {object}  helpers.APIResponse  "Forbidden — Admin only"
-// @Failure      409   {object}  helpers.APIResponse  "Payroll already exists for this month/year"
-// @Router       /api/admin/finance/payroll [post]
 func CreatePayroll(c *gin.Context) {
 	if c.GetString("role") != models.RoleAdmin {
 		helpers.Error(c, http.StatusForbidden, "admin only")
@@ -250,11 +205,23 @@ func CreatePayroll(c *gin.Context) {
 	helpers.Success(c, http.StatusCreated, "payroll created", payroll)
 }
 
-// GetPayrolls lists payroll records (Admin only)
 func GetPayrolls(c *gin.Context) {
 	var payrolls []models.Payroll
-	if err := config.DB.Preload("Teacher.User").
-		Order("year DESC, month DESC, id DESC").
+	db := config.DB.Model(&models.Payroll{})
+
+	if month := c.Query("month"); month != "" {
+		db = db.Where("payrolls.month = ?", month)
+	}
+	if year := c.Query("year"); year != "" {
+		db = db.Where("payrolls.year = ?", year)
+	}
+	if dept := c.Query("department"); dept != "" {
+		db = db.Joins("JOIN teachers ON payrolls.teacher_id = teachers.id").
+			Where("teachers.department = ?", dept)
+	}
+
+	if err := db.Preload("Teacher.User").
+		Order("payrolls.year DESC, payrolls.month DESC, payrolls.id DESC").
 		Limit(200).
 		Find(&payrolls).Error; err != nil {
 		helpers.Error(c, http.StatusInternalServerError, "failed to fetch payroll")
@@ -263,19 +230,6 @@ func GetPayrolls(c *gin.Context) {
 	helpers.Success(c, http.StatusOK, "payroll fetched", payrolls)
 }
 
-// MarkPayrollPaid godoc
-// @Summary      Mark payroll as paid (Admin only)
-// @Description  Sets a payroll record's status to Paid and records the payment timestamp.
-// @Tags         finance
-// @Security     BearerAuth
-// @Produce      json
-// @Param        id   path  int  true  "Payroll ID"
-// @Success      200  {object}  helpers.APIResponse  "Payroll updated"
-// @Failure      400  {object}  helpers.APIResponse  "Already paid"
-// @Failure      403  {object}  helpers.APIResponse  "Forbidden — Admin only"
-// @Failure      404  {object}  helpers.APIResponse  "Payroll not found"
-// @Failure      500  {object}  helpers.APIResponse  "Database error"
-// @Router       /api/admin/finance/payroll/{id}/pay [patch]
 func MarkPayrollPaid(c *gin.Context) {
 	if c.GetString("role") != models.RoleAdmin {
 		helpers.Error(c, http.StatusForbidden, "admin only")
@@ -306,30 +260,38 @@ func MarkPayrollPaid(c *gin.Context) {
 	helpers.Success(c, http.StatusOK, "payroll marked as paid", payroll)
 }
 
-// ══════════════════════════════════════════════════════
-//  TRANSACTIONS
-// ══════════════════════════════════════════════════════
-
-// GetAllTransactions godoc
-// @Summary      List all transactions (Admin only)
-// @Tags         finance
-// @Security     BearerAuth
-// @Produce      json
-// @Param        page       query  int  false  "Page number (default 1)"
-// @Param        page_size  query  int  false  "Page size (default 50, max 200)"
-// @Success      200  {object}  helpers.APIResponse  "All transactions"
-// @Failure      403  {object}  helpers.APIResponse  "Forbidden — Admin only"
-// @Router       /api/admin/finance/summary [get]
 func GetAllTransactions(c *gin.Context) {
 	offset, limit := parsePage(c)
 	var transactions []models.Transaction
 	var total int64
 
-	config.DB.Model(&models.Transaction{}).Count(&total)
-	config.DB.Preload("Student.User").
-		Order("created_at DESC").
+	db := config.DB.Model(&models.Transaction{})
+
+	if year := c.Query("academic_year"); year != "" {
+		db = db.Where("transactions.academic_year = ?", year)
+	}
+	if sem := c.Query("semester"); sem != "" {
+		db = db.Where("transactions.semester = ?", sem)
+	}
+	if status := c.Query("status"); status != "" {
+		db = db.Where("transactions.status = ?", status)
+	}
+	if student := c.Query("student"); student != "" {
+		like := "%" + student + "%"
+		db = db.Joins("JOIN students ON transactions.student_id = students.id").
+			Joins("JOIN users ON students.user_id = users.id").
+			Where("users.name ILIKE ? OR students.student_code ILIKE ?", like, like)
+	}
+
+	db.Count(&total)
+
+	if err := db.Preload("Student.User").
+		Order("transactions.created_at DESC").
 		Offset(offset).Limit(limit).
-		Find(&transactions)
+		Find(&transactions).Error; err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "failed to fetch transactions")
+		return
+	}
 
 	helpers.Success(c, http.StatusOK, "transactions fetched", gin.H{
 		"total": total,
@@ -337,18 +299,6 @@ func GetAllTransactions(c *gin.Context) {
 	})
 }
 
-// GetMyTransactions godoc
-// @Summary      List my transactions (Student or Parent)
-// @Description  Students see their own transactions. Parents see transactions for all their linked children.
-// @Tags         finance
-// @Security     BearerAuth
-// @Produce      json
-// @Param        page       query  int  false  "Page number (default 1)"
-// @Param        page_size  query  int  false  "Page size (default 50, max 200)"
-// @Success      200  {object}  helpers.APIResponse  "Transaction list"
-// @Failure      404  {object}  helpers.APIResponse  "Student profile not found"
-// @Failure      500  {object}  helpers.APIResponse  "Database error"
-// @Router       /api/finance/transactions [get]
 func GetMyTransactions(c *gin.Context) {
 	userID := c.GetUint("userID")
 	userRole := c.GetString("role")
@@ -379,7 +329,6 @@ func GetMyTransactions(c *gin.Context) {
 
 	var transactions []models.Transaction
 	var total int64
-	// Clone the scoped query for count so WHERE clauses are preserved without Offset/Limit.
 	countQ := query.Session(&gorm.Session{})
 	countQ.Model(&models.Transaction{}).Count(&total)
 	if err := query.Offset(offset).Limit(limit).Find(&transactions).Error; err != nil {
@@ -391,4 +340,127 @@ func GetMyTransactions(c *gin.Context) {
 		"total": total,
 		"data":  transactions,
 	})
+}
+
+// GetOverduePayments — FIX #6: single-query replacement for the per-student N+1 loop.
+func GetOverduePayments(c *gin.Context) {
+	if c.GetString("role") != models.RoleAdmin {
+		helpers.Error(c, http.StatusForbidden, "admin only")
+		return
+	}
+
+	type StudentPaymentStatus struct {
+		StudentID    uint   `json:"student_id"`
+		StudentName  string `json:"student_name"`
+		StudentCode  string `json:"student_code"`
+		ClassName    string `json:"class_name"`
+		AcademicYear int    `json:"academic_year"`
+		Semester1    string `json:"semester_1"`
+		Semester2    string `json:"semester_2"`
+		Semester3    string `json:"semester_3"`
+	}
+
+	query := `
+		SELECT
+			s.id AS student_id,
+			COALESCE(u.name, '') AS student_name,
+			s.student_code AS student_code,
+			COALESCE(cl.name, 'Grade ' || s.grade_level::text) AS class_name,
+			s.academic_year AS academic_year,
+			CASE
+				WHEN MAX(CASE WHEN t.semester = 'Semester 1' AND t.status = 'Verified' THEN 1 ELSE 0 END) = 1 THEN 'Paid'
+				WHEN MAX(CASE WHEN t.semester = 'Semester 1' AND t.status = 'Pending'  THEN 1 ELSE 0 END) = 1 THEN 'Pending'
+				ELSE 'Overdue'
+			END AS semester_1,
+			CASE
+				WHEN MAX(CASE WHEN t.semester = 'Semester 2' AND t.status = 'Verified' THEN 1 ELSE 0 END) = 1 THEN 'Paid'
+				WHEN MAX(CASE WHEN t.semester = 'Semester 2' AND t.status = 'Pending'  THEN 1 ELSE 0 END) = 1 THEN 'Pending'
+				ELSE 'Overdue'
+			END AS semester_2,
+			CASE
+				WHEN MAX(CASE WHEN t.semester = 'Semester 3' AND t.status = 'Verified' THEN 1 ELSE 0 END) = 1 THEN 'Paid'
+				WHEN MAX(CASE WHEN t.semester = 'Semester 3' AND t.status = 'Pending'  THEN 1 ELSE 0 END) = 1 THEN 'Pending'
+				ELSE 'Overdue'
+			END AS semester_3
+		FROM students s
+		JOIN users u ON s.user_id = u.id AND u.is_active = true AND u.deleted_at IS NULL
+		LEFT JOIN classes cl ON s.class_id = cl.id
+		LEFT JOIN transactions t
+		       ON t.student_id = s.id
+		      AND t.academic_year = s.academic_year
+		      AND t.type = 'Tuition'
+		GROUP BY s.id, u.name, s.student_code, cl.name, s.grade_level, s.academic_year
+		ORDER BY u.name
+	`
+
+	var result []StudentPaymentStatus
+	if err := config.DB.Raw(query).Scan(&result).Error; err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "failed to compute overdue payments: "+err.Error())
+		return
+	}
+	helpers.Success(c, http.StatusOK, "overdue payments fetched", result)
+}
+
+type PaymentReminderRequest struct {
+	StudentID    uint   `json:"student_id" binding:"required"`
+	AcademicYear int    `json:"academic_year" binding:"required"`
+	Semester     string `json:"semester" binding:"required"`
+}
+
+func SendPaymentReminder(c *gin.Context) {
+	if c.GetString("role") != models.RoleAdmin {
+		helpers.Error(c, http.StatusForbidden, "admin only")
+		return
+	}
+
+	adminID := c.GetUint("userID")
+
+	var input PaymentReminderRequest
+	if err := c.ShouldBindJSON(&input); err != nil {
+		helpers.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	var student models.Student
+	if err := config.DB.Preload("User").First(&student, input.StudentID).Error; err != nil {
+		helpers.Error(c, http.StatusNotFound, "student not found")
+		return
+	}
+
+	title := "Payment Reminder: Tuition Fee"
+	body := fmt.Sprintf("Dear %s, this is a friendly reminder to settle the outstanding tuition fee for %s, Academic Year %d.",
+		student.User.Name, input.Semester, input.AcademicYear)
+
+	notification := models.Notification{
+		Title:       title,
+		Body:        body,
+		TargetRoles: "Student,Parent",
+		SenderID:    adminID,
+	}
+	if err := config.DB.Create(&notification).Error; err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "failed to create reminder notification")
+		return
+	}
+
+	config.DB.Create(&models.NotificationReceipt{
+		UserID:         student.UserID,
+		NotificationID: notification.ID,
+		IsRead:         false,
+	})
+
+	if student.ParentID > 0 {
+		config.DB.Create(&models.NotificationReceipt{
+			UserID:         student.ParentID,
+			NotificationID: notification.ID,
+			IsRead:         false,
+		})
+	}
+
+	emails := []string{student.User.Email}
+	if student.ParentEmail != "" {
+		emails = append(emails, student.ParentEmail)
+	}
+	go helpers.SendBroadcast(emails, title, body)
+
+	helpers.Success(c, http.StatusOK, "payment reminder sent successfully", nil)
 }

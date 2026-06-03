@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Plus, BookOpen, TrendingUp } from 'lucide-react'
 import {
   getStudents, archiveStudent, createStudent, updateStudent, getClasses,
@@ -18,6 +19,7 @@ import { Badge } from '../../components/ui/Badge'
 import { AlertModal } from '../../components/ui/AlertModal'
 
 export default function StudentsPage() {
+  const navigate = useNavigate()
   const [students, setStudents] = useState<Student[]>([])
   const [classes, setClasses] = useState<Class[]>([])
   const [loading, setLoading] = useState(true)
@@ -264,7 +266,7 @@ export default function StudentsPage() {
                   }}
                   onArchive={() => setArchiveId(s.id)}
                 />
-                <Button size="sm" variant="ghost" onClick={() => setPromoteId(s.id)} title="Year-end promotion">
+                <Button size="sm" variant="ghost" onClick={() => navigate(`/admin/promotion?studentId=${s.id}`)} title="Year-end promotion">
                   <TrendingUp className="w-3 h-3" />
                 </Button>
               </div>

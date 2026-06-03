@@ -46,7 +46,7 @@ export default function ReportCardPage() {
         <div>
           <h1 className="text-xl font-bold text-[var(--text-h)]">Report Card</h1>
           <p className="text-sm text-[var(--text)] mt-0.5">
-            {report.student.user?.name} · {report.term} {report.year}
+            {report.student.user?.name} · {report.semester} {report.year}
           </p>
         </div>
         <Button variant="secondary" size="sm" loading={downloading} onClick={handleDownload}>

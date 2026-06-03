@@ -23,7 +23,7 @@ function TeacherView() {
   const [loadingGrades, setLoadingGrades] = useState(false)
 
   // Bulk entry row
-  const emptyEntry = { student_id: 0, subject_id: 0, score: 0, grade_type: 'Exam', term: 'Term 1', remarks: '' }
+  const emptyEntry = { student_id: 0, subject_id: 0, score: 0, grade_type: 'Exam', semester: 'Semester 1', remarks: '' }
   const [entries, setEntries] = useState([{ ...emptyEntry }])
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
@@ -94,9 +94,9 @@ function TeacherView() {
                 </select>
               </div>
               <div>
-                <label className="text-xs text-[var(--text)]">Term</label>
-                <select value={entry.term} onChange={(e) => updateEntry(i, 'term', e.target.value)} className={sel}>
-                  {['Term 1', 'Term 2', 'Term 3'].map((t) => <option key={t}>{t}</option>)}
+                <label className="text-xs text-[var(--text)]">Semester</label>
+                <select value={entry.semester} onChange={(e) => updateEntry(i, 'semester', e.target.value)} className={sel}>
+                  {['Semester 1', 'Semester 2', 'Semester 3'].map((t) => <option key={t}>{t}</option>)}
                 </select>
               </div>
               <button type="button" onClick={() => setEntries((prev) => prev.filter((_, idx) => idx !== i))}
@@ -132,7 +132,7 @@ function TeacherView() {
               { key: 'student', header: 'Student', render: (g) => g.student?.user?.name ?? `#${g.student_id}` },
               { key: 'score', header: 'Score' },
               { key: 'grade_type', header: 'Type' },
-              { key: 'term', header: 'Term' },
+              { key: 'semester', header: 'Semester' },
               { key: 'remarks', header: 'Remarks' },
             ]}
           />
@@ -164,7 +164,7 @@ function StudentView() {
           { key: 'subject', header: 'Subject', render: (g) => g.subject?.name ?? `#${g.subject_id}` },
           { key: 'score', header: 'Score' },
           { key: 'grade_type', header: 'Type' },
-          { key: 'term', header: 'Term' },
+          { key: 'semester', header: 'Semester' },
           { key: 'remarks', header: 'Remarks' },
           { key: 'created_at', header: 'Date', render: (g) => new Date(g.created_at).toLocaleDateString() },
         ]}
