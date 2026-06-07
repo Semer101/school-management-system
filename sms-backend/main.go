@@ -101,6 +101,16 @@ func main() {
 	if err := os.MkdirAll(avatarDir, 0750); err != nil {
 		log.Fatal("Failed to create avatars directory: ", err)
 	}
+	// Receipt uploads (parent payment receipts) live in their own subdir
+	// so we can apply different size limits and access control than the locker.
+	receiptDir := os.Getenv("RECEIPT_DIR")
+	if receiptDir == "" {
+		receiptDir = "./uploads/receipts"
+	}
+	if err := os.MkdirAll(receiptDir, 0750); err != nil {
+		log.Fatal("Failed to create receipts directory: ", err)
+	}
+
 
 	r := gin.Default()
 	r.Static("/uploads", "./uploads")

@@ -1,9 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, GraduationCap } from 'lucide-react'
 import { getTeachers, archiveTeacher, createTeacher, updateTeacher, type CreateTeacherPayload } from '../../api/admin'
 import type { Teacher } from '../../types/academic'
 import { listFromApi } from '../../types/api'
-import { DataTable } from '../../components/ui/DataTable'
+import { DataTable, type FilterDef } from '../../components/ui/DataTable'
 import { RowActions } from '../../components/ui/RowActions'
 import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
@@ -11,6 +11,7 @@ import { Input } from '../../components/ui/Input'
 import { ConfirmModal } from '../../components/ui/ConfirmModal'
 import { PageHeader } from '../../components/ui/PageHeader'
 import { AlertModal } from '../../components/ui/AlertModal'
+
 
 export default function TeachersPage() {
   const [teachers, setTeachers] = useState<Teacher[]>([])
@@ -92,12 +93,43 @@ export default function TeachersPage() {
         <Button onClick={() => setCreateOpen(true)}><Plus className="w-4 h-4 mr-1" /> Create</Button>
       } />
 
-      <DataTable
+      <DataTable<Teacher>
         loading={loading}
         data={teachers}
         keyExtractor={(t) => t.id}
-        searchKeys={['teacher_code', 'qualification']}
+        searchPlaceholder="Search by code, name, email, phone, or qualification..."
+        emptyState={{
+          icon: <GraduationCap className="w-6 h-6" />,
+          title: teachers.length === 0 ? 'No teachers yet' : 'No matching teachers',
+          description:
+            teachers.length === 0
+              ? 'Create a teacher profile to assign them to subjects and classes.'
+              : 'Try adjusting your search or clearing the active filters.',
+        }}
+        searchAccessor={(t) =>
+          [
+            t.teacher_code,
+            t.qualification,
+            t.user?.name,
+            t.user?.email,
+            t.user?.phone,
+          ]
+            .filter(Boolean)
+            .join(' \u0001 ')
+        }
+        filters={[
+          {
+            key: 'department',
+            label: 'All departments',
+            options: Array.from(
+              new Set(teachers.map((t) => t.department).filter(Boolean) as string[])
+            ).map((d) => ({ value: d, label: d })),
+            accessor: (t) => t.department ?? '',
+          },
+        ] satisfies FilterDef<Teacher>[]}
+        pageSize={10}
         columns={[
+
           { key: 'teacher_code', header: 'Code' },
           { key: 'user', header: 'Name', render: (t) => t.user?.name ?? '—' },
           { key: 'email', header: 'Email', render: (t) => t.user?.email ?? '—' },

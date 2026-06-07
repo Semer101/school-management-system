@@ -15,6 +15,7 @@ import TrashPage from './pages/admin/TrashPage'
 import ParentsPage from './pages/admin/ParentsPage'
 import AdminsPage from './pages/admin/AdminsPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
+import IdCardPage from './pages/IdCardPage'
 import TeachersPage from './pages/admin/TeachersPage'
 import ClassesPage from './pages/admin/ClassesPage'
 import SubjectsPage from './pages/admin/SubjectsPage'
@@ -63,9 +64,10 @@ function AnimatedRoutes() {
 
           <Route path="/academics/attendance" element={<ProtectedRoute allowedRoles={['Admin', 'Teacher', 'Student']}><PageTransition><AttendancePage /></PageTransition></ProtectedRoute>} />
           <Route path="/academics/grades" element={<ProtectedRoute allowedRoles={['Admin', 'Teacher', 'Student']}><PageTransition><GradesPage /></PageTransition></ProtectedRoute>} />
-          <Route path="/academics/reportcard" element={<ProtectedRoute allowedRoles={['Student']}><PageTransition><ReportCardPage /></PageTransition></ProtectedRoute>} />
+          <Route path="/academics/reportcard" element={<ProtectedRoute allowedRoles={['Student', 'Parent']}><PageTransition><ReportCardPage /></PageTransition></ProtectedRoute>} />
+          <Route path="/id-card" element={<ProtectedRoute allowedRoles={['Admin', 'Teacher', 'Student', 'Parent']}><PageTransition><IdCardPage /></PageTransition></ProtectedRoute>} />
 
-          <Route path="/finance" element={<ProtectedRoute allowedRoles={['Student', 'Parent']}><PageTransition><MyFinancePage /></PageTransition></ProtectedRoute>} />
+          <Route path="/finance" element={<ProtectedRoute allowedRoles={['Parent']}><PageTransition><MyFinancePage /></PageTransition></ProtectedRoute>} />
           <Route path="/locker" element={<ProtectedRoute allowedRoles={['Student']}><PageTransition><MyLockerPage /></PageTransition></ProtectedRoute>} />
           <Route path="/locker/student" element={<ProtectedRoute allowedRoles={['Admin', 'Teacher']}><PageTransition><StudentLockerPage /></PageTransition></ProtectedRoute>} />
 

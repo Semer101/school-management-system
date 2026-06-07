@@ -12,6 +12,29 @@ export const submitReceipt = (data: {
 export const getMyTransactions = () =>
   api.get<APIResponse<Transaction[]>>('/api/finance/transactions')
 
+// ── Parent: Receipt image upload ─────────────────────────
+export const uploadReceipt = (formData: FormData) =>
+  api.post<APIResponse<Transaction>>('/api/parent/finance/receipts', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+
+export const getReceipt = (id: number) =>
+  api.get<APIResponse<Transaction>>(`/api/parent/finance/receipts/${id}`)
+
+// ── Admin: Receipt moderation ────────────────────────────
+export const listPendingReceipts = (params?: {
+  status?: string
+  academic_year?: string
+  semester?: string
+  search?: string
+}) => api.get<APIResponse<Transaction[]>>('/api/admin/finance/receipts', { params })
+
+export const approveReceipt = (id: number) =>
+  api.patch<APIResponse<Transaction>>(`/api/admin/finance/receipts/${id}/approve`)
+
+export const rejectReceipt = (id: number, notes: string) =>
+  api.patch<APIResponse<Transaction>>(`/api/admin/finance/receipts/${id}/reject`, { notes })
+
 // ── Admin ────────────────────────────────────────────────
 export const getAllTransactions = (params?: { academic_year?: string; semester?: string; status?: string; student?: string }) =>
   api.get<APIResponse<Transaction[]>>('/api/admin/finance/summary', { params })

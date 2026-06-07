@@ -5,11 +5,14 @@ export interface Transaction {
   id: number
   student_id: number
   student?: Student
+  parent_id?: number | null
   amount: number
   receipt_id: string
+  receipt_image_url?: string
   type: 'Tuition' | 'Expense' | 'Payroll'
   status: 'Pending' | 'Verified' | 'Rejected'
   description: string
+  rejection_notes?: string
   created_by: number
   verified_by: number
   verified_at: string | null

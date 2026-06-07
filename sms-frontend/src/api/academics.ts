@@ -46,3 +46,6 @@ export const getReportCard = (studentID: number) =>
 
 export const downloadReportCard = (studentID: number) =>
   api.get(`/api/academics/reportcard/${studentID}/pdf`, { responseType: 'blob' })
+
+export const getTeacherDashboardKPIs = () =>
+  api.get<APIResponse<{ students: number; classes: number; subjects: number; attendance_rate: number }>>('/api/academics/dashboard/kpis')

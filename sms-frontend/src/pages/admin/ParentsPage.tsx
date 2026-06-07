@@ -1,9 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, Users } from 'lucide-react'
 import { getParents, registerUser, archiveParent, updateParent, getStudents, type ParentRow } from '../../api/admin'
 import type { Student } from '../../types/academic'
 import { listFromApi } from '../../types/api'
-import { DataTable } from '../../components/ui/DataTable'
+import { DataTable, type FilterDef } from '../../components/ui/DataTable'
 import { RowActions } from '../../components/ui/RowActions'
 import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
@@ -13,6 +13,7 @@ import { PageHeader } from '../../components/ui/PageHeader'
 import { Badge } from '../../components/ui/Badge'
 import { AlertModal } from '../../components/ui/AlertModal'
 import type { Role } from '../../types/user'
+
 
 export default function ParentsPage() {
   const [parents, setParents] = useState<ParentRow[]>([])
@@ -122,11 +123,36 @@ export default function ParentsPage() {
       <PageHeader title="Parents" subtitle="Guardian accounts linked to students"
         action={<Button onClick={() => setCreateOpen(true)}><Plus className="w-4 h-4 mr-1" /> Create</Button>} />
 
-      <DataTable
+      <DataTable<ParentRow>
         loading={loading}
         data={parents}
         keyExtractor={(p) => p.id}
-        searchKeys={['name', 'email', 'student_names']}
+        searchPlaceholder="Search by name, email, phone, status, or student..."
+        emptyState={{
+          icon: <Users className="w-6 h-6" />,
+          title: parents.length === 0 ? 'No parents yet' : 'No matching parents',
+          description:
+            parents.length === 0
+              ? 'Create a parent account to link a guardian to a student.'
+              : 'Try adjusting your search or clearing the active filters.',
+        }}
+        searchAccessor={(p) =>
+          [p.name, p.email, p.phone, p.status, p.student_names]
+            .filter(Boolean)
+            .join(' \u0001 ')
+        }
+        filters={[
+          {
+            key: 'status',
+            label: 'All statuses',
+            options: [
+              { value: 'active', label: 'Active' },
+              { value: 'inactive', label: 'Inactive' },
+            ],
+            accessor: (p) => (p.is_active ? 'active' : 'inactive'),
+          },
+        ] satisfies FilterDef<ParentRow>[]}
+        pageSize={10}
         columns={[
           { key: 'name', header: 'Parent Name' },
           { key: 'student_names', header: 'Student Name', render: (p) => p.student_names || '—' },

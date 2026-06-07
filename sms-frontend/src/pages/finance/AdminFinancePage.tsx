@@ -7,6 +7,9 @@ import {
   markPayrollPaid,
   getOverduePayments,
   sendPaymentReminder,
+  listPendingReceipts,
+  approveReceipt,
+  rejectReceipt,
   type OverduePaymentRow
 } from '../../api/finance'
 import { getTeachers } from '../../api/admin'
@@ -19,16 +22,17 @@ import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { Modal } from '../../components/ui/Modal'
 import { Spinner } from '../../components/ui/Spinner'
-import { DollarSign, UserCheck, TrendingUp, AlertCircle, FileSpreadsheet, Send } from 'lucide-react'
+import { DollarSign, UserCheck, TrendingUp, AlertCircle, FileSpreadsheet, Send, Image as ImageIcon, X } from 'lucide-react'
 import { GlassCard } from '../../components/ui/GlassCard'
 
-type Tab = 'transactions' | 'payroll' | 'reminders'
+type Tab = 'transactions' | 'payroll' | 'reminders' | 'receipts'
 
 export default function AdminFinancePage() {
   const [tab, setTab] = useState<Tab>('transactions')
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [payrolls, setPayrolls] = useState<Payroll[]>([])
   const [overdues, setOverdues] = useState<OverduePaymentRow[]>([])
+  const [receipts, setReceipts] = useState<Transaction[]>([])
   const [teachers, setTeachers] = useState<Teacher[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -43,6 +47,10 @@ export default function AdminFinancePage() {
   const [pyYear, setPyYear] = useState('')
   const [pyDept, setPyDept] = useState('')
 
+  // Filters for Receipts
+  const [rxStatus, setRxStatus] = useState('Pending')
+  const [rxSearch, setRxSearch] = useState('')
+
   // Modal form for creating payroll
   const [payrollModal, setPayrollModal] = useState(false)
   const [payrollForm, setPayrollForm] = useState({ teacher_id: 0, amount: '', month: new Date().getMonth() + 1, year: new Date().getFullYear() })
@@ -52,6 +60,14 @@ export default function AdminFinancePage() {
   const [reminderMessage, setReminderMessage] = useState('')
   const [reminderError, setReminderError] = useState('')
   const [reminderLoading, setReminderLoading] = useState<Record<string, boolean>>({})
+
+  // Receipt moderation states
+  const [zoomImage, setZoomImage] = useState<string | null>(null)
+  const [rejectModal, setRejectModal] = useState<{ id: number; open: boolean }>({ id: 0, open: false })
+  const [rejectNotes, setRejectNotes] = useState('')
+  const [rejectSaving, setRejectSaving] = useState(false)
+
+  const apiBase = import.meta.env.VITE_API_BASE_URL ?? ''
 
   const loadData = () => {
     setLoading(true)
@@ -77,6 +93,12 @@ export default function AdminFinancePage() {
         setOverdues(Array.isArray(o.data.data) ? o.data.data : [])
       })
       .finally(() => setLoading(false))
+  }
+
+  const loadReceipts = () => {
+    listPendingReceipts({ status: rxStatus || 'Pending', search: rxSearch || undefined })
+      .then((res) => setReceipts(Array.isArray(res.data.data) ? res.data.data : []))
+      .catch(() => setReceipts([]))
   }
 
   useEffect(() => {
@@ -108,6 +130,8 @@ export default function AdminFinancePage() {
     }
     load()
   }, [txYear, txSem, txStatus, txStudent, pyMonth, pyYear, pyDept])
+
+  useEffect(() => { loadReceipts() }, [rxStatus, rxSearch])
 
   const handleVerify = async (id: number) => {
     await verifyReceipt(id)
@@ -143,6 +167,25 @@ export default function AdminFinancePage() {
       setReminderError('Failed to send payment reminder.')
     } finally {
       setReminderLoading(prev => ({ ...prev, [key]: false }))
+    }
+  }
+
+  const handleApprove = async (id: number) => {
+    try {
+      await approveReceipt(id)
+      loadReceipts()
+    } catch {}
+  }
+
+  const handleReject = async () => {
+    setRejectSaving(true)
+    try {
+      await rejectReceipt(rejectModal.id, rejectNotes)
+      setRejectModal({ id: 0, open: false })
+      setRejectNotes('')
+      loadReceipts()
+    } finally {
+      setRejectSaving(false)
     }
   }
 
@@ -206,22 +249,20 @@ export default function AdminFinancePage() {
     downloadCSV(headers, data, `overdue_payments_${new Date().toISOString().split('T')[0]}.csv`)
   }
 
-  if (loading && transactions.length === 0 && payrolls.length === 0) return <Spinner fullPage />
+  if (loading && transactions.length === 0 && payrolls.length === 0 && receipts.length === 0) return <Spinner fullPage />
 
-  // Statistics Calculations (based on overall list)
   const totalVerified = transactions.filter(t => t.status === 'Verified').reduce((sum, t) => sum + t.amount, 0)
   const totalPending = transactions.filter(t => t.status === 'Pending').reduce((sum, t) => sum + t.amount, 0)
   const totalPaidPayroll = payrolls.filter(p => p.status === 'Paid').reduce((sum, p) => sum + p.amount, 0)
   const netCashFlow = totalVerified - totalPaidPayroll
 
-  // Active Payroll summary (based on filtered list)
   const payrollPaidSum = payrolls.filter(p => p.status === 'Paid').reduce((sum, p) => sum + p.amount, 0)
   const payrollPendingSum = payrolls.filter(p => p.status === 'Pending').reduce((sum, p) => sum + p.amount, 0)
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-[var(--text-h)]">Finance</h1>
+        <h1 className="text-xl font-bold text-foreground">Finance</h1>
         <Button size="sm" onClick={() => setPayrollModal(true)}>+ Payroll</Button>
       </div>
 
@@ -268,15 +309,16 @@ export default function AdminFinancePage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
         {([
           { id: 'transactions', label: 'Student Payments' },
           { id: 'payroll', label: 'Staff Payroll' },
+          { id: 'receipts', label: 'Receipt Images' },
           { id: 'reminders', label: 'Overdue & Reminders' }
         ] as const).map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)}
             className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors
-              ${tab === t.id ? 'bg-[var(--accent)] text-white' : 'bg-[var(--code-bg)] text-[var(--text)]'}`}
+              ${tab === t.id ? 'bg-accent text-white' : 'bg-surface-elevated text-muted hover:text-foreground'}`}
           >
             {t.label}
           </button>
@@ -342,6 +384,83 @@ export default function AdminFinancePage() {
         </div>
       )}
 
+      {/* Receipts Tab (NEW) */}
+      {tab === 'receipts' && (
+        <div className="space-y-4">
+          <div className="flex flex-wrap gap-3 items-end bg-surface border border-surface-border p-4 rounded-xl">
+            <label className="text-xs text-muted flex flex-col gap-1">
+              Status
+              <select value={rxStatus} onChange={(e) => setRxStatus(e.target.value)}
+                className="px-3 py-1.5 rounded-lg border border-surface-border bg-surface text-sm">
+                <option value="Pending">Pending</option>
+                <option value="Verified">Approved</option>
+                <option value="Rejected">Rejected</option>
+              </select>
+            </label>
+            <label className="text-xs text-muted flex flex-col gap-1 flex-1 min-w-[200px]">
+              Search Receipt ID
+              <input type="text" value={rxSearch} onChange={(e) => setRxSearch(e.target.value)}
+                placeholder="Search by receipt ID..."
+                className="px-3 py-1.5 rounded-lg border border-surface-border bg-surface text-sm w-full" />
+            </label>
+          </div>
+
+          <Table keyExtractor={(r) => r.id} data={receipts} emptyMessage="No receipt images pending review."
+            columns={[
+              { key: 'student', header: 'Student', render: (r) => r.student?.user?.name ?? `#${r.student_id}` },
+              { key: 'receipt_id', header: 'Receipt ID' },
+              { key: 'amount', header: 'Amount', render: (r) => `ETB ${r.amount.toLocaleString()}` },
+              {
+                key: 'receipt_image_url', header: 'Receipt Image',
+                render: (r) => r.receipt_image_url ? (
+                  <button
+                    type="button"
+                    onClick={() => setZoomImage(`${apiBase}${r.receipt_image_url}`)}
+                    className="flex items-center gap-1 text-accent hover:underline text-xs"
+                  >
+                    <ImageIcon className="w-3.5 h-3.5" /> View
+                  </button>
+                ) : <span className="text-muted text-xs">N/A</span>,
+              },
+              { key: 'academic_year', header: 'Year', render: (r) => r.academic_year || '—' },
+              { key: 'semester', header: 'Semester', render: (r) => r.semester || '—' },
+              {
+                key: 'status', header: 'Status',
+                render: (r) => (
+                  <div className="flex flex-col gap-0.5">
+                    <Badge label={r.status} variant={statusVariant(r.status)} />
+                    {r.status === 'Rejected' && r.rejection_notes && (
+                      <span className="text-[10px] text-danger/80 max-w-[160px] line-clamp-1" title={r.rejection_notes}>
+                        {r.rejection_notes}
+                      </span>
+                    )}
+                  </div>
+                ),
+              },
+              {
+                key: 'actions', header: '',
+                render: (r) => r.status === 'Pending' ? (
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="secondary"
+                      onClick={() => handleApprove(r.id)}
+                      className="text-xs text-success border-success/30 hover:bg-success/10"
+                    >
+                      Approve
+                    </Button>
+                    <Button size="sm" variant="secondary"
+                      onClick={() => setRejectModal({ id: r.id, open: true })}
+                      className="text-xs text-danger border-danger/30 hover:bg-danger/10"
+                    >
+                      Reject
+                    </Button>
+                  </div>
+                ) : null,
+              },
+            ]}
+          />
+        </div>
+      )}
+
       {/* Payroll Tab */}
       {tab === 'payroll' && (
         <div className="space-y-4">
@@ -385,7 +504,7 @@ export default function AdminFinancePage() {
             </Button>
           </div>
 
-          <div className="max-h-[480px] overflow-y-auto rounded-xl border border-[var(--border)] bg-surface">
+          <div className="max-h-[480px] overflow-y-auto rounded-xl border border-surface-border bg-surface">
             <Table keyExtractor={(p) => p.id} data={payrolls} emptyMessage="No payroll records matching current filters."
               columns={[
                 { key: 'teacher', header: 'Teacher', render: (p) => p.teacher?.user?.name ?? `#${p.teacher_id}` },
@@ -489,10 +608,10 @@ export default function AdminFinancePage() {
       >
         <form id="payroll-form" onSubmit={handlePayroll} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-[var(--text-h)]">Teacher</label>
+            <label className="text-sm font-medium text-foreground">Teacher</label>
             <select value={payrollForm.teacher_id}
               onChange={(e) => setPayrollForm((f) => ({ ...f, teacher_id: Number(e.target.value) }))}
-              className="w-full px-3 py-2 rounded-lg text-sm bg-[var(--bg)] border border-[var(--border)] text-[var(--text-h)] outline-none focus:border-[var(--accent)]"
+              className="w-full px-3 py-2 rounded-lg text-sm bg-surface border border-surface-border text-foreground outline-none focus:border-accent"
               required>
               <option value={0} disabled>Select teacher...</option>
               {teachers.map((t) => <option key={t.id} value={t.id}>{t.user?.name}</option>)}
@@ -502,10 +621,10 @@ export default function AdminFinancePage() {
             value={payrollForm.amount} onChange={(e) => setPayrollForm((f) => ({ ...f, amount: e.target.value }))} required />
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-[var(--text-h)]">Month</label>
+              <label className="text-sm font-medium text-foreground">Month</label>
               <select value={payrollForm.month}
                 onChange={(e) => setPayrollForm((f) => ({ ...f, month: Number(e.target.value) }))}
-                className="w-full px-3 py-2 rounded-lg text-sm bg-[var(--bg)] border border-[var(--border)] text-[var(--text-h)] outline-none">
+                className="w-full px-3 py-2 rounded-lg text-sm bg-surface border border-surface-border text-foreground outline-none">
                 {Array.from({ length: 12 }, (_, i) => (
                   <option key={i + 1} value={i + 1}>{new Date(0, i).toLocaleString('default', { month: 'long' })}</option>
                 ))}
@@ -516,6 +635,49 @@ export default function AdminFinancePage() {
           </div>
         </form>
       </Modal>
+
+      {/* Reject Receipt Modal */}
+      <Modal
+        open={rejectModal.open}
+        onClose={() => { setRejectModal({ id: 0, open: false }); setRejectNotes('') }}
+        title="Reject Receipt"
+        footer={<><Button variant="ghost" onClick={() => { setRejectModal({ id: 0, open: false }); setRejectNotes('') }}>Cancel</Button><Button loading={rejectSaving} onClick={handleReject} className="bg-danger hover:bg-red-600">Reject</Button></>}
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-muted">Provide a reason for rejecting this receipt. The parent will see this note.</p>
+          <textarea
+            value={rejectNotes}
+            onChange={(e) => setRejectNotes(e.target.value)}
+            placeholder="e.g. Amount does not match the bank slip. Please re-upload with correct amount."
+            rows={4}
+            className="w-full px-3 py-2 rounded-lg text-sm bg-surface border border-surface-border text-foreground outline-none focus:border-accent/50 resize-none"
+            required
+          />
+        </div>
+      </Modal>
+
+      {/* Image Zoom Modal */}
+      {zoomImage && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setZoomImage(null)}
+        >
+          <div className="relative max-w-3xl max-h-[90vh] w-full" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              onClick={() => setZoomImage(null)}
+              className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-surface border border-surface-border flex items-center justify-center text-foreground hover:text-accent z-10"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <img
+              src={zoomImage}
+              alt="Receipt"
+              className="w-full h-auto max-h-[85vh] object-contain rounded-2xl border border-surface-border shadow-2xl"
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

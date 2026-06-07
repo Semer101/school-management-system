@@ -1,11 +1,13 @@
 import { useNavigate } from 'react-router-dom'
-import { Bell, LogOut, UserPen } from 'lucide-react'
+import { Bell, LogOut, UserPen, Menu } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useNotifications } from '../../hooks/useNotifications'
 import { Badge, roleBadgeVariant } from '../ui/Badge'
 import { Button } from '../ui/Button'
 import { ThemeToggle } from '../ui/ThemeToggle'
 import { cn } from '../../lib/utils'
+import { useAppDispatch } from '../../store/hooks'
+import { toggleSidebar } from '../../store/uiSlice'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 
@@ -13,6 +15,7 @@ export function Navbar() {
   const { user, logout } = useAuth()
   const { unreadCount } = useNotifications()
   const navigate = useNavigate()
+  const dispatch = useAppDispatch()
 
   const handleLogout = async () => {
     await logout()
@@ -24,9 +27,21 @@ export function Navbar() {
     : null
 
   return (
-    <header className="h-14 shrink-0 border-b border-surface-border bg-surface/80 backdrop-blur-xl flex items-center justify-between px-6">
-      <div className="text-xs font-mono text-muted uppercase tracking-widest hidden sm:block">
-        School Management System
+    <header className="h-14 shrink-0 border-b border-surface-border bg-surface/80 backdrop-blur-xl flex items-center justify-between px-6 z-30">
+      <div className="flex items-center gap-3">
+        {/* Mobile Sidebar Hamburger Toggle */}
+        <button
+          type="button"
+          onClick={() => dispatch(toggleSidebar())}
+          className="p-1.5 rounded-lg border border-surface-border text-muted lg:hidden hover:text-accent hover:border-accent/40 hover:bg-surface-elevated/40 transition-colors"
+          aria-label="Toggle Menu"
+        >
+          <Menu className="w-4 h-4" />
+        </button>
+
+        <div className="text-xs font-mono text-muted uppercase tracking-widest hidden sm:block">
+          School Management System
+        </div>
       </div>
 
       <div className="flex items-center gap-2">

@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, ShieldCheck } from 'lucide-react'
 import { getAdmins, registerUser, updateAdmin, archiveAdmin } from '../../api/admin'
-import { DataTable } from '../../components/ui/DataTable'
+import { DataTable, type FilterDef } from '../../components/ui/DataTable'
 import { RowActions } from '../../components/ui/RowActions'
 import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
@@ -12,6 +12,7 @@ import { Badge } from '../../components/ui/Badge'
 import { AlertModal } from '../../components/ui/AlertModal'
 import type { Role } from '../../types/user'
 import type { AdminRow } from '../../api/admin'
+
 
 export default function AdminsPage() {
   const [admins, setAdmins] = useState<AdminRow[]>([])
@@ -104,13 +105,47 @@ export default function AdminsPage() {
         action={<Button onClick={() => setCreateOpen(true)}><Plus className="w-4 h-4 mr-1" /> Create</Button>}
       />
 
-      <DataTable
+      <DataTable<AdminRow>
         loading={loading}
         data={admins}
         keyExtractor={(a) => a.id}
-        searchKeys={['name', 'email']}
+        searchPlaceholder="Search by name, email, phone, or status..."
+        emptyState={{
+          icon: <ShieldCheck className="w-6 h-6" />,
+          title: admins.length === 0 ? 'No administrators yet' : 'No matching administrators',
+          description:
+            admins.length === 0
+              ? 'Create an admin account to grant elevated access to a staff member.'
+              : 'Try adjusting your search or clearing the active filters.',
+        }}
+        searchAccessor={(a) =>
+          [a.name, a.email, a.phone, a.status]
+            .filter(Boolean)
+            .join(' \u0001 ')
+        }
+        filters={[
+          {
+            key: 'status',
+            label: 'All statuses',
+            options: [
+              { value: 'active', label: 'Active' },
+              { value: 'inactive', label: 'Inactive' },
+            ],
+            accessor: (a) => (a.is_active ? 'active' : 'inactive'),
+          },
+          {
+            key: 'role',
+            label: 'All roles',
+            options: [
+              { value: 'Admin', label: 'Admin' },
+            ],
+            accessor: () => 'Admin',
+          },
+        ] satisfies FilterDef<AdminRow>[]}
+        pageSize={10}
         columns={[
           { key: 'name', header: 'Name' },
+
           { key: 'email', header: 'Email' },
           { key: 'phone', header: 'Phone', render: (a) => a.phone || <span className="text-warning text-xs">Not set</span> },
           {
