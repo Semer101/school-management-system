@@ -41,7 +41,7 @@ var (
 		"Gebru", "Habtamu", "Ibrahim", "Jemberu", "Kassahun",
 		"Lemi", "Mulugeta", "Nega", "Obang", "Petros",
 		"Rahman", "Solomon", "Tewodros", "Ukullu", "Veta",
-		"Wubishet", "Yohanis", "Zewde", "Aron", "Betekle"
+		"Wubishet", "Yohanis", "Zewde", "Aron", "Betekle",
 	}
 	femaleFirstNames = []string{
 		"Abeba", "Birtukan", "Chaltu", "Danawork", "Eden",
@@ -53,7 +53,7 @@ var (
 		"Hiwot", "Indermariat", "Jamila", "Kalid", "Lulseged",
 		"Meseret", "Nebiyat", "Olivia", "Persia", "Rediat",
 		"Selam", "Tirhas", "Umber", "Veronica", "Worknesh",
-		"Yeshi", "Zeneba", "Amarech", "Belay", "Chaltu"
+		"Yeshi", "Zeneba", "Amarech", "Belay", "Chaltu",
 	}
 	lastNames = []string{
 		"Bekele", "Girma", "Haile", "Alemu", "Tadesse",
@@ -63,7 +63,7 @@ var (
 		"Shiferaw", "Mulugeta", "Negash", "Asfaw", "Gebre",
 		"Kassa", "Tamiru", "Wondalessie", "Gidey", "Beyene",
 		"Ayalew", "Habte", "Yilma", "Dejene", "Tilahun",
-		"Workineh", "Goshu", "Bizuayehu", "Abate", "Kibru"
+		"Workineh", "Goshu", "Bizuayehu", "Abate", "Kibru",
 	}
 	departments = []string{
 		"Mathematics", "Physics", "Chemistry", "Biology",
