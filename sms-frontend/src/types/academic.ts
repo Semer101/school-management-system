@@ -87,7 +87,8 @@ export interface Grade {
   student_id: number
   subject_id: number
   score: number
-  grade_type: string
+  grade_type?: string
+  type?: string
   semester: string
   remarks: string
   student?: Student
@@ -95,11 +96,31 @@ export interface Grade {
   created_at: string
 }
 
+export interface ReportCardSubject {
+  subject_name: string
+  midterm: number
+  final: number
+  overall: number
+  letter_grade: string
+}
+
+export interface ReportCardAttendance {
+  overall_percentage: number
+  total_days: number
+  attended: number
+}
+
 export interface ReportCard {
-  student: Student
-  grades: Grade[]
-  attendance: AttendancePercentage[]
+  student: Student & {
+    name?: string
+    code?: string
+    class?: string
+  }
+  subjects?: ReportCardSubject[]
+  grades?: Grade[]
+  attendance?: ReportCardAttendance | AttendancePercentage[]
   average: number
   semester: string
   year: number
+  academic_year?: string | number
 }

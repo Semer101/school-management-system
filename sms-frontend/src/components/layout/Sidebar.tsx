@@ -32,12 +32,10 @@ const navItems: NavItem[] = [
   { to: '/academics/grades', label: 'Grades', icon: 'grades', roles: ['Teacher'] },
   { to: '/academics/attendance', label: 'My Attendance', icon: 'attendanceCheck', roles: ['Student'] },
   { to: '/academics/grades', label: 'My Grades', icon: 'grades', roles: ['Student'] },
-  { to: '/academics/reportcard', label: 'Report Card', icon: 'reportCard', roles: ['Student'] },
   { to: '/locker', label: 'Locker', icon: 'locker', roles: ['Student'] },
   { to: '/parent/children', label: 'Children', icon: 'children', roles: ['Parent'] },
   { to: '/finance', label: 'Payments', icon: 'payments', roles: ['Parent'] },
-  { to: '/academics/reportcard', label: 'Report Card', icon: 'reportCard', roles: ['Parent'] },
-  { to: '/id-card', label: 'ID Card', icon: 'profile', roles: ['Admin', 'Teacher', 'Student', 'Parent'] },
+  { to: '/id-card', label: 'ID Card', icon: 'profile', roles: ['Admin'] },
   { to: '/notifications', label: 'Notifications', icon: 'notifications' },
 ]
 

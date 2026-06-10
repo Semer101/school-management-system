@@ -143,3 +143,89 @@ func GetDashboardKPIs(c *gin.Context) {
 		"pending_transactions": pendingTx,
 	})
 }
+
+// GetParentDashboardKPIs returns KPIs for parent dashboard based on their children
+func GetParentDashboardKPIs(c *gin.Context) {
+	parentUserID := c.GetUint("userID")
+
+	// Get all children for this parent
+	var children []models.Student
+	if err := config.DB.Where("parent_id = ?", parentUserID).Find(&children).Error; err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "failed to fetch children")
+		return
+	}
+
+	childrenCount := len(children)
+
+	// Calculate average attendance across all children
+	var totalAttendanceCount, totalPresentCount int64
+	for _, child := range children {
+		var count, present int64
+		config.DB.Model(&models.Attendance{}).Where("student_id = ? AND subject_id IS NULL", child.ID).Count(&count)
+		config.DB.Model(&models.Attendance{}).Where("student_id = ? AND subject_id IS NULL AND status IN ('Present', 'Late')", child.ID).Count(&present)
+		totalAttendanceCount += count
+		totalPresentCount += present
+	}
+
+	var attendanceAvg float64
+	if totalAttendanceCount > 0 {
+		attendanceAvg = float64(totalPresentCount) / float64(totalAttendanceCount) * 100
+	} else {
+		attendanceAvg = 0.0
+	}
+
+	// Calculate average grade across all children
+	var totalGradeScore, totalGradeMax float64
+	var gradeCount int64
+	for _, child := range children {
+		var grades []models.Grade
+		config.DB.Where("student_id = ?", child.ID).Find(&grades)
+		for _, grade := range grades {
+			totalGradeScore += grade.Score
+			totalGradeMax += grade.MaxScore
+			gradeCount++
+		}
+	}
+
+	var gradeAvg float64
+	if gradeCount > 0 && totalGradeMax > 0 {
+		gradeAvg = (totalGradeScore / totalGradeMax) * 100
+	} else {
+		gradeAvg = 0.0
+	}
+
+	// Convert grade average to letter grade
+	var gradeLetter string
+	if gradeAvg >= 90 {
+		gradeLetter = "A"
+	} else if gradeAvg >= 80 {
+		gradeLetter = "B"
+	} else if gradeAvg >= 70 {
+		gradeLetter = "C"
+	} else if gradeAvg >= 60 {
+		gradeLetter = "D"
+	} else {
+		gradeLetter = "F"
+	}
+	if gradeCount == 0 {
+		gradeLetter = "N/A"
+	}
+
+	// Calculate pending fees for all children
+	var pendingFees float64
+	for _, child := range children {
+		var pending float64
+		config.DB.Model(&models.Transaction{}).
+			Where("student_id = ? AND status = ?", child.ID, "Pending").
+			Select("COALESCE(SUM(amount),0)").
+			Scan(&pending)
+		pendingFees += pending
+	}
+
+	helpers.Success(c, http.StatusOK, "parent dashboard kpis", gin.H{
+		"children":       childrenCount,
+		"attendance_avg": attendanceAvg,
+		"grade_avg":       gradeLetter,
+		"fee_pending":    pendingFees,
+	})
+}

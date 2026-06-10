@@ -1,5 +1,11 @@
 # Secrets — use .env.example locally
 sms-backend/.env
 
-# Compiled seed binary (use: go run cmd/seed/main.go)
+# Compiled binaries
+sms-backend/sms-backend.exe
+sms-backend/sms-backend-test.exe
+sms-backend/test-backend.exe
 sms-backend/seeder
+
+# Git artifacts from renames
+sms-backend/.../

@@ -39,13 +39,31 @@ go run main.go
 
 ## Seed the database
 ```bash
+# Trim legacy bulk data, then seed production-quality sample data
 go run cmd/seed/main.go
+
+# Trim only (no re-seed)
+go run cmd/seed/main.go -trim
+
+# Full sample set (50 students)
+go run cmd/seed/main.go -full
 ```
 
+Creates **3 admins**, **15 teachers**, **25 parents**, and **50 students** with classes, subjects, attendance, grades, notifications, finance, payroll, and locker files.
+
+Re-running the seed is **idempotent**: existing users are matched by email and refreshed (names, phones, student codes, parent links, class assignments). Legacy orphan classes and bulk rows are trimmed first. First run may take several minutes; subsequent runs are faster because attendance and other records are skipped when already present.
+
 Default logins after seeding:
-- Admin:   admin@sms.et / admin123
-- Teacher: abebe.g@sms.et / teacher123
-- Student: student1@sms.et / student123
+
+| Role    | Email               | Password     |
+|---------|---------------------|--------------|
+| Admin   | admin@school.et     | Admin@1234   |
+| Admin   | selam@school.et     | Admin@1234   |
+| Teacher | teacher1@school.et  | Teacher@1234 |
+| Student | student1@school.et  | Student@1234 |
+| Parent  | parent1@school.et   | Parent@1234  |
+
+Additional accounts follow the same pattern: `teacher2@school.et`, `student2@school.et`, `parent2@school.et`, etc.
 
 ## Install swagger packages
 ```bash
@@ -67,9 +85,11 @@ http://localhost:8080/api
 | Profile     | /api/me                | All logged in    |
 | Students    | /api/admin/students    | Admin            |
 | Teachers    | /api/admin/teachers    | Admin            |
+| Parents     | /api/admin/parents     | Admin            |
+| Parent portal | /api/parent/children, /api/parent/grades, /api/parent/finance | Parent |
 | Attendance  | /api/academics/attendance | Teacher       |
 | Grades      | /api/academics/grades  | Teacher          |
-| Report Card | /api/academics/reportcard | All           |
+| Report Card | /api/academics/reportcard | Student, Parent |
 | Locker      | /api/locker            | Student/Teacher  |
-| Finance     | /api/finance           | Student/Admin    |
+| Finance     | /api/finance           | Student/Admin/Parent |
 | Broadcast   | /api/admin/notify      | Admin            |

@@ -1,13 +1,16 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { X } from 'lucide-react'
+import { X, Filter } from 'lucide-react'
 import { useRole } from '../../hooks/useRole'
 import { bulkGradeEntry, getSubjectGrades, getStudentGrades } from '../../api/academics'
 import { getStudents, getSubjects } from '../../api/admin'
 import type { Grade, Student, Subject } from '../../types/academic'
 import { listFromApi } from '../../types/api'
+import { gradeTypeLabel } from '../../lib/grades'
 import { Table } from '../../components/ui/Table'
 import { Button } from '../../components/ui/Button'
 import { Spinner } from '../../components/ui/Spinner'
+
+const SEMESTERS = ['Semester 1', 'Semester 2', 'Semester 3']
 
 export default function GradesPage() {
   const { isTeacher, isAdmin } = useRole()
@@ -96,7 +99,7 @@ function TeacherView() {
               <div>
                 <label className="text-xs text-[var(--text)]">Semester</label>
                 <select value={entry.semester} onChange={(e) => updateEntry(i, 'semester', e.target.value)} className={sel}>
-                  {['Semester 1', 'Semester 2', 'Semester 3'].map((t) => <option key={t}>{t}</option>)}
+                  {SEMESTERS.map((t) => <option key={t}>{t}</option>)}
                 </select>
               </div>
               <button type="button" onClick={() => setEntries((prev) => prev.filter((_, idx) => idx !== i))}
@@ -131,7 +134,7 @@ function TeacherView() {
             columns={[
               { key: 'student', header: 'Student', render: (g) => g.student?.user?.name ?? `#${g.student_id}` },
               { key: 'score', header: 'Score' },
-              { key: 'grade_type', header: 'Type' },
+              { key: 'grade_type', header: 'Type', render: (g) => gradeTypeLabel(g) },
               { key: 'semester', header: 'Semester' },
               { key: 'remarks', header: 'Remarks' },
             ]}
@@ -146,29 +149,74 @@ function TeacherView() {
 function StudentView() {
   const [grades, setGrades] = useState<Grade[]>([])
   const [loading, setLoading] = useState(true)
+  const [filterSemester, setFilterSemester] = useState<string>('')
+  const [filterSubject, setFilterSubject] = useState<string>('')
 
   useEffect(() => {
-    // Backend resolves student ID from JWT
-    getStudentGrades(0)
+    getStudentGrades(0, filterSemester || undefined)
       .then((r) => setGrades(r.data.data ?? []))
       .finally(() => setLoading(false))
-  }, [])
+  }, [filterSemester])
 
-  if (loading) return <Spinner fullPage />
+  const getUniqueSubjects = () => {
+    const subjects: Record<string, string> = {}
+    grades.forEach(g => {
+      if (g.subject?.name) subjects[g.subject.name] = g.subject.name
+    })
+    return Object.values(subjects)
+  }
+
+  const filteredGrades = grades.filter(g => {
+    const matchesSemester = !filterSemester || g.semester === filterSemester
+    const matchesSubject = !filterSubject || (g.subject?.name === filterSubject)
+    return matchesSemester && matchesSubject
+  })
+
+  const clearFilters = () => {
+    setFilterSemester('')
+    setFilterSubject('')
+  }
 
   return (
-    <div>
-      <h1 className="text-xl font-bold text-[var(--text-h)] mb-6">My Grades</h1>
-      <Table keyExtractor={(g) => g.id} data={grades}
-        columns={[
-          { key: 'subject', header: 'Subject', render: (g) => g.subject?.name ?? `#${g.subject_id}` },
-          { key: 'score', header: 'Score' },
-          { key: 'grade_type', header: 'Type' },
-          { key: 'semester', header: 'Semester' },
-          { key: 'remarks', header: 'Remarks' },
-          { key: 'created_at', header: 'Date', render: (g) => new Date(g.created_at).toLocaleDateString() },
-        ]}
-      />
+    <div className="space-y-6">
+      <h1 className="text-xl font-bold text-[var(--text-h)]">My Grades</h1>
+
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <Filter className="w-4 h-4 text-muted" />
+          <select
+            value={filterSemester}
+            onChange={(e) => setFilterSemester(e.target.value)}
+            className="px-3 py-1.5 rounded-lg text-sm bg-[var(--bg)] border border-[var(--border)] text-[var(--text-h)] outline-none focus:border-accent/50"
+          >
+            <option value="">All Semesters</option>
+            {SEMESTERS.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <select
+            value={filterSubject}
+            onChange={(e) => setFilterSubject(e.target.value)}
+            className="px-3 py-1.5 rounded-lg text-sm bg-[var(--bg)] border border-[var(--border)] text-[var(--text-h)] outline-none focus:border-accent/50"
+          >
+            <option value="">All Subjects</option>
+            {getUniqueSubjects().map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+        {(filterSemester || filterSubject) && (
+          <button onClick={clearFilters} className="text-xs text-accent hover:underline">
+            Clear
+          </button>
+        )}
+      </div>
+
+      {loading ? <Spinner /> : (
+        <Table keyExtractor={(g) => g.id} data={filteredGrades}
+          columns={[
+            { key: 'subject', header: 'Subject', render: (g) => g.subject?.name ?? `#${g.subject_id}` },
+            { key: 'score', header: 'Score', render: (g) => `${g.score}/100` },
+            { key: 'semester', header: 'Semester' },
+          ]}
+        />
+      )}
     </div>
   )
 }

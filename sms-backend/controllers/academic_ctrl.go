@@ -1429,6 +1429,21 @@ func GetClassAttendance(c *gin.Context) {
 	helpers.Success(c, http.StatusOK, "class attendance", records)
 }
 
+// resolveStudentIDParam maps "0" or "me" to the authenticated student's ID.
+func resolveStudentIDParam(c *gin.Context, studentIDParam string) (string, bool) {
+	if studentIDParam == "0" || studentIDParam == "me" {
+		if c.GetString("role") != models.RoleStudent {
+			return "", false
+		}
+		var self models.Student
+		if err := config.DB.Where("user_id = ?", c.GetUint("userID")).First(&self).Error; err != nil {
+			return "", false
+		}
+		return fmt.Sprintf("%d", self.ID), true
+	}
+	return studentIDParam, true
+}
+
 // GetAttendancePercentage godoc
 // @Summary      Get student attendance percentage
 // @Description  Returns overall and per-subject attendance stats for a student.
@@ -1442,7 +1457,12 @@ func GetClassAttendance(c *gin.Context) {
 // @Failure      404  {object}  helpers.APIResponse  "Student profile not found"
 // @Router       /api/academics/attendance/{studentID} [get]
 func GetAttendancePercentage(c *gin.Context) {
-	studentID := c.Param("studentID")
+	resolvedID, ok := resolveStudentIDParam(c, c.Param("studentID"))
+	if !ok {
+		helpers.Error(c, http.StatusNotFound, "student profile not found")
+		return
+	}
+	studentID := resolvedID
 
 	if c.GetString("role") == models.RoleStudent {
 		var self models.Student
@@ -1839,7 +1859,12 @@ func GetSubjectGrades(c *gin.Context) {
 // @Failure      404  {object}  helpers.APIResponse  "Student profile not found"
 // @Router       /api/academics/grades/student/{studentID} [get]
 func GetStudentGrades(c *gin.Context) {
-	studentID := c.Param("studentID")
+	resolvedID, ok := resolveStudentIDParam(c, c.Param("studentID"))
+	if !ok {
+		helpers.Error(c, http.StatusNotFound, "student profile not found")
+		return
+	}
+	studentID := resolvedID
 
 	if c.GetString("role") == models.RoleStudent {
 		var self models.Student
@@ -1891,9 +1916,13 @@ func GetStudentGrades(c *gin.Context) {
 // @Failure      404  {object}  helpers.APIResponse  "Student not found"
 // @Router       /api/academics/reportcard/{studentID} [get]
 func GetReportCard(c *gin.Context) {
-	studentID := c.Param("studentID")
+	resolvedID, ok := resolveStudentIDParam(c, c.Param("studentID"))
+	if !ok {
+		helpers.Error(c, http.StatusNotFound, "student not found")
+		return
+	}
 	var student models.Student
-	if err := config.DB.Preload("User").Preload("Class").First(&student, studentID).Error; err != nil {
+	if err := config.DB.Preload("User").Preload("Class").First(&student, resolvedID).Error; err != nil {
 		helpers.Error(c, http.StatusNotFound, "student not found")
 		return
 	}
@@ -1910,8 +1939,11 @@ func GetReportCard(c *gin.Context) {
 		}
 	}
 
-	// default to current year; require explicit year or get a cross-year averaged mess.
-	yearStr := c.DefaultQuery("academic_year", fmt.Sprintf("%d", time.Now().Year()))
+	defaultYear := student.AcademicYear
+	if defaultYear == 0 {
+		defaultYear = time.Now().Year()
+	}
+	yearStr := c.DefaultQuery("academic_year", fmt.Sprintf("%d", defaultYear))
 	semester := c.Query("semester")
 
 	type SubjectReport struct {
@@ -1926,7 +1958,7 @@ func GetReportCard(c *gin.Context) {
 
 	// Build the WHERE clause dynamically so semester is optional.
 	semClause := ""
-	args := []any{studentID, yearStr}
+	args := []any{student.ID, yearStr}
 	if semester != "" {
 		semClause = "AND g.semester = ?"
 		args = append(args, semester)
@@ -1947,20 +1979,47 @@ func GetReportCard(c *gin.Context) {
 		GROUP BY s.name
 	`, semClause), args...).Scan(&report)
 
+	var overallSum float64
 	for i, r := range report {
 		report[i].LetterGrade = scoreToLetter(r.Overall)
+		overallSum += r.Overall
 	}
+	overallAvg := 0.0
+	if len(report) > 0 {
+		overallAvg = overallSum / float64(len(report))
+	}
+
+	var attTotal, attPresent int64
+	config.DB.Model(&models.Attendance{}).Where("student_id = ? AND subject_id IS NULL", student.ID).Count(&attTotal)
+	config.DB.Model(&models.Attendance{}).
+		Where("student_id = ? AND subject_id IS NULL AND status IN ('Present','Late')", student.ID).
+		Count(&attPresent)
+	attPct := 0.0
+	if attTotal > 0 {
+		attPct = float64(attPresent) / float64(attTotal) * 100
+	}
+
+	yearInt, _ := strconv.Atoi(yearStr)
 
 	helpers.Success(c, http.StatusOK, "report card", gin.H{
 		"student": gin.H{
-			"id":    student.ID,
-			"name":  student.User.Name,
-			"code":  student.StudentCode,
-			"class": student.Class.Name,
+			"id":           student.ID,
+			"name":         student.User.Name,
+			"code":         student.StudentCode,
+			"student_code": student.StudentCode,
+			"class":        student.Class.Name,
+			"user":         gin.H{"name": student.User.Name},
 		},
 		"academic_year": yearStr,
+		"year":          yearInt,
 		"semester":      semester,
 		"subjects":      report,
+		"average":       overallAvg,
+		"attendance": gin.H{
+			"overall_percentage": attPct,
+			"total_days":         attTotal,
+			"attended":           attPresent,
+		},
 	})
 }
 
@@ -1979,9 +2038,13 @@ func GetReportCard(c *gin.Context) {
 // @Failure      500  {object}  helpers.APIResponse  "PDF generation failed"
 // @Router       /api/academics/reportcard/{studentID}/pdf [get]
 func DownloadReportCard(c *gin.Context) {
-	studentID := c.Param("studentID")
+	resolvedID, ok := resolveStudentIDParam(c, c.Param("studentID"))
+	if !ok {
+		helpers.Error(c, http.StatusNotFound, "student not found")
+		return
+	}
 	var student models.Student
-	if err := config.DB.Preload("User").Preload("Class").First(&student, studentID).Error; err != nil {
+	if err := config.DB.Preload("User").Preload("Class").First(&student, resolvedID).Error; err != nil {
 		helpers.Error(c, http.StatusNotFound, "student not found")
 		return
 	}
@@ -1998,7 +2061,11 @@ func DownloadReportCard(c *gin.Context) {
 		}
 	}
 
-	yearStr := c.DefaultQuery("academic_year", fmt.Sprintf("%d", time.Now().Year()))
+	defaultYear := student.AcademicYear
+	if defaultYear == 0 {
+		defaultYear = time.Now().Year()
+	}
+	yearStr := c.DefaultQuery("academic_year", fmt.Sprintf("%d", defaultYear))
 	semester := c.Query("semester")
 
 	semClause := ""
@@ -2405,7 +2472,7 @@ func GetTeacherKPIs(c *gin.Context) {
 			Count(&studentCount)
 	}
 
-	var attendanceRate float64 = 95.0 // default/fallback
+	var attendanceRate float64 = 0.0 // default when no data
 	var presentCount, totalCount int64
 	config.DB.Table("attendances").
 		Joins("JOIN students ON attendances.student_id = students.id").

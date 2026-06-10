@@ -408,6 +408,39 @@ func GetMe(c *gin.Context) {
 	})
 }
 
+// GetPortalContext returns active academic year and semester for the portal dashboard.
+func GetPortalContext(c *gin.Context) {
+	var academicYear int
+	config.DB.Model(&models.Class{}).
+		Where("status = ?", "Active").
+		Select("COALESCE(MAX(year), 0)").
+		Scan(&academicYear)
+	if academicYear == 0 {
+		config.DB.Model(&models.Student{}).
+			Select("COALESCE(MAX(academic_year), 0)").
+			Scan(&academicYear)
+	}
+	if academicYear == 0 {
+		academicYear = time.Now().Year()
+	}
+
+	month := time.Now().Month()
+	activeSemester := "Semester 1"
+	switch {
+	case month >= time.September || month <= time.January:
+		activeSemester = "Semester 1"
+	case month >= time.February && month <= time.May:
+		activeSemester = "Semester 2"
+	default:
+		activeSemester = "Semester 3"
+	}
+
+	helpers.Success(c, http.StatusOK, "portal context", gin.H{
+		"academic_year":   academicYear,
+		"active_semester": activeSemester,
+	})
+}
+
 // ══════════════════════════════════════════════════════
 //  CHANGE PASSWORD
 // ══════════════════════════════════════════════════════

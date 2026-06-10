@@ -3,10 +3,26 @@ import { useRole } from '../../hooks/useRole'
 import { getReportCard, downloadReportCard } from '../../api/academics'
 import { getMyChildren, getChildReportCard } from '../../api/parent'
 import { listFromApi } from '../../types/api'
-import type { ReportCard } from '../../types/academic'
+import type { ReportCard, ReportCardAttendance, ReportCardSubject } from '../../types/academic'
 import { Badge } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
 import { Spinner } from '../../components/ui/Spinner'
+
+function studentDisplayName(report: ReportCard): string {
+  return report.student.user?.name ?? report.student.name ?? `Student #${report.student.id}`
+}
+
+function reportYear(report: ReportCard): number {
+  if (report.year) return report.year
+  if (report.academic_year) return Number(report.academic_year)
+  return new Date().getFullYear()
+}
+
+function isOverallAttendance(
+  att: ReportCard['attendance']
+): att is ReportCardAttendance {
+  return !!att && !Array.isArray(att) && 'overall_percentage' in att
+}
 
 export default function ReportCardPage() {
   const { isParent } = useRole()
@@ -23,7 +39,10 @@ export default function ReportCardPage() {
       getMyChildren()
         .then((res) => {
           const kids = listFromApi(res.data)
-          setChildList(kids.map((k: any) => ({ id: k.id, name: k.user?.name ?? `Student #${k.id}` })))
+          setChildList(kids.map((k: { id: number; user?: { name?: string } }) => ({
+            id: k.id,
+            name: k.user?.name ?? `Student #${k.id}`,
+          })))
           if (kids.length > 0) setSelectedChild(kids[0].id)
         })
     }
@@ -51,11 +70,12 @@ export default function ReportCardPage() {
     if (!report) return
     setDownloading(true)
     try {
-      const res = await downloadReportCard(report.student.id)
+      const studentId = report.student.id
+      const res = await downloadReportCard(studentId)
       const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
       const a = document.createElement('a')
       a.href = url
-      a.download = `report-card-${report.student.student_code}.pdf`
+      a.download = `report-card-${report.student.student_code ?? studentId}.pdf`
       a.click()
       URL.revokeObjectURL(url)
     } finally {
@@ -86,13 +106,17 @@ export default function ReportCardPage() {
   if (error) return <p className="text-sm text-red-500">{error}</p>
   if (!report) return null
 
+  const subjects: ReportCardSubject[] = report.subjects ?? []
+  const overallAtt = isOverallAttendance(report.attendance) ? report.attendance : null
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-xl font-bold text-foreground">Report Card</h1>
           <p className="text-sm text-muted mt-0.5">
-            {report.student.user?.name} · {report.semester} {report.year}
+            {studentDisplayName(report)}
+            {report.semester ? ` · ${report.semester}` : ''} {reportYear(report)}
           </p>
         </div>
         <div className="flex gap-2">
@@ -128,57 +152,77 @@ export default function ReportCardPage() {
 
         <div className="bg-surface border border-surface-border rounded-2xl overflow-hidden mt-4">
           <div className="px-5 py-3 border-b border-surface-border bg-surface-elevated">
-            <h2 className="text-sm font-semibold text-foreground">Grades</h2>
+            <h2 className="text-sm font-semibold text-foreground">Subject Grades</h2>
           </div>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-surface-border">
-                {['Subject', 'Type', 'Score', 'Remarks'].map((h) => (
-                  <th key={h} className="text-left px-5 py-2.5 font-medium text-foreground">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {report.grades.map((g) => (
-                <tr key={g.id} className="border-b border-surface-border last:border-0">
-                  <td className="px-5 py-2.5 text-muted">{g.subject?.name ?? `#${g.subject_id}`}</td>
-                  <td className="px-5 py-2.5 text-muted">{g.grade_type}</td>
-                  <td className="px-5 py-2.5 font-medium text-foreground">{g.score}</td>
-                  <td className="px-5 py-2.5 text-muted">{g.remarks || '—'}</td>
+          {subjects.length > 0 ? (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-surface-border">
+                  {['Subject', 'Midterm', 'Final', 'Overall', 'Grade'].map((h) => (
+                    <th key={h} className="text-left px-5 py-2.5 font-medium text-foreground">{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {subjects.map((s) => (
+                  <tr key={s.subject_name} className="border-b border-surface-border last:border-0">
+                    <td className="px-5 py-2.5 text-muted">{s.subject_name}</td>
+                    <td className="px-5 py-2.5 text-muted">{s.midterm > 0 ? s.midterm.toFixed(1) : '—'}</td>
+                    <td className="px-5 py-2.5 text-muted">{s.final > 0 ? s.final.toFixed(1) : '—'}</td>
+                    <td className="px-5 py-2.5 font-medium text-foreground">{s.overall.toFixed(1)}</td>
+                    <td className="px-5 py-2.5">
+                      <Badge label={s.letter_grade} variant="default" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p className="px-5 py-6 text-sm text-muted">No grade records for this academic year.</p>
+          )}
         </div>
 
         <div className="bg-surface border border-surface-border rounded-2xl overflow-hidden mt-4">
           <div className="px-5 py-3 border-b border-surface-border bg-surface-elevated">
             <h2 className="text-sm font-semibold text-foreground">Attendance</h2>
           </div>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-surface-border">
-                {['Subject', 'Present', 'Total', '%'].map((h) => (
-                  <th key={h} className="text-left px-5 py-2.5 font-medium text-foreground">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {report.attendance.map((a) => (
-                <tr key={a.subject_id} className="border-b border-surface-border last:border-0">
-                  <td className="px-5 py-2.5 text-muted">{a.subject_name}</td>
-                  <td className="px-5 py-2.5 text-muted">{a.present}</td>
-                  <td className="px-5 py-2.5 text-muted">{a.total}</td>
-                  <td className="px-5 py-2.5">
-                    <Badge
-                      label={`${a.percentage.toFixed(1)}%`}
-                      variant={a.percentage >= 75 ? 'success' : a.percentage >= 50 ? 'warning' : 'danger'}
-                    />
-                  </td>
+          {overallAtt ? (
+            <div className="px-5 py-4 text-sm text-muted space-y-1">
+              <p>
+                Overall: <strong className="text-foreground">{overallAtt.overall_percentage.toFixed(1)}%</strong>
+              </p>
+              <p>
+                Days attended: <strong className="text-foreground">{overallAtt.attended}</strong> / {overallAtt.total_days}
+              </p>
+            </div>
+          ) : Array.isArray(report.attendance) && report.attendance.length > 0 ? (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-surface-border">
+                  {['Subject', 'Present', 'Total', '%'].map((h) => (
+                    <th key={h} className="text-left px-5 py-2.5 font-medium text-foreground">{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {report.attendance.map((a: any) => (
+                  <tr key={a.subject_id} className="border-b border-surface-border last:border-0">
+                    <td className="px-5 py-2.5 text-muted">{a.subject_name}</td>
+                    <td className="px-5 py-2.5 text-muted">{a.present}</td>
+                    <td className="px-5 py-2.5 text-muted">{a.total}</td>
+                    <td className="px-5 py-2.5">
+                      <Badge
+                        label={`${a.percentage.toFixed(1)}%`}
+                        variant={a.percentage >= 75 ? 'success' : a.percentage >= 50 ? 'warning' : 'danger'}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p className="px-5 py-6 text-sm text-muted">No attendance records available.</p>
+          )}
         </div>
       </div>
     </div>

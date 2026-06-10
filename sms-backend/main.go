@@ -56,7 +56,7 @@ func main() {
 	}
 
 	// 🚨 RUN MIGRATIONS ONLY IN DEVELOPMENT
-	if os.Getenv("ENV") != "production" {
+	if os.Getenv("ENV") != "production" && os.Getenv("SKIP_MIGRATE") != "true" {
 		// Safe local development only
 		// NEVER runs on Render
 		log.Println("Running AutoMigrate (dev mode only)")
@@ -82,6 +82,8 @@ func main() {
 		if err != nil {
 			log.Fatal("Migration failed: ", err)
 		}
+	} else if os.Getenv("SKIP_MIGRATE") == "true" {
+		log.Println("Skipping AutoMigrate (SKIP_MIGRATE=true)")
 	}
 
 	log.Println("Database ready")

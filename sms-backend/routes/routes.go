@@ -43,6 +43,7 @@ func SetupRoutes(r *gin.Engine) {
 	{
 		auth.POST("/logout", controllers.Logout)
 		auth.GET("/me", controllers.GetMe)
+		auth.GET("/portal/context", controllers.GetPortalContext)
 		auth.PUT("/me/password", controllers.ChangePassword)
 		auth.POST("/me/avatar", controllers.UploadAvatar)
 		auth.GET("/notifications", controllers.GetMyNotifications)
@@ -147,6 +148,7 @@ func SetupRoutes(r *gin.Engine) {
 		parent.Use(middlewares.RoleMiddleware(models.RoleParent))
 		{
 			parent.GET("/children", controllers.GetMyChildren)
+			parent.GET("/dashboard/kpis", controllers.GetParentDashboardKPIs)
 			parent.GET("/attendance/:studentID", middlewares.ParentOwnsStudent(), controllers.GetAttendancePercentage)
 			parent.GET("/grades/:studentID", middlewares.ParentOwnsStudent(), controllers.GetStudentGrades)
 			parent.GET("/reportcard/:studentID", middlewares.ParentOwnsStudent(), controllers.GetReportCard)

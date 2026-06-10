@@ -9,8 +9,11 @@ export const getMyChildren = () =>
 export const getChildAttendance = (studentID: number) =>
   api.get<APIResponse<AttendancePercentage[]>>(`/api/parent/attendance/${studentID}`)
 
-export const getChildGrades = (studentID: number) =>
-  api.get<APIResponse<Grade[]>>(`/api/parent/grades/${studentID}`)
+export const getChildGrades = (studentID: number, semester?: string) => {
+  let url = `/api/parent/grades/${studentID}`
+  if (semester) url += `?semester=${encodeURIComponent(semester)}`
+  return api.get<APIResponse<Grade[]>>(url)
+}
 
 export const getChildReportCard = (studentID: number) =>
   api.get<APIResponse<ReportCard>>(`/api/parent/reportcard/${studentID}`)
@@ -26,3 +29,6 @@ export const submitParentReceipt = (data: {
 
 export const getParentTransactions = () =>
   api.get<APIResponse<Transaction[]>>('/api/parent/finance/transactions')
+
+export const getParentDashboardKPIs = () =>
+  api.get<APIResponse<{ children: number; attendance_avg: number; grade_avg: string; fee_pending: number }>>('/api/parent/dashboard/kpis')

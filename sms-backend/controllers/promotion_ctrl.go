@@ -86,10 +86,7 @@ func validateStudentPromotion(student *models.Student) (bool, error) {
 		}
 	}
 
-	// For each enrolled subject, check if Semester 1 and Semester 2 are completed.
-	// FIX #4: Semester 3 is OPTIONAL (not all curricula have a 3rd semester — Ethiopian system
-	// typically uses Sem 1 + Sem 2, with Sem 3 being an exit/preparatory window that may not
-	// be fully graded). Students missing only Sem 3 can still be evaluated.
+	// For each enrolled subject, check if Semester 1, Semester 2, and Semester 3 are completed.
 	for _, enrollment := range enrollments {
 		var subject models.Subject
 		if err := config.DB.First(&subject, enrollment.SubjectID).Error; err != nil {
@@ -97,13 +94,16 @@ func validateStudentPromotion(student *models.Student) (bool, error) {
 		}
 
 		sems := subjectSemesters[enrollment.SubjectID]
-		if !sems["Semester 1"] || !sems["Semester 2"] {
+		if !sems["Semester 1"] || !sems["Semester 2"] || !sems["Semester 3"] {
 			var missing []string
 			if !sems["Semester 1"] {
 				missing = append(missing, "Semester 1")
 			}
 			if !sems["Semester 2"] {
 				missing = append(missing, "Semester 2")
+			}
+			if !sems["Semester 3"] {
+				missing = append(missing, "Semester 3")
 			}
 			// isIneligible = true so the caller can return 409 (not 400).
 			return true, fmt.Errorf("promotion blocked: student is missing grades for %v in subject %s", missing, subject.Name)
@@ -136,12 +136,10 @@ func evaluatePromotion(studentID uint, academicYear int) (status string, failed 
 		subjectSemScores[g.SubjectID][g.Semester] = append(subjectSemScores[g.SubjectID][g.Semester], pct)
 	}
 
-	// For each subject, calculate Sem1, Sem2 averages, and then overall average.
-	// FIX #4: only count semesters that have at least one grade, so Sem 3 missing
-	// data doesn't drag the average to 0/fail.
+	// For each subject, calculate Sem1, Sem2, and Sem3 averages, and then the overall average.
 	for subID, sems := range subjectSemScores {
-		var sem1Sum, sem2Sum float64
-		var sem1Count, sem2Count float64
+		var sem1Sum, sem2Sum, sem3Sum float64
+		var sem1Count, sem2Count, sem3Count float64
 
 		for _, s := range sems["Semester 1"] {
 			sem1Sum += s
@@ -150,6 +148,10 @@ func evaluatePromotion(studentID uint, academicYear int) (status string, failed 
 		for _, s := range sems["Semester 2"] {
 			sem2Sum += s
 			sem2Count++
+		}
+		for _, s := range sems["Semester 3"] {
+			sem3Sum += s
+			sem3Count++
 		}
 
 		sem1Avg := 0.0
@@ -160,17 +162,30 @@ func evaluatePromotion(studentID uint, academicYear int) (status string, failed 
 		if sem2Count > 0 {
 			sem2Avg = sem2Sum / sem2Count
 		}
+		sem3Avg := 0.0
+		if sem3Count > 0 {
+			sem3Avg = sem3Sum / sem3Count
+		}
 
-		// Final score is the average of the completed semesters (Sem 1 + Sem 2).
-		// If both exist, normalise by 2; if only one, use that one directly.
-		var avg float64
-		switch {
-		case sem1Count > 0 && sem2Count > 0:
-			avg = (sem1Avg + sem2Avg) / 2.0
-		case sem1Count > 0:
-			avg = sem1Avg
-		case sem2Count > 0:
-			avg = sem2Avg
+		// Final score is the average of the completed semesters (Sem 1 + Sem 2 + Sem 3).
+		var count float64
+		var sum float64
+		if sem1Count > 0 {
+			sum += sem1Avg
+			count++
+		}
+		if sem2Count > 0 {
+			sum += sem2Avg
+			count++
+		}
+		if sem3Count > 0 {
+			sum += sem3Avg
+			count++
+		}
+
+		avg := 0.0
+		if count > 0 {
+			avg = sum / count
 		}
 
 		if avg < 50 {

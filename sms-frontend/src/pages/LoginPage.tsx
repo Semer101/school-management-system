@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth'
 import { Input } from '../components/ui/Input'
 import { Button } from '../components/ui/Button'
 import { GlassCard } from '../components/ui/GlassCard'
+import { LoginIllustrationBanner } from '../components/auth/LoginIllustrationBanner'
 
 export default function LoginPage() {
   const { login, loading, error, clearError } = useAuth()
@@ -28,55 +29,8 @@ export default function LoginPage() {
       {/* Grid background on the entire screen under elements */}
       <div className="absolute inset-0 app-grid-bg pointer-events-none opacity-40 z-0" />
 
-      {/* Left side: Illustration Banner (60% Desktop, 50% Tablet, Hidden on Mobile) */}
-      <div className="hidden md:flex md:w-1/2 lg:w-3/5 bg-gradient-to-br from-accent/80 via-accent/90 to-cyan-950 dark:from-cyan-950 dark:via-cyan-900 dark:to-void flex-col justify-between p-12 text-white relative z-10 border-r border-surface-border">
-        {/* Glow effect overlay */}
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(8,145,178,0.18),transparent_60%)] pointer-events-none" />
-        {/* Subtle grid pattern overlay for depth */}
-        <div className="absolute inset-0 opacity-[0.07] pointer-events-none [background-image:linear-gradient(rgba(255,255,255,0.4)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.4)_1px,transparent_1px)] [background-size:48px_48px]" />
-        {/* Top-right soft glow blob */}
-        <div className="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-cyan-400/20 blur-3xl pointer-events-none" />
-        {/* Bottom-left soft glow blob */}
-        <div className="absolute -bottom-32 -left-16 w-80 h-80 rounded-full bg-accent/30 blur-3xl pointer-events-none" />
-REPLACE
-
-
-        <div className="flex items-center gap-2 select-none">
-          <div className="w-8 h-8 rounded-lg bg-white/20 border border-white/30 flex items-center justify-center">
-            <span className="text-white font-mono text-sm font-bold">S</span>
-          </div>
-          <div>
-            <p className="text-sm font-semibold tracking-wide">SMS Portal</p>
-            <p className="text-[10px] uppercase tracking-widest opacity-75">Ethiopia G9–12</p>
-          </div>
-        </div>
-
-        {/* Center Illustration */}
-        <div className="flex-1 flex flex-col items-center justify-center py-10">
-          <motion.img
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.6, ease: 'easeOut' }}
-            src="/login_illustration_cyan.png"
-            alt="School Management Portal Illustration"
-            className="max-w-[75%] max-h-[45vh] object-contain drop-shadow-[0_12px_24px_rgba(8,145,178,0.25)] select-none pointer-events-none"
-            loading="eager"
-          />
-        </div>
-
-        {/* Footer/Tagline info */}
-        <div className="space-y-2 relative z-10 max-w-xl">
-          <h2 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-            Elevating Academic Excellence
-          </h2>
-          <p className="text-sm text-cyan-100/80 leading-relaxed">
-            Welcome to the digital heart of our school. Connect with students, teachers, parents, and administrative tools in a unified, premium space designed for collaboration.
-          </p>
-        </div>
-      </div>
-
-      {/* Right side: Login Form (40% Desktop, 50% Tablet, 100% Mobile) */}
-      <div className="flex-1 flex items-center justify-center p-6 sm:p-12 relative z-10">
+      {/* Left side: Login Form */}
+      <div className="flex-1 flex items-center justify-center p-6 sm:p-12 relative z-10 order-2 md:order-1">
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
@@ -156,6 +110,9 @@ REPLACE
           </p>
         </motion.div>
       </div>
+
+      {/* Right side: Illustration Banner */}
+      <LoginIllustrationBanner className="order-1 md:order-2" />
     </div>
   )
 }

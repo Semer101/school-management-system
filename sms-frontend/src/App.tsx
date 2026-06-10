@@ -24,7 +24,6 @@ import NotifyPage from './pages/admin/NotifyPage'
 import AdminFinancePage from './pages/finance/AdminFinancePage'
 import AttendancePage from './pages/academics/AttendancePage'
 import GradesPage from './pages/academics/GradesPage'
-import ReportCardPage from './pages/academics/ReportCardPage'
 import MyFinancePage from './pages/finance/MyFinancePage'
 import MyLockerPage from './pages/locker/MyLockerPage'
 import StudentLockerPage from './pages/locker/StudentLockerPage'
@@ -64,8 +63,7 @@ function AnimatedRoutes() {
 
           <Route path="/academics/attendance" element={<ProtectedRoute allowedRoles={['Admin', 'Teacher', 'Student']}><PageTransition><AttendancePage /></PageTransition></ProtectedRoute>} />
           <Route path="/academics/grades" element={<ProtectedRoute allowedRoles={['Admin', 'Teacher', 'Student']}><PageTransition><GradesPage /></PageTransition></ProtectedRoute>} />
-          <Route path="/academics/reportcard" element={<ProtectedRoute allowedRoles={['Student', 'Parent']}><PageTransition><ReportCardPage /></PageTransition></ProtectedRoute>} />
-          <Route path="/id-card" element={<ProtectedRoute allowedRoles={['Admin', 'Teacher', 'Student', 'Parent']}><PageTransition><IdCardPage /></PageTransition></ProtectedRoute>} />
+          <Route path="/id-card" element={<ProtectedRoute allowedRoles={['Admin']}><PageTransition><IdCardPage /></PageTransition></ProtectedRoute>} />
 
           <Route path="/finance" element={<ProtectedRoute allowedRoles={['Parent']}><PageTransition><MyFinancePage /></PageTransition></ProtectedRoute>} />
           <Route path="/locker" element={<ProtectedRoute allowedRoles={['Student']}><PageTransition><MyLockerPage /></PageTransition></ProtectedRoute>} />

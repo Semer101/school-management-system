@@ -85,14 +85,24 @@ export default function MyFinancePage() {
     setError(''); setMessage(''); setSaving(true)
 
     try {
-      if (isParent && file) {
+      if (isParent) {
+        if (!file) {
+          setError('Receipt image is required.')
+          setSaving(false)
+          return
+        }
+        if (!form.description.trim()) {
+          setError('Description is required.')
+          setSaving(false)
+          return
+        }
         // Image upload via multipart FormData
         const fd = new FormData()
         fd.append('receipt', file)
         fd.append('student_id', String(form.student_id))
         fd.append('amount', form.amount)
         fd.append('receipt_id', form.receipt_id)
-        if (form.description) fd.append('description', form.description)
+        fd.append('description', form.description)
         const res = await uploadReceipt(fd)
         const created = res.data.data
         if (created) setTransactions((prev) => [created, ...prev])
@@ -160,13 +170,13 @@ export default function MyFinancePage() {
               value={form.receipt_id} onChange={(e) => setForm((f) => ({ ...f, receipt_id: e.target.value }))} required />
           </div>
 
-          <Input label="Description (optional)" placeholder="Tuition for Term 1"
-            value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
+          <Input label="Description" placeholder="Tuition for Term 1"
+            value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} required />
 
           {/* Image upload */}
           {isParent && (
             <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">Upload Receipt Image (JPG / PNG / WEBP)</label>
+              <label className="text-sm font-medium text-foreground">Upload Receipt Image (JPG / PNG / WEBP) *</label>
 
               {!preview ? (
                 <div

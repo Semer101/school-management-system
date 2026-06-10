@@ -110,13 +110,91 @@ func hashPwd(pwd string) string {
 	return string(h)
 }
 
-func randFromSlice(s []string) string {
-	return s[rand.Intn(len(s))]
+// upsertUser creates or updates a user by email.
+// Values must be passed explicitly — FirstOrCreate overwrites the struct with DB state.
+func upsertUser(email, name, phone, password, role string) models.User {
+	u := models.User{
+		Name: name, Email: email, Password: hashPwd(password),
+		Role: role, Phone: phone, IsActive: true,
+	}
+	config.DB.Where("email = ?", email).FirstOrCreate(&u)
+	config.DB.Model(&u).Updates(map[string]any{
+		"name": name, "phone": phone, "is_active": true,
+	})
+	config.DB.Where("email = ?", email).First(&u)
+	return u
+}
+
+// pickName returns a stable name pair for a given index (idempotent across re-seeds).
+func pickName(index int, female bool) (string, string) {
+	firstNames := maleFirstNames
+	if female {
+		firstNames = femaleFirstNames
+	}
+	first := firstNames[index%len(firstNames)]
+	last := lastNames[(index*7+3)%len(lastNames)]
+	return first, last
+}
+
+func cleanupOrphanClasses(year int) {
+	expectedClasses := expectedSeedClassNames(year)
+	var orphanClassIDs []uint
+	config.DB.Model(&models.Class{}).
+		Where("year = ? AND name NOT IN ?", year, expectedClasses).
+		Pluck("id", &orphanClassIDs)
+	for _, cid := range orphanClassIDs {
+		var studentCount int64
+		config.DB.Model(&models.Student{}).Where("class_id = ?", cid).Count(&studentCount)
+		if studentCount == 0 {
+			config.DB.Unscoped().Delete(&models.Class{}, cid)
+		}
+	}
+
+	// Legacy naming from older seeds (e.g. "Grade 9A")
+	var legacyNamedIDs []uint
+	config.DB.Model(&models.Class{}).Where("name LIKE ?", "Grade %").Pluck("id", &legacyNamedIDs)
+	for _, cid := range legacyNamedIDs {
+		var studentCount int64
+		config.DB.Model(&models.Student{}).Where("class_id = ?", cid).Count(&studentCount)
+		if studentCount == 0 {
+			config.DB.Unscoped().Delete(&models.Class{}, cid)
+		}
+	}
+}
+
+func expectedSeedClassNames(year int) []string {
+	classDefs := []struct {
+		Grade           int
+		Section, Stream string
+	}{
+		{9, "A", ""}, {9, "B", ""},
+		{10, "A", ""}, {10, "B", ""},
+		{11, "A", models.StreamNatural}, {11, "B", models.StreamNatural},
+		{11, "C", models.StreamSocial},
+		{12, "A", models.StreamNatural}, {12, "B", models.StreamSocial},
+		{12, "C", models.StreamNatural},
+	}
+	names := make([]string, 0, len(classDefs))
+	for _, cd := range classDefs {
+		if cd.Stream != "" {
+			names = append(names, fmt.Sprintf("%d%s %s", cd.Grade, cd.Section, cd.Stream))
+		} else {
+			names = append(names, fmt.Sprintf("%d%s", cd.Grade, cd.Section))
+		}
+	}
+	_ = year // reserved for future multi-year seeds
+	return names
 }
 
 func seedProductionData(studentCount int) {
 	academicYear := 2025
-	rand.Seed(time.Now().UnixNano())
+	seedRng := rand.New(rand.NewSource(42))
+
+	log.Println("Resetting previous seed records (grades, enrollments, transactions, attendances)...")
+	config.DB.Exec("DELETE FROM grades WHERE academic_year = ?", academicYear)
+	config.DB.Exec("DELETE FROM enrollments")
+	config.DB.Exec("DELETE FROM transactions WHERE academic_year = ?", academicYear)
+	config.DB.Exec("DELETE FROM attendances")
 
 	// ── 1. Admins ─────────────────────────────────────────
 	adminDefs := []struct {
@@ -129,45 +207,31 @@ func seedProductionData(studentCount int) {
 	var admins []models.User
 	for i := 0; i < sampleAdmins && i < len(adminDefs); i++ {
 		d := adminDefs[i]
-		u := models.User{
-			Name: d.Name, Email: d.Email,
-			Password: hashPwd("Admin@1234"), Role: models.RoleAdmin,
-			Phone: d.Phone, IsActive: true,
-		}
-		config.DB.Where("email = ?", u.Email).FirstOrCreate(&u)
-		config.DB.Model(&u).Updates(map[string]any{"name": d.Name, "phone": d.Phone, "is_active": true})
-		config.DB.Where("email = ?", u.Email).First(&u)
-		admins = append(admins, u)
+		admins = append(admins, upsertUser(d.Email, d.Name, d.Phone, "Admin@1234", models.RoleAdmin))
 	}
 
 	// ── 2. Teachers ───────────────────────────────────────
 	var teachers []models.Teacher
 	for i := 1; i <= sampleTeachers; i++ {
-		firstName := randFromSlice(maleFirstNames)
-		lastName := randFromSlice(lastNames)
+		firstName, lastName := pickName(i, i%2 == 0)
+		name := fmt.Sprintf("%s %s", firstName, lastName)
 		email := fmt.Sprintf("teacher%d@school.et", i)
+		phone := fmt.Sprintf("0911100%03d", i)
 		dept := departments[(i-1)%len(departments)]
 		qual := qualifications[(i-1)%len(qualifications)]
+		teacherCode := fmt.Sprintf("TCH-%04d", i)
+		joinedAt := time.Date(academicYear, 9, 1, 0, 0, 0, 0, time.UTC)
 
-		u := models.User{
-			Name: fmt.Sprintf("%s %s", firstName, lastName), Email: email,
-			Password: hashPwd("Teacher@1234"), Role: models.RoleTeacher,
-			Phone: fmt.Sprintf("0911100%03d", i), IsActive: true,
-		}
-		config.DB.Where("email = ?", u.Email).FirstOrCreate(&u)
-		config.DB.Model(&u).Updates(map[string]any{
-			"name": u.Name, "phone": u.Phone, "is_active": true,
-		})
+		u := upsertUser(email, name, phone, "Teacher@1234", models.RoleTeacher)
 
 		t := models.Teacher{
-			UserID: u.ID, TeacherCode: fmt.Sprintf("TCH-%04d", i),
-			Qualification: qual, Department: dept,
-			JoinedAt: time.Date(academicYear, 9, 1, 0, 0, 0, 0, time.UTC),
+			UserID: u.ID, TeacherCode: teacherCode,
+			Qualification: qual, Department: dept, JoinedAt: joinedAt,
 		}
 		config.DB.Where("user_id = ?", u.ID).FirstOrCreate(&t)
 		config.DB.Model(&t).Updates(map[string]any{
-			"teacher_code": t.TeacherCode, "qualification": qual,
-			"department": dept, "joined_at": t.JoinedAt,
+			"teacher_code": teacherCode, "qualification": qual,
+			"department": dept, "joined_at": joinedAt,
 		})
 		config.DB.Where("user_id = ?", u.ID).First(&t)
 		t.User = u
@@ -236,80 +300,55 @@ func seedProductionData(studentCount int) {
 	// ── 5. Parents ────────────────────────────────────────
 	var parents []models.User
 	for i := 1; i <= sampleParents; i++ {
-		isMother := rand.Intn(2) == 0
-		var firstName string
-		if isMother {
-			firstName = randFromSlice(femaleFirstNames)
-		} else {
-			firstName = randFromSlice(maleFirstNames)
-		}
-		lastName := randFromSlice(lastNames)
+		firstName, lastName := pickName(i+100, i%2 == 0)
+		name := fmt.Sprintf("%s %s", firstName, lastName)
 		email := fmt.Sprintf("parent%d@school.et", i)
-		u := models.User{
-			Name: fmt.Sprintf("%s %s", firstName, lastName), Email: email,
-			Password: hashPwd("Parent@1234"), Role: models.RoleParent,
-			Phone: fmt.Sprintf("0944%06d", 100000+i), IsActive: true,
-		}
-		config.DB.Where("email = ?", u.Email).FirstOrCreate(&u)
-		config.DB.Model(&u).Updates(map[string]any{"name": u.Name, "is_active": true})
-		config.DB.Where("email = ?", u.Email).First(&u)
-		parents = append(parents, u)
+		phone := fmt.Sprintf("0944%06d", 100000+i)
+		parents = append(parents, upsertUser(email, name, phone, "Parent@1234", models.RoleParent))
 	}
 
 	// ── 6. Students ───────────────────────────────────────
 	var students []models.Student
+	enrolledAt := time.Date(academicYear, 9, 1, 0, 0, 0, 0, time.UTC)
 	for i := 1; i <= studentCount; i++ {
-		isMale := rand.Intn(2) == 0
-		var firstName string
-		if isMale {
-			firstName = randFromSlice(maleFirstNames)
-		} else {
-			firstName = randFromSlice(femaleFirstNames)
-		}
-		lastName := randFromSlice(lastNames)
+		isMale := i%2 == 0
+		firstName, lastName := pickName(i+200, !isMale)
+		name := fmt.Sprintf("%s %s", firstName, lastName)
 		email := fmt.Sprintf("student%d@school.et", i)
+		phone := fmt.Sprintf("0911500%03d", i)
+		studentCode := fmt.Sprintf("STU-%d-%04d", academicYear, i)
 
-		// Assign to a class (cycle through classes, weighted toward lower grades)
+		// Assign to a class (cycle through classes, with stable variety per index)
 		classIdx := (i - 1) % len(classes)
-		if rand.Float64() < 0.3 {
-			classIdx = rand.Intn(len(classes))
+		if i%3 == 0 {
+			classIdx = (i * 7) % len(classes)
 		}
 		assignedClass := classes[classIdx]
 
 		parentIdx := (i - 1) % len(parents)
 		if i%7 == 0 {
-			// Some students share parents (siblings)
 			parentIdx = (i - 2) % len(parents)
 			if parentIdx < 0 {
 				parentIdx = 0
 			}
 		}
 
-		u := models.User{
-			Name: fmt.Sprintf("%s %s", firstName, lastName), Email: email,
-			Password: hashPwd("Student@1234"), Role: models.RoleStudent,
-			Phone: fmt.Sprintf("0911500%03d", i), IsActive: true,
-		}
-		config.DB.Where("email = ?", u.Email).FirstOrCreate(&u)
-		config.DB.Model(&u).Updates(map[string]any{"name": u.Name, "is_active": true})
+		u := upsertUser(email, name, phone, "Student@1234", models.RoleStudent)
 
-		// Generate realistic date of birth based on grade level
 		dobYear := academicYear - assignedClass.GradeLevel - 3
-		dob := time.Date(dobYear, time.Month(rand.Intn(12)+1), rand.Intn(28)+1, 0, 0, 0, 0, time.UTC)
+		dob := time.Date(dobYear, time.Month((i%12)+1), (i%28)+1, 0, 0, 0, 0, time.UTC)
 
 		st := models.Student{
 			UserID: u.ID, ParentID: parents[parentIdx].ID, ClassID: &assignedClass.ID,
-			StudentCode: fmt.Sprintf("STU-%d-%04d", academicYear, i),
+			StudentCode: studentCode,
 			ParentName:  parents[parentIdx].Name, ParentEmail: parents[parentIdx].Email,
 			ParentPhone: parents[parentIdx].Phone,
-			DateOfBirth:  dob,
-			Stream:       assignedClass.Stream, GradeLevel: assignedClass.GradeLevel,
-			PromotionStatus: models.PromotionNormal,
-			AcademicYear:    academicYear,
-			EnrolledAt:      time.Date(academicYear, 9, 1, 0, 0, 0, 0, time.UTC),
+			DateOfBirth: dob, Stream: assignedClass.Stream, GradeLevel: assignedClass.GradeLevel,
+			PromotionStatus: models.PromotionNormal, AcademicYear: academicYear, EnrolledAt: enrolledAt,
 		}
 		config.DB.Where("user_id = ?", u.ID).FirstOrCreate(&st)
 		config.DB.Model(&st).Updates(map[string]any{
+			"student_code":     studentCode,
 			"class_id":         assignedClass.ID,
 			"grade_level":      assignedClass.GradeLevel,
 			"stream":           assignedClass.Stream,
@@ -317,8 +356,9 @@ func seedProductionData(studentCount int) {
 			"parent_name":      parents[parentIdx].Name,
 			"parent_email":     parents[parentIdx].Email,
 			"parent_phone":     parents[parentIdx].Phone,
+			"date_of_birth":    dob,
 			"academic_year":    academicYear,
-			"enrolled_at":      time.Date(academicYear, 9, 1, 0, 0, 0, 0, time.UTC),
+			"enrolled_at":      enrolledAt,
 			"promotion_status": models.PromotionNormal,
 		})
 		config.DB.Where("user_id = ?", u.ID).First(&st)
@@ -348,6 +388,7 @@ func seedProductionData(studentCount int) {
 		"Absent",
 	}
 	attStart := time.Now().AddDate(0, 0, -42)
+	var allAttendance []models.Attendance
 	for _, st := range students {
 		schoolDays := 0
 		for day := 0; schoolDays < 30; day++ {
@@ -356,34 +397,31 @@ func seedProductionData(studentCount int) {
 				continue
 			}
 			schoolDays++
-			var cnt int64
-			config.DB.Model(&models.Attendance{}).
-				Where("student_id = ? AND subject_id IS NULL AND DATE(date) = DATE(?)", st.ID, d).Count(&cnt)
-			if cnt == 0 {
-				pick := (int(st.ID) + schoolDays) % len(attStatuses)
-				config.DB.Create(&models.Attendance{
-					StudentID: st.ID, SubjectID: nil, Date: d, Status: attStatuses[pick],
-				})
-			}
+			pick := (int(st.ID) + schoolDays) % len(attStatuses)
+			allAttendance = append(allAttendance, models.Attendance{
+				StudentID: st.ID, SubjectID: nil, Date: d, Status: attStatuses[pick],
+			})
 		}
+	}
+	if len(allAttendance) > 0 {
+		log.Printf("Inserting %d attendance records in bulk...", len(allAttendance))
+		config.DB.CreateInBatches(&allAttendance, 200)
 	}
 
 	// ── 9. Grades (Midterm + Final for each enrolled subject/semester) ─
+	var allGrades []models.Grade
 	for i, st := range students {
 		var subs []models.Subject
 		config.DB.Joins("JOIN enrollments ON enrollments.subject_id = subjects.id").
 			Where("enrollments.student_id = ?", st.ID).Find(&subs)
 		for _, sub := range subs {
-			semsToSeed := []string{"Semester 1", "Semester 2"}
-			if i <= 2 {
-				semsToSeed = append(semsToSeed, "Semester 3")
-			}
+			semsToSeed := []string{"Semester 1", "Semester 2", "Semester 3"}
 			for _, sem := range semsToSeed {
 				for _, gt := range []string{"Midterm", "Final"} {
 					// Realistic grade distribution: bell curve around 72
 					score := 72.0 + float64((st.ID+sub.ID)%25)
 					// Add some randomness
-					score += float64(rand.Intn(11) - 5) // ±5
+					score += float64(seedRng.Intn(11) - 5) // ±5
 					if score < 20 {
 						score = 20
 					}
@@ -398,25 +436,22 @@ func seedProductionData(studentCount int) {
 					} else if i == 3 && gt == "Final" {
 						score = 42.0
 					}
-					var gc int64
-					config.DB.Model(&models.Grade{}).Where(
-						"student_id = ? AND subject_id = ? AND grade_type = ? AND semester = ? AND academic_year = ?",
-						st.ID, sub.ID, gt, sem, academicYear,
-					).Count(&gc)
-					if gc == 0 {
-						var teacherID uint
-						if sub.TeacherID != nil {
-							teacherID = *sub.TeacherID
-						}
-						config.DB.Create(&models.Grade{
-							StudentID: st.ID, SubjectID: sub.ID, TeacherID: teacherID,
-							Score: score, MaxScore: 100, Type: gt, Semester: sem,
-							AcademicYear: academicYear,
-						})
+					var teacherID uint
+					if sub.TeacherID != nil {
+						teacherID = *sub.TeacherID
 					}
+					allGrades = append(allGrades, models.Grade{
+						StudentID: st.ID, SubjectID: sub.ID, TeacherID: teacherID,
+						Score: score, MaxScore: 100, Type: gt, Semester: sem,
+						AcademicYear: academicYear,
+					})
 				}
 			}
 		}
+	}
+	if len(allGrades) > 0 {
+		log.Printf("Inserting %d grades in bulk...", len(allGrades))
+		config.DB.CreateInBatches(&allGrades, 200)
 	}
 
 	// ── 10. Notifications ─────────────────────────────────
@@ -430,6 +465,7 @@ func seedProductionData(studentCount int) {
 		{"Science Fair", "Annual science fair submissions due next week."},
 		{"Teacher Training", "Professional development day — no classes on Friday."},
 	}
+	var allReceipts []models.NotificationReceipt
 	for i, nd := range notifDefs {
 		var cnt int64
 		config.DB.Model(&models.Notification{}).Where("title = ?", nd.Title).Count(&cnt)
@@ -440,71 +476,61 @@ func seedProductionData(studentCount int) {
 			}
 			config.DB.Create(&notif)
 			for _, st := range students {
-				var rc int64
-				config.DB.Model(&models.NotificationReceipt{}).
-					Where("notification_id = ? AND user_id = ?", notif.ID, st.UserID).Count(&rc)
-				if rc == 0 {
-					config.DB.Create(&models.NotificationReceipt{
-						NotificationID: notif.ID, UserID: st.UserID, IsRead: i%2 == 0,
-					})
-				}
+				allReceipts = append(allReceipts, models.NotificationReceipt{
+					NotificationID: notif.ID, UserID: st.UserID, IsRead: i%2 == 0,
+				})
 			}
 		}
 	}
+	if len(allReceipts) > 0 {
+		log.Printf("Inserting %d notification receipts in bulk...", len(allReceipts))
+		config.DB.CreateInBatches(&allReceipts, 200)
+	}
 
 	// ── 11. Finance (Transactions) ────────────────────────
+	var allTransactions []models.Transaction
 	for i, student := range students {
 		// Semester 1 payment (everyone gets one)
 		rid1 := fmt.Sprintf("ETH-CBE-%06d", 300000+i)
-		var tc1 int64
-		config.DB.Model(&models.Transaction{}).Where("receipt_id = ?", rid1).Count(&tc1)
-		if tc1 == 0 {
-			txStatus := "Pending"
-			if i%3 == 0 {
-				txStatus = "Verified"
-			}
-			config.DB.Create(&models.Transaction{
-				StudentID: student.ID, Amount: 8500, ReceiptID: rid1, Type: "Tuition",
-				Status: txStatus, Description: "Semester 1 Tuition",
-				CreatedBy: student.UserID, AcademicYear: academicYear, Semester: "Semester 1",
-			})
+		txStatus1 := "Pending"
+		if i%3 == 0 {
+			txStatus1 = "Verified"
 		}
+		allTransactions = append(allTransactions, models.Transaction{
+			StudentID: student.ID, Amount: 8500, ReceiptID: rid1, Type: "Tuition",
+			Status: txStatus1, Description: "Semester 1 Tuition",
+			CreatedBy: student.UserID, AcademicYear: academicYear, Semester: "Semester 1",
+		})
 
 		// Semester 2 payment (subset to demonstrate overdue states)
 		if i%2 == 0 {
 			rid2 := fmt.Sprintf("ETH-CBE-%06d", 400000+i)
-			var tc2 int64
-			config.DB.Model(&models.Transaction{}).Where("receipt_id = ?", rid2).Count(&tc2)
-			if tc2 == 0 {
-				txStatus := "Pending"
-				if i%4 == 0 {
-					txStatus = "Verified"
-				}
-				config.DB.Create(&models.Transaction{
-					StudentID: student.ID, Amount: 8500, ReceiptID: rid2, Type: "Tuition",
-					Status: txStatus, Description: "Semester 2 Tuition",
-					CreatedBy: student.UserID, AcademicYear: academicYear, Semester: "Semester 2",
-				})
+			txStatus2 := "Pending"
+			if i%4 == 0 {
+				txStatus2 = "Verified"
 			}
+			allTransactions = append(allTransactions, models.Transaction{
+				StudentID: student.ID, Amount: 8500, ReceiptID: rid2, Type: "Tuition",
+				Status: txStatus2, Description: "Semester 2 Tuition",
+				CreatedBy: student.UserID, AcademicYear: academicYear, Semester: "Semester 2",
+			})
 		}
 
-		// Semester 3 payment (only for first 10 students — top grades)
-		if i < 10 {
-			rid3 := fmt.Sprintf("ETH-CBE-%06d", 500000+i)
-			var tc3 int64
-			config.DB.Model(&models.Transaction{}).Where("receipt_id = ?", rid3).Count(&tc3)
-			if tc3 == 0 {
-				txStatus := "Pending"
-				if i%2 == 0 {
-					txStatus = "Verified"
-				}
-				config.DB.Create(&models.Transaction{
-					StudentID: student.ID, Amount: 8500, ReceiptID: rid3, Type: "Tuition",
-					Status: txStatus, Description: "Semester 3 Tuition",
-					CreatedBy: student.UserID, AcademicYear: academicYear, Semester: "Semester 3",
-				})
-			}
+		// Semester 3 payment (everyone gets one)
+		rid3 := fmt.Sprintf("ETH-CBE-%06d", 500000+i)
+		txStatus3 := "Pending"
+		if i%3 == 1 {
+			txStatus3 = "Verified"
 		}
+		allTransactions = append(allTransactions, models.Transaction{
+			StudentID: student.ID, Amount: 8500, ReceiptID: rid3, Type: "Tuition",
+			Status: txStatus3, Description: "Semester 3 Tuition",
+			CreatedBy: student.UserID, AcademicYear: academicYear, Semester: "Semester 3",
+		})
+	}
+	if len(allTransactions) > 0 {
+		log.Printf("Inserting %d transactions in bulk...", len(allTransactions))
+		config.DB.CreateInBatches(&allTransactions, 100)
 	}
 
 	// ── 12. Payroll (6 months per teacher) ────────────────
@@ -555,6 +581,8 @@ func seedProductionData(studentCount int) {
 			})
 		}
 	}
+
+	cleanupOrphanClasses(academicYear)
 
 	log.Println("=== Seed complete ===")
 	log.Printf("  Admins:     %d", sampleAdmins)
@@ -629,11 +657,13 @@ func trimExcessData() {
 	config.DB.Unscoped().Where("deleted_at IS NOT NULL").Delete(&models.Student{})
 	config.DB.Unscoped().Where("deleted_at IS NOT NULL").Delete(&models.Teacher{})
 
-	// Cap notifications
+	cleanupOrphanClasses(2025)
+
+	// Cap notifications (matches seed count)
 	var notifIDs []uint
 	config.DB.Model(&models.Notification{}).Order("id DESC").Pluck("id", &notifIDs)
-	if len(notifIDs) > 5 {
-		extra := notifIDs[5:]
+	if len(notifIDs) > 8 {
+		extra := notifIDs[8:]
 		config.DB.Where("notification_id IN ?", extra).Delete(&models.NotificationReceipt{})
 		config.DB.Where("id IN ?", extra).Delete(&models.Notification{})
 	}

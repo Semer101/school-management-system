@@ -37,8 +37,13 @@ export const bulkGradeEntry = (grades: {
 export const getSubjectGrades = (subjectID: number) =>
   api.get<APIResponse<Grade[]>>(`/api/academics/grades/subject/${subjectID}`)
 
-export const getStudentGrades = (studentID: number) =>
-  api.get<APIResponse<Grade[]>>(`/api/academics/grades/student/${studentID}`)
+export const getStudentGrades = (studentID: number, semester?: string, subjectID?: string) => {
+  const params = new URLSearchParams()
+  if (semester) params.append('semester', semester)
+  if (subjectID) params.append('subject_id', subjectID)
+  const query = params.toString() ? `?${params.toString()}` : ''
+  return api.get<APIResponse<Grade[]>>(`/api/academics/grades/student/${studentID}${query}`)
+}
 
 // ── Report Card ──────────────────────────────────────────
 export const getReportCard = (studentID: number) =>

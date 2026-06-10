@@ -111,7 +111,11 @@ func UploadPaymentReceipt(c *gin.Context) {
 		return
 	}
 
-	description := c.PostForm("description")
+	description := strings.TrimSpace(c.PostForm("description"))
+	if description == "" {
+		helpers.Error(c, http.StatusBadRequest, "description is required")
+		return
+	}
 	academicYearStr := c.PostForm("academic_year")
 	academicYear, _ := strconv.Atoi(academicYearStr)
 	semester := strings.TrimSpace(c.PostForm("semester"))
@@ -351,10 +355,10 @@ func ApproveReceipt(c *gin.Context) {
 
 	now := time.Now()
 	if err := config.DB.Model(&tx).Updates(map[string]any{
-		"status":           "Verified",
-		"verified_by":      adminID,
-		"verified_at":      &now,
-		"rejection_notes":  "", // clear any notes from a prior provisional reject
+		"status":          "Verified",
+		"verified_by":     adminID,
+		"verified_at":     &now,
+		"rejection_notes": "", // clear any notes from a prior provisional reject
 	}).Error; err != nil {
 		helpers.Error(c, http.StatusInternalServerError, "failed to approve receipt")
 		return
@@ -471,5 +475,3 @@ func GetReceipt(c *gin.Context) {
 
 	helpers.Success(c, http.StatusOK, "receipt fetched", tx)
 }
-
-
