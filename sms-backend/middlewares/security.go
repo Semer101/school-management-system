@@ -41,7 +41,7 @@ func SecurityHeaders() gin.HandlerFunc {
 		} else {
 			connectSrc := os.Getenv("CSP_CONNECT_SRC")
 			if connectSrc == "" {
-				connectSrc = "'self'"
+				connectSrc = "'self' https://school-management-system-3cd1x3scx-semers-projects-fdb5d8af.vercel.app"
 			}
 			frontendURL := os.Getenv("FRONTEND_URL")
 			if frontendURL != "" {
@@ -80,6 +80,7 @@ func CORSMiddleware() gin.HandlerFunc {
 			"http://localhost:8080",
 			"http://127.0.0.1:5500",
 			"https://school-management-system-70z3.onrender.com",
+			"https://school-management-system-3cd1x3scx-semers-projects-fdb5d8af.vercel.app",
 		}
 		for port := 5173; port <= 5190; port++ {
 			allowedOrigins = append(allowedOrigins,
