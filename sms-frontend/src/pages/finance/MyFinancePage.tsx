@@ -20,7 +20,7 @@ export default function MyFinancePage() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [children, setChildren] = useState<Student[]>([])
   const [loading, setLoading] = useState(true)
-  const [form, setForm] = useState({ student_id: 0, amount: '', receipt_id: '', description: '' })
+  const [form, setForm] = useState({ student_id: 0, amount: '', receipt_id: '', semester: '', description: '' })
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [fileError, setFileError] = useState('')
@@ -103,6 +103,9 @@ export default function MyFinancePage() {
         fd.append('amount', form.amount)
         fd.append('receipt_id', form.receipt_id)
         fd.append('description', form.description)
+        if (form.semester) {
+          fd.append('semester', form.semester)
+        }
         const res = await uploadReceipt(fd)
         const created = res.data.data
         if (created) setTransactions((prev) => [created, ...prev])
@@ -112,11 +115,13 @@ export default function MyFinancePage() {
           ? await submitParentReceipt({
               amount: Number(form.amount),
               receipt_id: form.receipt_id,
+              semester: form.semester || undefined,
               description: form.description,
             })
           : await submitReceipt({
               amount: Number(form.amount),
               receipt_id: form.receipt_id,
+              semester: form.semester || undefined,
               description: form.description,
             })
         const created = res.data.data
@@ -124,7 +129,7 @@ export default function MyFinancePage() {
       }
 
       setMessage('Receipt submitted. Pending admin verification.')
-      setForm({ student_id: 0, amount: '', receipt_id: '', description: '' })
+      setForm({ student_id: 0, amount: '', receipt_id: '', semester: '', description: '' })
       removeFile()
     } catch (err: unknown) {
       const httpErr = err as { response?: { data?: { error?: string } } }
@@ -170,8 +175,23 @@ export default function MyFinancePage() {
               value={form.receipt_id} onChange={(e) => setForm((f) => ({ ...f, receipt_id: e.target.value }))} required />
           </div>
 
-          <Input label="Description" placeholder="Tuition for Term 1"
-            value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} required />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input label="Description" placeholder="Tuition for Semester 1"
+              value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} required />
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-foreground">Semester</label>
+              <select
+                value={form.semester}
+                onChange={(e) => setForm((f) => ({ ...f, semester: e.target.value }))}
+                className="w-full px-3 py-2 rounded-lg border border-surface-border bg-surface text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-accent/40 focus:border-accent"
+              >
+                <option value="">Other / Non-semester fee</option>
+                <option value="Semester 1">Semester 1</option>
+                <option value="Semester 2">Semester 2</option>
+                <option value="Semester 3">Semester 3</option>
+              </select>
+            </div>
+          </div>
 
           {/* Image upload */}
           {isParent && (

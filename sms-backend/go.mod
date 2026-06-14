@@ -14,6 +14,8 @@ require (
 	gorm.io/gorm v1.25.10
 )
 
+require github.com/dutchcoders/go-clamd v0.0.0-20170520113014-b970184f4d9e // indirect
+
 require (
 	github.com/KyleBanks/depth v1.2.1 // indirect
 	github.com/PuerkitoBio/purell v1.1.1 // indirect

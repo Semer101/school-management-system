@@ -1,6 +1,6 @@
 import api from './axiosClient'
 import type { APIResponse } from '../types/api'
-import type { Attendance, Grade, ReportCard } from '../types/academic'
+import type { Attendance, Grade, ReportCard, Student, Subject, Class } from '../types/academic'
 
 // ── Attendance ───────────────────────────────────────────
 export const recordAttendance = (data: {
@@ -51,6 +51,17 @@ export const getReportCard = (studentID: number) =>
 
 export const downloadReportCard = (studentID: number) =>
   api.get(`/api/academics/reportcard/${studentID}/pdf`, { responseType: 'blob' })
+
+export const getTeacherClasses = () =>
+  api.get<APIResponse<Class[]>>('/api/academics/teacher/classes')
+
+export const getTeacherSubjects = () =>
+  api.get<APIResponse<Subject[]>>('/api/academics/teacher/subjects')
+
+export const getTeacherStudents = (classId?: number) =>
+  api.get<APIResponse<Student[]>>('/api/academics/teacher/students', {
+    params: classId ? { class_id: classId } : undefined
+  })
 
 export const getTeacherDashboardKPIs = () =>
   api.get<APIResponse<{ students: number; classes: number; subjects: number; attendance_rate: number }>>('/api/academics/dashboard/kpis')

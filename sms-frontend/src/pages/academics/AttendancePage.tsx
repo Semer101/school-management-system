@@ -5,9 +5,10 @@ import {
   recordAttendance,
   getClassAttendance,
   getAttendancePercentage,
+  getTeacherClasses,
+  getTeacherStudents,
   type AttendanceStats,
 } from '../../api/academics'
-import { getStudents, getClasses } from '../../api/admin'
 import type { Attendance, Student, Class } from '../../types/academic'
 import { listFromApi } from '../../types/api'
 import { Table } from '../../components/ui/Table'
@@ -40,8 +41,8 @@ function TeacherView() {
 
   useEffect(() => {
     Promise.all([
-      getClasses({ page_size: 50 }),
-      getStudents({ page_size: 50 }),
+      getTeacherClasses(),
+      getTeacherStudents(),
     ]).then(([c, s]) => {
       setClasses(listFromApi(c.data))
       setStudents(listFromApi(s.data))

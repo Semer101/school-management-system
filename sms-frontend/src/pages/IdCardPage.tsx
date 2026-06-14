@@ -72,60 +72,59 @@ function StudentIdCard({ card }: { card: CardData }) {
   const qrData = qrDataFromCard(card)
 
   return (
-    <div className="id-card relative w-[340px] bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+    <div id={`card-${card.role}-${card.id}`} className="id-card relative w-[300px] bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-800 px-5 py-4 text-white text-center">
-        <div className="flex items-center justify-center gap-2 mb-1">
-          <SchoolLogo />
-          <p className="text-sm font-bold tracking-wide">{SCHOOL_NAME}</p>
+      <div className="bg-gradient-to-r from-blue-600 to-blue-800 px-3 py-3 text-white text-center">
+        <div className="flex items-center justify-center gap-1.5 mb-0.5">
+          <SchoolLogo size="sm" />
+          <p className="text-[11px] font-bold tracking-wide">{SCHOOL_NAME}</p>
         </div>
-        <p className="text-[10px] uppercase tracking-widest opacity-80">Student Identification Card</p>
+        <p className="text-[9px] uppercase tracking-widest opacity-80">Student ID Card</p>
       </div>
 
       {/* Photo */}
-      <div className="flex justify-center pt-6 -mt-2">
+      <div className="flex justify-center pt-4 -mt-2">
         {imgUrl ? (
           <img
             src={imgUrl}
             alt={card.name}
-            className="w-24 h-24 rounded-full border-4 border-white shadow-md object-cover bg-gray-100"
+            className="w-16 h-16 rounded-full border-3 border-white shadow-sm object-cover bg-gray-100"
           />
         ) : (
-          <div className="w-24 h-24 rounded-full border-4 border-white shadow-md bg-blue-100 flex items-center justify-center text-blue-600 text-3xl font-bold">
+          <div className="w-16 h-16 rounded-full border-3 border-white shadow-sm bg-blue-100 flex items-center justify-center text-blue-600 text-xl font-bold">
             {card.name[0]?.toUpperCase()}
           </div>
         )}
       </div>
 
       {/* Details */}
-      <div className="px-5 py-4 text-center space-y-1.5">
-        <h3 className="text-base font-bold text-gray-900 break-words">{card.name}</h3>
+      <div className="px-3 py-2 text-center space-y-1">
+        <h3 className="text-sm font-bold text-gray-900 break-words">{card.name}</h3>
         {card.code && (
-          <p className="text-xs font-mono text-gray-500">ID: {card.code}</p>
+          <p className="text-[10px] font-mono text-gray-500">ID: {card.code}</p>
         )}
         {card.grade_level && (
-          <p className="text-xs text-gray-500">
+          <p className="text-[10px] text-gray-500">
             Grade {card.grade_level}{card.section ? ` — ${card.section}` : ''}{card.stream ? ` (${card.stream})` : ''}
           </p>
         )}
         {card.gender && (
-          <p className="text-xs text-gray-400">{card.gender}</p>
+          <p className="text-[10px] text-gray-400">{card.gender}</p>
         )}
       </div>
 
       {/* QR */}
-      <div className="flex justify-center pb-4">
-        <div className="bg-white p-1.5 rounded-lg border border-gray-200">
-          <QRCodeSVG value={qrData} size={80} level="M" />
+      <div className="flex justify-center pb-3">
+        <div className="bg-white p-1 rounded-lg border border-gray-200">
+          <QRCodeSVG value={qrData} size={64} level="M" />
         </div>
       </div>
 
       {/* Footer */}
-      <div className="bg-gray-50 px-5 py-2.5 text-center border-t border-gray-200">
-        <p className="text-[9px] uppercase tracking-widest text-gray-400">
-          {SCHOOL_NAME} • Valid Until: {VALID_UNTIL_YEAR}
+      <div className="bg-gray-50 px-3 py-1.5 text-center border-t border-gray-200">
+        <p className="text-[8px] uppercase tracking-widest text-gray-400">
+          {SCHOOL_NAME} • Valid: {VALID_UNTIL_YEAR}
         </p>
-        <p className="text-[9px] text-gray-300 mt-0.5">Issued: {new Date().toLocaleDateString()}</p>
       </div>
     </div>
   )
@@ -136,53 +135,52 @@ function TeacherIdCard({ card }: { card: CardData }) {
   const qrData = qrDataFromCard(card)
 
   return (
-    <div className="id-card relative w-[340px] bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
-      <div className="bg-gradient-to-r from-emerald-600 to-emerald-800 px-5 py-4 text-white text-center">
-        <div className="flex items-center justify-center gap-2 mb-1">
-          <SchoolLogo />
-          <p className="text-sm font-bold tracking-wide">{SCHOOL_NAME}</p>
+    <div id={`card-${card.role}-${card.id}`} className="id-card relative w-[300px] bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+      <div className="bg-gradient-to-r from-emerald-600 to-emerald-800 px-3 py-3 text-white text-center">
+        <div className="flex items-center justify-center gap-1.5 mb-0.5">
+          <SchoolLogo size="sm" />
+          <p className="text-[11px] font-bold tracking-wide">{SCHOOL_NAME}</p>
         </div>
-        <p className="text-[10px] uppercase tracking-widest opacity-80">Staff Identification Card</p>
+        <p className="text-[9px] uppercase tracking-widest opacity-80">Staff ID Card</p>
       </div>
 
-      <div className="flex justify-center pt-6 -mt-2">
+      <div className="flex justify-center pt-4 -mt-2">
         {imgUrl ? (
           <img
             src={imgUrl}
             alt={card.name}
-            className="w-24 h-24 rounded-full border-4 border-white shadow-md object-cover bg-gray-100"
+            className="w-16 h-16 rounded-full border-3 border-white shadow-sm object-cover bg-gray-100"
           />
         ) : (
-          <div className="w-24 h-24 rounded-full border-4 border-white shadow-md bg-emerald-100 flex items-center justify-center text-emerald-600 text-3xl font-bold">
+          <div className="w-16 h-16 rounded-full border-3 border-white shadow-sm bg-emerald-100 flex items-center justify-center text-emerald-600 text-xl font-bold">
             {card.name[0]?.toUpperCase()}
           </div>
         )}
       </div>
 
-      <div className="px-5 py-4 text-center space-y-1.5">
-        <h3 className="text-base font-bold text-gray-900 break-words">{card.name}</h3>
+      <div className="px-3 py-2 text-center space-y-1">
+        <h3 className="text-sm font-bold text-gray-900 break-words">{card.name}</h3>
         {card.code && (
-          <p className="text-xs font-mono text-gray-500">Staff ID: {card.code}</p>
+          <p className="text-[10px] font-mono text-gray-500">Staff ID: {card.code}</p>
         )}
         {card.department && (
-          <p className="text-xs text-gray-500">{card.department}</p>
+          <p className="text-[10px] text-gray-500">{card.department}</p>
         )}
         {card.phone && (
-          <p className="text-xs text-gray-400">{card.phone}</p>
+          <p className="text-[10px] text-gray-400">{card.phone}</p>
         )}
       </div>
 
-      <div className="flex justify-center pb-4">
-        <div className="bg-white p-1.5 rounded-lg border border-gray-200">
-          <QRCodeSVG value={qrData} size={80} level="M" />
+      <div className="flex justify-center pb-3">
+        <div className="bg-white p-1 rounded-lg border border-gray-200">
+          <QRCodeSVG value={qrData} size={64} level="M" />
         </div>
       </div>
 
-      <div className="bg-gray-50 px-5 py-2.5 text-center border-t border-gray-200">
-        <p className="text-[9px] uppercase tracking-widest text-gray-400">
-          {SCHOOL_NAME} • Valid Until: {VALID_UNTIL_YEAR}
+      <div className="bg-gray-50 px-3 py-1.5 text-center border-t border-gray-200">
+        <p className="text-[8px] uppercase tracking-widest text-gray-400">
+          {SCHOOL_NAME} • Valid: {VALID_UNTIL_YEAR}
         </p>
-        <p className="text-[9px] text-gray-300 mt-0.5">Issued: {new Date().toLocaleDateString()}</p>
       </div>
     </div>
   )
@@ -193,42 +191,42 @@ function ParentIdCard({ card }: { card: CardData }) {
   const qrData = qrDataFromCard(card)
 
   return (
-    <div className="id-card relative w-[340px] bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
-      <div className="bg-gradient-to-r from-purple-600 to-purple-800 px-5 py-4 text-white text-center">
-        <div className="flex items-center justify-center gap-2 mb-1">
-          <SchoolLogo />
-          <p className="text-sm font-bold tracking-wide">{SCHOOL_NAME}</p>
+    <div id={`card-${card.role}-${card.id}`} className="id-card relative w-[300px] bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+      <div className="bg-gradient-to-r from-purple-600 to-purple-800 px-3 py-3 text-white text-center">
+        <div className="flex items-center justify-center gap-1.5 mb-0.5">
+          <SchoolLogo size="sm" />
+          <p className="text-[11px] font-bold tracking-wide">{SCHOOL_NAME}</p>
         </div>
-        <p className="text-[10px] uppercase tracking-widest opacity-80">Parent Identification Card</p>
+        <p className="text-[9px] uppercase tracking-widest opacity-80">Parent ID Card</p>
       </div>
 
-      <div className="flex justify-center pt-6 -mt-2">
+      <div className="flex justify-center pt-4 -mt-2">
         {imgUrl ? (
           <img
             src={imgUrl}
             alt={card.name}
-            className="w-24 h-24 rounded-full border-4 border-white shadow-md object-cover bg-gray-100"
+            className="w-16 h-16 rounded-full border-3 border-white shadow-sm object-cover bg-gray-100"
           />
         ) : (
-          <div className="w-24 h-24 rounded-full border-4 border-white shadow-md bg-purple-100 flex items-center justify-center text-purple-600 text-3xl font-bold">
+          <div className="w-16 h-16 rounded-full border-3 border-white shadow-sm bg-purple-100 flex items-center justify-center text-purple-600 text-xl font-bold">
             {card.name[0]?.toUpperCase()}
           </div>
         )}
       </div>
 
-      <div className="px-5 py-4 text-center space-y-1.5">
-        <h3 className="text-base font-bold text-gray-900 break-words">{card.name}</h3>
+      <div className="px-3 py-2 text-center space-y-1">
+        <h3 className="text-sm font-bold text-gray-900 break-words">{card.name}</h3>
         {card.code && (
-          <p className="text-xs font-mono text-gray-500">Parent ID: {card.code}</p>
+          <p className="text-[10px] font-mono text-gray-500">Parent ID: {card.code}</p>
         )}
         {card.phone && (
-          <p className="text-xs text-gray-500">{card.phone}</p>
+          <p className="text-[10px] text-gray-500">{card.phone}</p>
         )}
         {card.children && card.children.length > 0 && (
-          <div className="mt-2 pt-2 border-t border-gray-100">
-            <p className="text-[10px] uppercase tracking-wider text-gray-400 mb-1">Associated Student(s)</p>
+          <div className="mt-1 pt-1.5 border-t border-gray-100">
+            <p className="text-[9px] uppercase tracking-wider text-gray-400 mb-1">Student(s)</p>
             {card.children.map((child) => (
-              <p key={child.id} className="text-xs text-gray-600">
+              <p key={child.id} className="text-[10px] text-gray-600">
                 {child.name} {child.grade ? `• ${child.grade}${child.section ? ` (${child.section})` : ''}` : ''}
               </p>
             ))}
@@ -236,17 +234,16 @@ function ParentIdCard({ card }: { card: CardData }) {
         )}
       </div>
 
-      <div className="flex justify-center pb-4">
-        <div className="bg-white p-1.5 rounded-lg border border-gray-200">
-          <QRCodeSVG value={qrData} size={80} level="M" />
+      <div className="flex justify-center pb-3">
+        <div className="bg-white p-1 rounded-lg border border-gray-200">
+          <QRCodeSVG value={qrData} size={64} level="M" />
         </div>
       </div>
 
-      <div className="bg-gray-50 px-5 py-2.5 text-center border-t border-gray-200">
-        <p className="text-[9px] uppercase tracking-widest text-gray-400">
-          {SCHOOL_NAME} • Valid Until: {VALID_UNTIL_YEAR}
+      <div className="bg-gray-50 px-3 py-1.5 text-center border-t border-gray-200">
+        <p className="text-[8px] uppercase tracking-widest text-gray-400">
+          {SCHOOL_NAME} • Valid: {VALID_UNTIL_YEAR}
         </p>
-        <p className="text-[9px] text-gray-300 mt-0.5">Issued: {new Date().toLocaleDateString()}</p>
       </div>
     </div>
   )
@@ -257,53 +254,52 @@ function AdminIdCard({ card }: { card: CardData }) {
   const qrData = qrDataFromCard(card)
 
   return (
-    <div className="id-card relative w-[340px] bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
-      <div className="bg-gradient-to-r from-amber-600 to-amber-800 px-5 py-4 text-white text-center">
-        <div className="flex items-center justify-center gap-2 mb-1">
-          <SchoolLogo />
-          <p className="text-sm font-bold tracking-wide">{SCHOOL_NAME}</p>
+    <div id={`card-${card.role}-${card.id}`} className="id-card relative w-[300px] bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+      <div className="bg-gradient-to-r from-amber-600 to-amber-800 px-3 py-3 text-white text-center">
+        <div className="flex items-center justify-center gap-1.5 mb-0.5">
+          <SchoolLogo size="sm" />
+          <p className="text-[11px] font-bold tracking-wide">{SCHOOL_NAME}</p>
         </div>
-        <p className="text-[10px] uppercase tracking-widest opacity-80">Administrator Identification Card</p>
+        <p className="text-[9px] uppercase tracking-widest opacity-80">Admin ID Card</p>
       </div>
 
-      <div className="flex justify-center pt-6 -mt-2">
+      <div className="flex justify-center pt-4 -mt-2">
         {imgUrl ? (
           <img
             src={imgUrl}
             alt={card.name}
-            className="w-24 h-24 rounded-full border-4 border-white shadow-md object-cover bg-gray-100"
+            className="w-16 h-16 rounded-full border-3 border-white shadow-sm object-cover bg-gray-100"
           />
         ) : (
-          <div className="w-24 h-24 rounded-full border-4 border-white shadow-md bg-amber-100 flex items-center justify-center text-amber-600 text-3xl font-bold">
+          <div className="w-16 h-16 rounded-full border-3 border-white shadow-sm bg-amber-100 flex items-center justify-center text-amber-600 text-xl font-bold">
             {card.name[0]?.toUpperCase()}
           </div>
         )}
       </div>
 
-      <div className="px-5 py-4 text-center space-y-1.5">
-        <h3 className="text-base font-bold text-gray-900 break-words">{card.name}</h3>
+      <div className="px-3 py-2 text-center space-y-1">
+        <h3 className="text-sm font-bold text-gray-900 break-words">{card.name}</h3>
         {card.code && (
-          <p className="text-xs font-mono text-gray-500">Admin ID: {card.code}</p>
+          <p className="text-[10px] font-mono text-gray-500">Admin ID: {card.code}</p>
         )}
         {card.position && (
-          <p className="text-xs text-gray-500">{card.position}</p>
+          <p className="text-[10px] text-gray-500">{card.position}</p>
         )}
         {card.phone && (
-          <p className="text-xs text-gray-400">{card.phone}</p>
+          <p className="text-[10px] text-gray-400">{card.phone}</p>
         )}
       </div>
 
-      <div className="flex justify-center pb-4">
-        <div className="bg-white p-1.5 rounded-lg border border-gray-200">
-          <QRCodeSVG value={qrData} size={80} level="M" />
+      <div className="flex justify-center pb-3">
+        <div className="bg-white p-1 rounded-lg border border-gray-200">
+          <QRCodeSVG value={qrData} size={64} level="M" />
         </div>
       </div>
 
-      <div className="bg-gray-50 px-5 py-2.5 text-center border-t border-gray-200">
-        <p className="text-[9px] uppercase tracking-widest text-gray-400">
-          {SCHOOL_NAME} • Valid Until: {VALID_UNTIL_YEAR}
+      <div className="bg-gray-50 px-3 py-1.5 text-center border-t border-gray-200">
+        <p className="text-[8px] uppercase tracking-widest text-gray-400">
+          {SCHOOL_NAME} • Valid: {VALID_UNTIL_YEAR}
         </p>
-        <p className="text-[9px] text-gray-300 mt-0.5">Issued: {new Date().toLocaleDateString()}</p>
       </div>
     </div>
   )
@@ -397,6 +393,8 @@ export default function IdCardPage() {
 
   // Role selection state
   const [selectedRole, setSelectedRole] = useState<IdCardRole | ''>('')
+  const [batchMode, setBatchMode] = useState<'single' | 'batch'>('single')
+  const [selectedUsers, setSelectedUsers] = useState<CardData[]>([])
 
   type UsersState = {
     users: CardData[]
@@ -500,11 +498,11 @@ export default function IdCardPage() {
     return cardEl ? cardEl.outerHTML : ''
   }
 
-  const getPrintStyles = (): string => `
+  const getPrintStyles = (isBatch: boolean = false): string => `
     <style>
       @page {
-        margin: 5mm;
-        size: 100mm 150mm portrait;
+        margin: ${isBatch ? '5mm' : '0'};
+        size: ${isBatch ? 'A4 landscape' : '120mm 180mm'};
       }
       @media print {
         html, body {
@@ -512,36 +510,52 @@ export default function IdCardPage() {
           padding: 0;
           display: flex;
           justify-content: center;
-          align-items: center;
+          align-items: flex-start;
           background: white;
+          width: 100%;
+          height: auto;
+          overflow: visible;
+          padding-left: 15mm;
         }
         body {
-          -webkit-print-color-adjust: exact;
-          print-color-adjust: exact;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
         }
         .id-card {
-          margin: 0 auto;
+          margin: ${isBatch ? '4px' : '10px auto'};
           overflow: visible !important;
           page-break-inside: avoid;
+          box-shadow: none !important;
+          flex-shrink: 0;
         }
+        ${isBatch ? `
+        .batch-container {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 12px;
+          padding: 10mm;
+          width: 100%;
+          justify-items: center;
+        }
+        ` : ''}
       }
       * {
         box-sizing: border-box;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
       }
       body {
         margin: 0;
         padding: 0;
         font-family: system-ui, -apple-system, sans-serif;
         background: white;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
       }
       .id-card {
-        width: 340px;
+        width: 300px;
         background: white;
-        border-radius: 16px;
+        border-radius: 12px;
         border: 2px solid #e5e7eb;
-        overflow: visible !important;
+        overflow: hidden;
       }
       .id-card * {
         box-sizing: border-box;
@@ -555,68 +569,168 @@ export default function IdCardPage() {
   `
 
   const handlePrint = () => {
-    const cardHtml = getCardHtml()
-    if (!cardHtml) return
+    const styleTags = Array.from(document.head.querySelectorAll('link[rel="stylesheet"], link[rel="preconnect"], style'))
+      .map(el => el.outerHTML)
+      .join('\n')
 
-    const printWindow = window.open('', '_blank')
-    if (!printWindow) {
-      window.print()
-      return
+    if (batchMode === 'batch') {
+      if (selectedUsers.length === 0) return
+      const cardsToPrint = selectedUsers.slice(0, 4) // Limit to 4 cards per page
+      const printWindow = window.open('', '_blank')
+      if (!printWindow) {
+        window.print()
+        return
+      }
+
+      const cardsHtml = cardsToPrint.map(card => {
+        const cardEl = document.getElementById(`card-${card.role}-${card.id}`)
+        return cardEl ? cardEl.outerHTML : ''
+      }).join('')
+
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=210mm">
+            <title>ID Cards - Batch</title>
+            ${styleTags}
+            ${getPrintStyles(true)}
+          </head>
+          <body>
+            <div class="batch-container">
+              ${cardsHtml}
+            </div>
+          </body>
+        </html>
+      `)
+      printWindow.document.close()
+      printWindow.focus()
+      setTimeout(() => {
+        printWindow.print()
+        printWindow.close()
+      }, 500)
+    } else {
+      const cardHtml = getCardHtml()
+      if (!cardHtml) return
+
+      const printWindow = window.open('', '_blank')
+      if (!printWindow) {
+        window.print()
+        return
+      }
+
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=210mm">
+            <title>ID Card - ${selectedUser?.name ?? ''}</title>
+            ${styleTags}
+            ${getPrintStyles(false)}
+          </head>
+          <body>
+            <div style="display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;">
+              ${cardHtml}
+            </div>
+          </body>
+        </html>
+      `)
+      printWindow.document.close()
+      printWindow.focus()
+      setTimeout(() => {
+        printWindow.print()
+        printWindow.close()
+      }, 500)
     }
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=210mm">
-          <title>ID Card - ${selectedUser?.name ?? ''}</title>
-          ${getPrintStyles()}
-        </head>
-        <body>
-          <div style="display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;">
-            ${cardHtml}
-          </div>
-        </body>
-      </html>
-    `)
-    printWindow.document.close()
-    printWindow.focus()
-    setTimeout(() => {
-      printWindow.print()
-      printWindow.close()
-    }, 500)
   }
 
   const handlePdf = () => {
-    const cardHtml = getCardHtml()
-    if (!cardHtml) return
+    const styleTags = Array.from(document.head.querySelectorAll('link[rel="stylesheet"], link[rel="preconnect"], style'))
+      .map(el => el.outerHTML)
+      .join('\n')
 
-    const printWindow = window.open('', '_blank')
-    if (!printWindow) return
+    if (batchMode === 'batch') {
+      if (selectedUsers.length === 0) return
+      const cardsToPrint = selectedUsers.slice(0, 4) // Limit to 4 cards per page
+      const printWindow = window.open('', '_blank')
+      if (!printWindow) return
 
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=210mm">
-          <title>ID Card - ${selectedUser?.name ?? ''}</title>
-          ${getPrintStyles()}
-        </head>
-        <body>
-          <div style="display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;">
-            ${cardHtml}
-          </div>
-        </body>
-      </html>
-    `)
-    printWindow.document.close()
-    printWindow.focus()
-    setTimeout(() => {
-      printWindow.print()
-      printWindow.close()
-    }, 500)
+      const cardsHtml = cardsToPrint.map(card => {
+        const cardEl = document.getElementById(`card-${card.role}-${card.id}`)
+        return cardEl ? cardEl.outerHTML : ''
+      }).join('')
+
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=210mm">
+            <title>ID Cards - Batch</title>
+            ${styleTags}
+            ${getPrintStyles(true)}
+          </head>
+          <body>
+            <div class="batch-container">
+              ${cardsHtml}
+            </div>
+          </body>
+        </html>
+      `)
+      printWindow.document.close()
+      printWindow.focus()
+      setTimeout(() => {
+        printWindow.print()
+        printWindow.close()
+      }, 500)
+    } else {
+      const cardHtml = getCardHtml()
+      if (!cardHtml) return
+
+      const printWindow = window.open('', '_blank')
+      if (!printWindow) return
+
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=210mm">
+            <title>ID Card - ${selectedUser?.name ?? ''}</title>
+            ${styleTags}
+            ${getPrintStyles(false)}
+          </head>
+          <body>
+            <div style="display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;">
+              ${cardHtml}
+            </div>
+          </body>
+        </html>
+      `)
+      printWindow.document.close()
+      printWindow.focus()
+      setTimeout(() => {
+        printWindow.print()
+        printWindow.close()
+      }, 500)
+    }
+  }
+
+  const toggleUserSelection = (user: CardData) => {
+    if (batchMode === 'batch') {
+      setSelectedUsers(prev => {
+        const exists = prev.find(u => u.id === user.id && u.role === user.role)
+        if (exists) {
+          return prev.filter(u => !(u.id === user.id && u.role === user.role))
+        }
+        if (prev.length >= 4) {
+          return prev // Limit to 4 cards
+        }
+        return [...prev, user]
+      })
+    }
   }
 
   // ─── Render ──────────────────────────────────────────────────────────
@@ -632,10 +746,10 @@ export default function IdCardPage() {
         subtitle="Generate identification cards for existing users"
         action={
           <div className="flex gap-2">
-            <Button variant="secondary" size="sm" onClick={handlePrint} disabled={!selectedUser}>
+            <Button variant="secondary" size="sm" onClick={handlePrint} disabled={batchMode === 'single' ? !selectedUser : selectedUsers.length === 0}>
               <Printer className="w-4 h-4 mr-1" /> Print
             </Button>
-            <Button variant="secondary" size="sm" onClick={handlePdf} disabled={!selectedUser}>
+            <Button variant="secondary" size="sm" onClick={handlePdf} disabled={batchMode === 'single' ? !selectedUser : selectedUsers.length === 0}>
               <Download className="w-4 h-4 mr-1" /> PDF
             </Button>
           </div>
@@ -644,7 +758,7 @@ export default function IdCardPage() {
 
       {/* Role Selector + Search */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {/* Role Selector */}
           <div className="space-y-1.5">
             <label className="text-xs font-medium uppercase tracking-wider text-gray-500">
@@ -656,6 +770,7 @@ export default function IdCardPage() {
               onChange={(e) => {
                 const newRole = e.target.value as IdCardRole | ''
                 setSelectedRole(newRole)
+                setSelectedUsers([])
                 if (!newRole) {
                   dispatch({ type: 'RESET' })
                 } else {
@@ -671,10 +786,47 @@ export default function IdCardPage() {
             </select>
           </div>
 
+          {/* Batch Mode Toggle */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium uppercase tracking-wider text-gray-500">
+              Generation Mode
+            </label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setBatchMode('single')
+                  setSelectedUsers([])
+                }}
+                className={`flex-1 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  batchMode === 'single'
+                    ? 'bg-accent text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Single
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setBatchMode('batch')
+                  dispatch({ type: 'SELECT_USER', user: null })
+                }}
+                className={`flex-1 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  batchMode === 'batch'
+                    ? 'bg-accent text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Batch (4)
+              </button>
+            </div>
+          </div>
+
           {/* Search */}
           <div className="space-y-1.5">
             <label className="text-xs font-medium uppercase tracking-wider text-gray-500">
-              Select User
+              {batchMode === 'batch' ? 'Select Users (max 4)' : 'Select User'}
             </label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -711,41 +863,74 @@ export default function IdCardPage() {
 
         {!loadingUsers && filteredUsers.length > 0 && (
           <div className="max-h-48 overflow-y-auto space-y-1 border border-gray-200 rounded-lg p-1">
-            {filteredUsers.map((u) => (
-              <button
-                key={`${u.role}-${u.id}`}
-                onClick={() => {
-                  dispatch({ type: 'SELECT_USER', user: u })
-                  dispatch({ type: 'SET_SEARCH', query: u.name })
-                }}
-                className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center gap-3 ${
-                  selectedUser?.id === u.id && selectedUser?.role === u.role
-                    ? 'bg-accent/10 text-accent border border-accent/30'
-                    : 'hover:bg-gray-50 text-gray-700 border border-transparent'
-                }`}
-              >
-                <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-600 flex-shrink-0 overflow-hidden">
-                  {u.avatar_url ? (
-                    <img src={profileUrl(u.avatar_url)!} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    u.name[0]?.toUpperCase()
+            {filteredUsers.map((u) => {
+              const isSelected = batchMode === 'batch'
+                ? selectedUsers.some(su => su.id === u.id && su.role === u.role)
+                : selectedUser?.id === u.id && selectedUser?.role === u.role
+              return (
+                <button
+                  key={`${u.role}-${u.id}`}
+                  onClick={() => {
+                    if (batchMode === 'batch') {
+                      toggleUserSelection(u)
+                    } else {
+                      dispatch({ type: 'SELECT_USER', user: u })
+                      dispatch({ type: 'SET_SEARCH', query: u.name })
+                    }
+                  }}
+                  className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center gap-3 ${
+                    isSelected
+                      ? 'bg-accent/10 text-accent border border-accent/30'
+                      : 'hover:bg-gray-50 text-gray-700 border border-transparent'
+                  }`}
+                >
+                  {batchMode === 'batch' && (
+                    <div className="w-5 h-5 rounded border border-gray-300 flex items-center justify-center flex-shrink-0">
+                      {isSelected && (
+                        <div className="w-3 h-3 rounded-sm bg-accent" />
+                      )}
+                    </div>
                   )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate">{u.name}</div>
-                  <div className="text-xs text-gray-400 truncate">
-                    {u.code && <span className="font-mono">{u.code} • </span>}
-                    {u.email}
+                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-600 flex-shrink-0 overflow-hidden">
+                    {u.avatar_url ? (
+                      <img src={profileUrl(u.avatar_url)!} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      u.name[0]?.toUpperCase()
+                    )}
                   </div>
-                </div>
-              </button>
-            ))}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate">{u.name}</div>
+                    <div className="text-xs text-gray-400 truncate">
+                      {u.code && <span className="font-mono">{u.code} • </span>}
+                      {u.email}
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
           </div>
         )}
       </div>
 
       {/* ID Card Preview */}
-      {selectedUser ? (
+      {batchMode === 'batch' ? (
+        selectedUsers.length > 0 ? (
+          <div ref={printRef} className="grid grid-cols-1 sm:grid-cols-2 gap-6 justify-items-center py-4">
+            {selectedUsers.map((user) => (
+              <IdCardRenderer key={`${user.role}-${user.id}`} card={user} />
+            ))}
+          </div>
+        ) : (
+          <div className="flex justify-center py-12">
+            <div className="text-center text-gray-400">
+              <div className="w-24 h-24 rounded-full bg-gray-100 mx-auto mb-4 flex items-center justify-center">
+                <Search className="w-8 h-8 text-gray-300" />
+              </div>
+              <p className="text-sm">Select up to 4 users to generate ID cards in batch mode</p>
+            </div>
+          </div>
+        )
+      ) : selectedUser ? (
         <div ref={printRef} className="flex justify-center py-4">
           <IdCardRenderer card={selectedUser} />
         </div>

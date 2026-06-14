@@ -177,7 +177,7 @@ export function LoginIllustrationBanner({ className }: { className?: string }) {
   return (
     <aside
       className={cn(
-        'hidden md:flex md:w-1/2 lg:w-3/5 flex-col justify-between p-8 lg:p-12 text-white relative z-10 overflow-hidden',
+        'hidden md:flex flex-col justify-between p-8 lg:p-12 text-white relative z-10 overflow-hidden',
         'border-l border-white/10',
         className,
       )}

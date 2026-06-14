@@ -1,13 +1,13 @@
 import api from './axiosClient'
 import type { APIResponse } from '../types/api'
-import type { AttendancePercentage, Grade, ReportCard, Student } from '../types/academic'
+import type { Grade, ReportCard, Student } from '../types/academic'
 import type { Transaction } from '../types/finance'
 
 export const getMyChildren = () =>
   api.get<APIResponse<Student[]>>('/api/parent/children')
 
 export const getChildAttendance = (studentID: number) =>
-  api.get<APIResponse<AttendancePercentage[]>>(`/api/parent/attendance/${studentID}`)
+  api.get<APIResponse<any>>(`/api/parent/attendance/${studentID}`)
 
 export const getChildGrades = (studentID: number, semester?: string) => {
   let url = `/api/parent/grades/${studentID}`
@@ -25,6 +25,7 @@ export const submitParentReceipt = (data: {
   amount: number
   receipt_id: string
   description?: string
+  semester?: string
 }) => api.post<APIResponse<Transaction>>('/api/parent/finance/receipt', data)
 
 export const getParentTransactions = () =>

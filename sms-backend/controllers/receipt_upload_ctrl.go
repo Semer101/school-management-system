@@ -213,6 +213,13 @@ func UploadPaymentReceipt(c *gin.Context) {
 		return
 	}
 
+	// Scan file for viruses using ClamAV
+	if !helpers.ScanFileSimple(fullPath) {
+		os.Remove(fullPath)
+		helpers.Error(c, http.StatusBadRequest, "receipt image contains a virus or malicious content and was rejected")
+		return
+	}
+
 	// Relative URL served by the public /uploads static mount in main.go.
 	// We strip the leading "./" or absolute path so the URL is consistent.
 	relURL := "/uploads/receipts/" + safeFilename

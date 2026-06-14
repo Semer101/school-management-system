@@ -470,6 +470,7 @@ func seedProductionData(studentCount int) {
 		var cnt int64
 		config.DB.Model(&models.Notification{}).Where("title = ?", nd.Title).Count(&cnt)
 		if cnt == 0 {
+			// Notifications for Students & Parents
 			notif := models.Notification{
 				Title: nd.Title, Body: nd.Body, TargetRoles: "Student,Parent",
 				SenderID: admins[0].ID,
@@ -480,6 +481,20 @@ func seedProductionData(studentCount int) {
 					NotificationID: notif.ID, UserID: st.UserID, IsRead: i%2 == 0,
 				})
 			}
+			// Also create teacher-targeted versions of relevant notifications
+			if i == 0 || i == 3 || i == 4 || i == 6 || i == 7 {
+				teacherNotif := models.Notification{
+					Title: nd.Title, Body: nd.Body + " (Teacher info)",
+					TargetRoles: "Teacher",
+					SenderID: admins[0].ID,
+				}
+				config.DB.Create(&teacherNotif)
+				for _, t := range teachers {
+					allReceipts = append(allReceipts, models.NotificationReceipt{
+						NotificationID: teacherNotif.ID, UserID: t.UserID, IsRead: i%2 == 0,
+					})
+				}
+			}
 		}
 	}
 	if len(allReceipts) > 0 {
@@ -487,47 +502,48 @@ func seedProductionData(studentCount int) {
 		config.DB.CreateInBatches(&allReceipts, 200)
 	}
 
-	// ── 11. Finance (Transactions) ────────────────────────
-	var allTransactions []models.Transaction
-	for i, student := range students {
-		// Semester 1 payment (everyone gets one)
-		rid1 := fmt.Sprintf("ETH-CBE-%06d", 300000+i)
-		txStatus1 := "Pending"
-		if i%3 == 0 {
-			txStatus1 = "Verified"
-		}
-		allTransactions = append(allTransactions, models.Transaction{
-			StudentID: student.ID, Amount: 8500, ReceiptID: rid1, Type: "Tuition",
-			Status: txStatus1, Description: "Semester 1 Tuition",
-			CreatedBy: student.UserID, AcademicYear: academicYear, Semester: "Semester 1",
-		})
+// ── 11. Finance (Transactions) ────────────────────────
+  var allTransactions []models.Transaction
+  descriptions := []string{"Semester 1 Tuition", "Semester 2 Tuition", "Semester 3 Tuition", "Exam Fee", "Activity Fee", "Development Fee"}
+  for i, student := range students {
+    // Semester 1 payment (everyone gets one)
+    rid1 := fmt.Sprintf("ETH-CBE-%06d", 300000+i)
+    txStatus1 := "Pending"
+    if i%3 == 0 {
+      txStatus1 = "Verified"
+    }
+    allTransactions = append(allTransactions, models.Transaction{
+      StudentID: student.ID, Amount: 8500, ReceiptID: rid1, Type: "Tuition",
+      Status: txStatus1, Description: descriptions[i%len(descriptions)],
+      CreatedBy: student.UserID, AcademicYear: academicYear, Semester: "Semester 1",
+    })
 
-		// Semester 2 payment (subset to demonstrate overdue states)
-		if i%2 == 0 {
-			rid2 := fmt.Sprintf("ETH-CBE-%06d", 400000+i)
-			txStatus2 := "Pending"
-			if i%4 == 0 {
-				txStatus2 = "Verified"
-			}
-			allTransactions = append(allTransactions, models.Transaction{
-				StudentID: student.ID, Amount: 8500, ReceiptID: rid2, Type: "Tuition",
-				Status: txStatus2, Description: "Semester 2 Tuition",
-				CreatedBy: student.UserID, AcademicYear: academicYear, Semester: "Semester 2",
-			})
-		}
+    // Semester 2 payment (subset to demonstrate overdue states)
+    if i%2 == 0 {
+      rid2 := fmt.Sprintf("ETH-CBE-%06d", 400000+i)
+      txStatus2 := "Pending"
+      if i%4 == 0 {
+        txStatus2 = "Verified"
+      }
+      allTransactions = append(allTransactions, models.Transaction{
+        StudentID: student.ID, Amount: 8500, ReceiptID: rid2, Type: "Tuition",
+        Status: txStatus2, Description: descriptions[(i+1)%len(descriptions)],
+        CreatedBy: student.UserID, AcademicYear: academicYear, Semester: "Semester 2",
+      })
+    }
 
-		// Semester 3 payment (everyone gets one)
-		rid3 := fmt.Sprintf("ETH-CBE-%06d", 500000+i)
-		txStatus3 := "Pending"
-		if i%3 == 1 {
-			txStatus3 = "Verified"
-		}
-		allTransactions = append(allTransactions, models.Transaction{
-			StudentID: student.ID, Amount: 8500, ReceiptID: rid3, Type: "Tuition",
-			Status: txStatus3, Description: "Semester 3 Tuition",
-			CreatedBy: student.UserID, AcademicYear: academicYear, Semester: "Semester 3",
-		})
-	}
+    // Semester 3 payment (everyone gets one)
+    rid3 := fmt.Sprintf("ETH-CBE-%06d", 500000+i)
+    txStatus3 := "Pending"
+    if i%3 == 1 {
+      txStatus3 = "Verified"
+    }
+    allTransactions = append(allTransactions, models.Transaction{
+      StudentID: student.ID, Amount: 8500, ReceiptID: rid3, Type: "Tuition",
+      Status: txStatus3, Description: descriptions[(i+2)%len(descriptions)],
+      CreatedBy: student.UserID, AcademicYear: academicYear, Semester: "Semester 3",
+    })
+  }
 	if len(allTransactions) > 0 {
 		log.Printf("Inserting %d transactions in bulk...", len(allTransactions))
 		config.DB.CreateInBatches(&allTransactions, 100)

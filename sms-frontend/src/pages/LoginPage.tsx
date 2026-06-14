@@ -29,8 +29,11 @@ export default function LoginPage() {
       {/* Grid background on the entire screen under elements */}
       <div className="absolute inset-0 app-grid-bg pointer-events-none opacity-40 z-0" />
 
-      {/* Left side: Login Form */}
-      <div className="flex-1 flex items-center justify-center p-6 sm:p-12 relative z-10 order-2 md:order-1">
+      {/* Left side: Illustration Banner */}
+      <LoginIllustrationBanner className="w-1/2 order-1 md:order-1" />
+
+      {/* Right side: Login Form */}
+      <div className="w-1/2 flex items-center justify-center p-6 sm:p-12 relative z-10 order-2 md:order-2">
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
@@ -57,7 +60,7 @@ export default function LoginPage() {
             </p>
           </div>
 
-          <GlassCard className="p-8 shadow-glass border border-surface-border bg-surface/50 backdrop-blur-md">
+          <GlassCard className="p-8 border border-surface-border bg-surface/50 backdrop-blur-md shadow-none">
             <form onSubmit={handleSubmit} className="flex flex-col gap-5">
               <Input
                 label="Email Address"
@@ -98,7 +101,7 @@ export default function LoginPage() {
               <Button
                 type="submit"
                 loading={loading}
-                className="w-full py-2.5 rounded-xl bg-accent text-white hover:bg-accent-hover active:scale-[0.98] transition-all duration-200 mt-2 text-sm font-semibold"
+                className="w-full py-2.5 rounded-xl bg-accent text-white hover:bg-accent-hover active:scale-[0.98] transition-all duration-200 mt-2 text-sm font-semibold shadow-none"
               >
                 Sign in
               </Button>
@@ -110,9 +113,6 @@ export default function LoginPage() {
           </p>
         </motion.div>
       </div>
-
-      {/* Right side: Illustration Banner */}
-      <LoginIllustrationBanner className="order-1 md:order-2" />
     </div>
   )
 }

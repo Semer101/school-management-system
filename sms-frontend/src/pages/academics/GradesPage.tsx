@@ -1,8 +1,14 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { X, Filter } from 'lucide-react'
 import { useRole } from '../../hooks/useRole'
-import { bulkGradeEntry, getSubjectGrades, getStudentGrades } from '../../api/academics'
-import { getStudents, getSubjects } from '../../api/admin'
+import {
+  bulkGradeEntry,
+  getSubjectGrades,
+  getStudentGrades,
+  getTeacherClasses,
+  getTeacherSubjects,
+  getTeacherStudents,
+} from '../../api/academics'
 import type { Grade, Student, Subject } from '../../types/academic'
 import { listFromApi } from '../../types/api'
 import { gradeTypeLabel } from '../../lib/grades'
@@ -25,6 +31,11 @@ function TeacherView() {
   const [grades, setGrades] = useState<Grade[]>([])
   const [loadingGrades, setLoadingGrades] = useState(false)
 
+  // Filters for viewing
+  const [filterSemester, setFilterSemester] = useState('')
+  const [filterType, setFilterType] = useState('')
+  const [filterStudentName, setFilterStudentName] = useState('')
+
   // Bulk entry row
   const emptyEntry = { student_id: 0, subject_id: 0, score: 0, grade_type: 'Exam', semester: 'Semester 1', remarks: '' }
   const [entries, setEntries] = useState([{ ...emptyEntry }])
@@ -32,13 +43,17 @@ function TeacherView() {
   const [message, setMessage] = useState('')
 
   useEffect(() => {
-    Promise.all([getStudents({ page_size: 50 }), getSubjects({ page_size: 50 })]).then(([s, sub]) => {
-      setStudents(listFromApi(s.data)); setSubjects(listFromApi(sub.data))
+    Promise.all([getTeacherStudents(), getTeacherSubjects(), getTeacherClasses()]).then(([s, sub, _cls]) => {
+      setStudents(listFromApi(s.data))
+      setSubjects(listFromApi(sub.data))
     })
   }, [])
 
   const loadGrades = async (id: number) => {
     setSubjectId(id); setLoadingGrades(true)
+    setFilterSemester('')
+    setFilterType('')
+    setFilterStudentName('')
     const res = await getSubjectGrades(id)
     setGrades(res.data.data ?? [])
     setLoadingGrades(false)
@@ -58,6 +73,14 @@ function TeacherView() {
     }
   }
 
+  const filteredGrades = grades.filter((g) => {
+    const matchesSemester = !filterSemester || g.semester === filterSemester
+    const matchesType = !filterType || g.grade_type === filterType
+    const matchesStudentName = !filterStudentName ||
+      (g.student?.user?.name ?? '').toLowerCase().includes(filterStudentName.toLowerCase())
+    return matchesSemester && matchesType && matchesStudentName
+  })
+
   const sel = "w-full px-2 py-1.5 rounded-lg text-xs bg-[var(--bg)] border border-[var(--border)] text-[var(--text-h)] outline-none focus:border-[var(--accent)]"
 
   return (
@@ -74,7 +97,11 @@ function TeacherView() {
                 <label className="text-xs text-[var(--text)]">Student</label>
                 <select value={entry.student_id} onChange={(e) => updateEntry(i, 'student_id', Number(e.target.value))} className={sel} required>
                   <option value={0} disabled>Student</option>
-                  {students.map((s) => <option key={s.id} value={s.id}>{s.user?.name ?? s.student_code}</option>)}
+                  {students.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.user?.name ?? s.student_code} {s.class?.name ? `(${s.class.name})` : ''}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
@@ -121,22 +148,71 @@ function TeacherView() {
 
       {/* View grades by subject */}
       <div className="bg-[var(--bg)] border border-[var(--border)] rounded-2xl p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <h2 className="text-base font-semibold text-[var(--text-h)]">View by Subject</h2>
-          <select value={subjectId} onChange={(e) => loadGrades(Number(e.target.value))}
-            className="px-3 py-1.5 rounded-lg text-sm bg-[var(--bg)] border border-[var(--border)] text-[var(--text-h)] outline-none">
-            <option value={0}>Select subject...</option>
-            {subjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+          <div className="flex items-center gap-3">
+            <h2 className="text-base font-semibold text-[var(--text-h)]">View by Subject</h2>
+            <select value={subjectId} onChange={(e) => loadGrades(Number(e.target.value))}
+              className="px-3 py-1.5 rounded-lg text-sm bg-[var(--bg)] border border-[var(--border)] text-[var(--text-h)] outline-none">
+              <option value={0}>Select subject...</option>
+              {subjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
+
+          {subjectId > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <Filter className="w-4 h-4 text-muted" />
+              <select
+                value={filterSemester}
+                onChange={(e) => setFilterSemester(e.target.value)}
+                className="px-3 py-1.5 rounded-lg text-sm bg-[var(--bg)] border border-[var(--border)] text-[var(--text-h)] outline-none focus:border-accent/50"
+              >
+                <option value="">All Semesters</option>
+                {SEMESTERS.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+
+              <select
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
+                className="px-3 py-1.5 rounded-lg text-sm bg-[var(--bg)] border border-[var(--border)] text-[var(--text-h)] outline-none focus:border-accent/50"
+              >
+                <option value="">All Types</option>
+                {['Exam', 'Quiz', 'Assignment', 'Midterm', 'Final'].map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+
+              <input
+                type="text"
+                placeholder="Filter by student..."
+                value={filterStudentName}
+                onChange={(e) => setFilterStudentName(e.target.value)}
+                className="px-3 py-1.5 rounded-lg text-sm bg-[var(--bg)] border border-[var(--border)] text-[var(--text-h)] outline-none focus:border-accent/50 w-40"
+              />
+
+              {(filterSemester || filterType || filterStudentName) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilterSemester('')
+                    setFilterType('')
+                    setFilterStudentName('')
+                  }}
+                  className="text-xs text-accent hover:underline ml-1"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          )}
         </div>
+
         {loadingGrades ? <Spinner /> : (
-          <Table keyExtractor={(g) => g.id} data={grades}
+          <Table keyExtractor={(g) => g.id} data={filteredGrades}
             columns={[
               { key: 'student', header: 'Student', render: (g) => g.student?.user?.name ?? `#${g.student_id}` },
               { key: 'score', header: 'Score' },
               { key: 'grade_type', header: 'Type', render: (g) => gradeTypeLabel(g) },
               { key: 'semester', header: 'Semester' },
-              { key: 'remarks', header: 'Remarks' },
             ]}
           />
         )}

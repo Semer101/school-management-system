@@ -7,6 +7,7 @@ export const submitReceipt = (data: {
   amount: number
   receipt_id: string
   description?: string
+  semester?: string
 }) => api.post<APIResponse<Transaction>>('/api/finance/receipt', data)
 
 export const getMyTransactions = () =>

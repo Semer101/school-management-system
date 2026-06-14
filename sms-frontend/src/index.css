@@ -27,24 +27,24 @@
   }
 
   html.dark {
-    --bg: #0c0c12;
-    --code-bg: #12121c;
-    --border: rgba(148, 163, 184, 0.12);
-    --text: #94a3b8;
-    --text-h: #f1f5f9;
+    --bg: #000000;
+    --code-bg: #0a0a0a;
+    --border: rgba(255, 255, 255, 0.1);
+    --text: #e2e8f0;
+    --text-h: #ffffff;
     --accent: #22d3ee;
     --accent-bg: rgba(34, 211, 238, 0.15);
     --accent-border: rgba(34, 211, 238, 0.3);
-    --color-void: #050508;
-    --color-surface: #0c0c12;
-    --color-surface-elevated: #12121c;
-    --color-surface-border: rgba(148, 163, 184, 0.12);
-    --color-foreground: #f1f5f9;
-    --color-muted: #94a3b8;
+    --color-void: #000000;
+    --color-surface: #0a0a0a;
+    --color-surface-elevated: #111111;
+    --color-surface-border: rgba(255, 255, 255, 0.1);
+    --color-foreground: #ffffff;
+    --color-muted: #e2e8f0;
     --color-accent: #22d3ee;
     --color-accent-hover: #67e8f9;
     --color-accent-muted: rgba(34, 211, 238, 0.15);
-    --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.4);
+    --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.6);
     --shadow-glow-sm: 0 0 20px rgba(34, 211, 238, 0.15);
     --shadow-glow-md: 0 0 40px rgba(34, 211, 238, 0.2);
   }
@@ -63,7 +63,7 @@
   }
 
   html.dark body {
-    background-image: linear-gradient(180deg, #050508 0%, #0a0a10 50%, #050508 100%);
+    background-image: linear-gradient(180deg, #000000 0%, #0a0a0a 50%, #000000 100%);
   }
 
   #root {

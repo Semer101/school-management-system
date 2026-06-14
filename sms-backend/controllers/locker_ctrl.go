@@ -161,6 +161,13 @@ func UploadLockerFile(c *gin.Context) {
 		return
 	}
 
+	// Scan file for viruses using ClamAV
+	if !helpers.ScanFileSimple(filePath) {
+		os.Remove(filePath)
+		helpers.Error(c, http.StatusBadRequest, "file contains a virus or malicious content and was rejected")
+		return
+	}
+
 	lockerFile := models.LockerFile{
 		StudentID:  student.ID,
 		FileName:   displayName,

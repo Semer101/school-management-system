@@ -114,6 +114,9 @@ func SetupRoutes(r *gin.Engine) {
 			teacher.POST("/grades/bulk", controllers.BulkGradeEntry)
 			teacher.GET("/grades/subject/:subjectID", controllers.GetSubjectGrades)
 			teacher.GET("/dashboard/kpis", controllers.GetTeacherKPIs)
+			teacher.GET("/teacher/classes", controllers.GetTeacherClasses)
+			teacher.GET("/teacher/subjects", controllers.GetTeacherSubjects)
+			teacher.GET("/teacher/students", controllers.GetTeacherStudents)
 		}
 
 		// SHARED

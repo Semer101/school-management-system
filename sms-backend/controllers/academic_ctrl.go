@@ -2440,6 +2440,92 @@ func scoreToLetter(score float64) string {
 	}
 }
 
+// GetTeacherClasses godoc
+// @Summary      Get classes assigned to the teacher
+// @Tags         academics
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  helpers.APIResponse  "Class list"
+// @Failure      403  {object}  helpers.APIResponse  "Teacher profile not found"
+// @Router       /api/academics/teacher/classes [get]
+func GetTeacherClasses(c *gin.Context) {
+	teacherUserID := c.GetUint("userID")
+	var teacher models.Teacher
+	if err := config.DB.Where("user_id = ?", teacherUserID).First(&teacher).Error; err != nil {
+		helpers.Error(c, http.StatusForbidden, "teacher profile not found")
+		return
+	}
+	var classes []models.Class
+	config.DB.Where("teacher_id = ?", teacher.ID).Order("name").Find(&classes)
+	helpers.Success(c, http.StatusOK, "classes fetched", classes)
+}
+
+// GetTeacherSubjects godoc
+// @Summary      Get subjects assigned to the teacher
+// @Tags         academics
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200  {object}  helpers.APIResponse  "Subject list"
+// @Failure      403  {object}  helpers.APIResponse  "Teacher profile not found"
+// @Router       /api/academics/teacher/subjects [get]
+func GetTeacherSubjects(c *gin.Context) {
+	userID := c.GetUint("userID")
+	var teacher models.Teacher
+	if err := config.DB.Where("user_id = ?", userID).First(&teacher).Error; err != nil {
+		helpers.Error(c, http.StatusNotFound, "teacher profile not found")
+		return
+	}
+
+	var subjects []models.Subject
+	config.DB.Where("teacher_id = ?", teacher.ID).Order("name ASC").Find(&subjects)
+
+	type subjectResp struct {
+		ID       uint   `json:"id"`
+		Name     string `json:"name"`
+		Code     string `json:"code"`
+		Grade    int    `json:"grade_level"`
+		Stream   string `json:"stream"`
+	}
+
+	var out []subjectResp
+	for _, s := range subjects {
+		// Build a display name that clarifies grade level and stream
+		displayName := s.Name
+		if s.GradeLevel > 0 {
+			displayName = fmt.Sprintf("%s (Grade %d", s.Name, s.GradeLevel)
+			if s.Stream != "" {
+				displayName += ", " + s.Stream
+			}
+			displayName += ")"
+		}
+		out = append(out, subjectResp{
+			ID: s.ID, Name: displayName, Code: s.Code,
+			Grade: s.GradeLevel, Stream: s.Stream,
+		})
+	}
+	helpers.Success(c, http.StatusOK, "subjects fetched", out)
+}
+
+// GetTeacherStudents returns students enrolled in the teacher's classes
+func GetTeacherStudents(c *gin.Context) {
+	teacherUserID := c.GetUint("userID")
+	var teacher models.Teacher
+	if err := config.DB.Where("user_id = ?", teacherUserID).First(&teacher).Error; err != nil {
+		helpers.Error(c, http.StatusForbidden, "teacher profile not found")
+		return
+	}
+	classID := c.Query("class_id")
+	query := config.DB.Joins("JOIN classes ON students.class_id = classes.id").
+		Where("classes.teacher_id = ?", teacher.ID).
+		Preload("User").Preload("Class")
+	if classID != "" {
+		query = query.Where("students.class_id = ?", classID)
+	}
+	var students []models.Student
+	query.Order("students.id").Find(&students)
+	helpers.Success(c, http.StatusOK, "students fetched", students)
+}
+
 // GetTeacherKPIs returns quick stats for the teacher dashboard
 func GetTeacherKPIs(c *gin.Context) {
 	teacherUserID := c.GetUint("userID")

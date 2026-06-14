@@ -37,7 +37,6 @@ export default function AdminFinancePage() {
   const [loading, setLoading] = useState(true)
 
   // Filters for Transactions
-  const [txYear, setTxYear] = useState('')
   const [txSem, setTxSem] = useState('')
   const [txStatus, setTxStatus] = useState('')
   const [txStudent, setTxStudent] = useState('')
@@ -73,7 +72,6 @@ export default function AdminFinancePage() {
     setLoading(true)
     Promise.all([
       getAllTransactions({
-        academic_year: txYear || undefined,
         semester: txSem || undefined,
         status: txStatus || undefined,
         student: txStudent || undefined
@@ -102,34 +100,8 @@ export default function AdminFinancePage() {
   }
 
   useEffect(() => {
-    async function load() {
-      setLoading(true)
-      try {
-        const [t, te, p, o] = await Promise.all([
-          getAllTransactions({
-            academic_year: txYear || undefined,
-            semester: txSem || undefined,
-            status: txStatus || undefined,
-            student: txStudent || undefined
-          }),
-          getTeachers({ page_size: 50 }),
-          getPayrolls({
-            month: pyMonth || undefined,
-            year: pyYear || undefined,
-            department: pyDept || undefined
-          }),
-          getOverduePayments()
-        ])
-        setTransactions(listFromApi(t.data))
-        setTeachers(listFromApi(te.data))
-        setPayrolls(Array.isArray(p.data.data) ? p.data.data : [])
-        setOverdues(Array.isArray(o.data.data) ? o.data.data : [])
-      } finally {
-        setLoading(false)
-      }
-    }
-    load()
-  }, [txYear, txSem, txStatus, txStudent, pyMonth, pyYear, pyDept])
+    loadData()
+  }, [txSem, txStatus, txStudent, pyMonth, pyYear, pyDept])
 
   useEffect(() => { loadReceipts() }, [rxStatus, rxSearch])
 
@@ -207,7 +179,7 @@ export default function AdminFinancePage() {
   }
 
   const exportTransactionsCSV = () => {
-    const headers = ['Student', 'Student Code', 'Receipt ID', 'Amount', 'Type', 'Status', 'Academic Year', 'Semester', 'Date']
+    const headers = ['Student', 'Student Code', 'Receipt ID', 'Amount', 'Type', 'Status', 'Description', 'Semester', 'Date']
     const data = transactions.map(t => [
       t.student?.user?.name || '—',
       t.student?.student_code || '—',
@@ -215,7 +187,7 @@ export default function AdminFinancePage() {
       t.amount,
       t.type,
       t.status,
-      t.academic_year || '—',
+      t.description || '—',
       t.semester || '—',
       new Date(t.created_at).toLocaleDateString()
     ])
@@ -330,14 +302,6 @@ export default function AdminFinancePage() {
         <div className="space-y-4">
           <div className="flex flex-wrap gap-3 items-end bg-surface border border-surface-border p-4 rounded-xl">
             <label className="text-xs text-muted flex flex-col gap-1">
-              Academic Year
-              <select value={txYear} onChange={(e) => setTxYear(e.target.value)}
-                className="px-3 py-1.5 rounded-lg border border-surface-border bg-surface text-sm">
-                <option value="">All</option>
-                {[2024, 2025, 2026, 2027].map(y => <option key={y} value={String(y)}>{y}</option>)}
-              </select>
-            </label>
-            <label className="text-xs text-muted flex flex-col gap-1">
               Semester
               <select value={txSem} onChange={(e) => setTxSem(e.target.value)}
                 className="px-3 py-1.5 rounded-lg border border-surface-border bg-surface text-sm">
@@ -369,8 +333,12 @@ export default function AdminFinancePage() {
               { key: 'student', header: 'Student', render: (t) => t.student?.user?.name ?? `#${t.student_id}` },
               { key: 'receipt_id', header: 'Receipt ID' },
               { key: 'amount', header: 'Amount', render: (t) => `ETB ${t.amount.toLocaleString()}` },
-              { key: 'academic_year', header: 'Academic Year', render: (t) => t.academic_year || '—' },
-              { key: 'semester', header: 'Semester', render: (t) => t.semester || '—' },
+              { key: 'semester', header: 'Semester Description', render: (t) => {
+                  const parts = [t.semester]
+                  if (t.description) parts.push(t.description)
+                  return parts.join(' — ') || '—'
+                }
+              },
               { key: 'status', header: 'Status', render: (t) => <Badge label={t.status} variant={statusVariant(t.status)} /> },
               { key: 'created_at', header: 'Date', render: (t) => new Date(t.created_at).toLocaleDateString() },
               {
@@ -410,6 +378,7 @@ export default function AdminFinancePage() {
               { key: 'student', header: 'Student', render: (r) => r.student?.user?.name ?? `#${r.student_id}` },
               { key: 'receipt_id', header: 'Receipt ID' },
               { key: 'amount', header: 'Amount', render: (r) => `ETB ${r.amount.toLocaleString()}` },
+              { key: 'description', header: 'Description', render: (r) => r.description || '—' },
               {
                 key: 'receipt_image_url', header: 'Receipt Image',
                 render: (r) => r.receipt_image_url ? (
@@ -422,7 +391,6 @@ export default function AdminFinancePage() {
                   </button>
                 ) : <span className="text-muted text-xs">N/A</span>,
               },
-              { key: 'academic_year', header: 'Year', render: (r) => r.academic_year || '—' },
               { key: 'semester', header: 'Semester', render: (r) => r.semester || '—' },
               {
                 key: 'status', header: 'Status',
