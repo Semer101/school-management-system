@@ -27,10 +27,8 @@ func cookieSameSite() http.SameSite {
 }
 
 func SetAccessCookie(c *gin.Context, accessToken string) {
-	sameSite := cookieSameSite()
-	secure := cookieSecure()
-	c.SetSameSite(sameSite)
-	c.SetCookie(AccessCookieName, accessToken, accessMaxAge, "/", "", secure, true)
+	c.SetSameSite(cookieSameSite())
+	c.SetCookie(AccessCookieName, accessToken, accessMaxAge, "/", "", cookieSecure(), true)
 }
 
 func SetRefreshCookie(c *gin.Context, refreshToken string) {

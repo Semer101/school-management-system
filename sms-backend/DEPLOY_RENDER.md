@@ -24,7 +24,7 @@ Go to [render.com](https://render.com) and import this repository.
 | `JWT_SECRET` | *your-secret-key* |
 | `JWT_REFRESH_SECRET` | *your-refresh-secret* |
 | `FRONTEND_URL` | `https://your-frontend.vercel.app` |
-| `CORS_ORIGINS` | `https://your-frontend.vercel.app` |
+| `CORS_ORIGINS` | `https://your-frontend.vercel.app` (optional, auto-used if `FRONTEND_URL` is set) |
 | `CSP_CONNECT_SRC` | *(optional, auto-added if FRONTEND_URL set)* |
 | `PORT` | `8080` |
 
@@ -36,7 +36,6 @@ Push to GitHub. Render auto-deploys on push.
 
 ## CLI Alternative
 ```bash
-# Install Render CLI
-npm install -g wrangler
-# or use render.yaml with Infrastructure as Code
+# Push to GitHub, then connect to Render dashboard
+# Or use render.yaml for Infrastructure as Code
 ```
