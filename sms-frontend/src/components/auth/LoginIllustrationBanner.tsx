@@ -177,8 +177,8 @@ export function LoginIllustrationBanner({ className }: { className?: string }) {
   return (
     <aside
       className={cn(
-        'hidden md:flex flex-col justify-between p-8 lg:p-12 text-white relative z-10 overflow-hidden',
-        'border-l border-white/10',
+        'flex flex-col justify-between p-8 lg:p-12 text-white relative z-10 overflow-hidden',
+        'border-b md:border-b-0 md:border-r border-white/10',
         className,
       )}
       aria-label="Platform highlights"
@@ -229,9 +229,9 @@ export function LoginIllustrationBanner({ className }: { className?: string }) {
       </div>
 
       {/* Illustration scene */}
-      <div className="relative z-10 flex-1 flex items-center justify-center py-6 lg:py-10 min-h-[280px]">
+      <div className="relative z-10 flex-1 flex items-center justify-center py-6 lg:py-10 min-h-[200px] md:min-h-[280px]">
         {/* Floating UI elements */}
-        <FloatingCard className="top-[8%] left-[6%] lg:left-[10%] p-2.5" delay={0}>
+        <FloatingCard className="hidden md:block top-[8%] left-[6%] lg:left-[10%] p-2.5" delay={0}>
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center">
               <MessageCircle className="w-3.5 h-3.5 text-white" strokeWidth={2} />
@@ -243,14 +243,14 @@ export function LoginIllustrationBanner({ className }: { className?: string }) {
           </div>
         </FloatingCard>
 
-        <FloatingCard className="top-[4%] right-[8%] lg:right-[12%] p-2" delay={1}>
+        <FloatingCard className="hidden md:block top-[4%] right-[8%] lg:right-[12%] p-2" delay={1}>
           <div className="flex items-center gap-1.5">
             <Bell className="w-4 h-4 text-white/90" strokeWidth={2} />
             <span className="text-[9px] font-medium text-white/80">3 alerts</span>
           </div>
         </FloatingCard>
 
-        <FloatingCard className="top-[32%] left-[2%] lg:left-[5%] p-2.5" delay={2}>
+        <FloatingCard className="hidden md:block top-[32%] left-[2%] lg:left-[5%] p-2.5" delay={2}>
           <div className="flex items-center gap-2">
             <BarChart3 className="w-4 h-4 text-cyan-200" strokeWidth={2} />
             <div>
@@ -260,7 +260,7 @@ export function LoginIllustrationBanner({ className }: { className?: string }) {
           </div>
         </FloatingCard>
 
-        <FloatingCard className="top-[28%] right-[4%] lg:right-[8%] p-2.5 w-[88px]" delay={3}>
+        <FloatingCard className="hidden md:block top-[28%] right-[4%] lg:right-[8%] p-2.5 w-[88px]" delay={3}>
           <div className="flex items-center gap-1.5 mb-1.5">
             <GraduationCap className="w-3.5 h-3.5 text-white/90" strokeWidth={2} />
             <span className="text-[8px] font-medium text-white/80">Grades</span>
@@ -273,22 +273,22 @@ export function LoginIllustrationBanner({ className }: { className?: string }) {
           </div>
         </FloatingCard>
 
-        <FloatingCard className="bottom-[28%] left-[8%] lg:left-[12%] p-2" delay={1}>
+        <FloatingCard className="hidden md:block bottom-[28%] left-[8%] lg:left-[12%] p-2" delay={1}>
           <CalendarCheck className="w-4 h-4 text-white/85" strokeWidth={2} />
         </FloatingCard>
 
-        <FloatingCard className="bottom-[32%] right-[6%] lg:right-[10%] p-2.5" delay={2}>
+        <FloatingCard className="hidden md:block bottom-[32%] right-[6%] lg:right-[10%] p-2.5" delay={2}>
           <div className="flex items-center gap-2">
             <Users className="w-3.5 h-3.5 text-white/90" strokeWidth={2} />
             <span className="text-[9px] text-white/80 font-medium">1,240 students</span>
           </div>
         </FloatingCard>
 
-        <FloatingCard className="bottom-[12%] left-[18%] p-2" delay={0}>
+        <FloatingCard className="hidden md:block bottom-[12%] left-[18%] p-2" delay={0}>
           <BookOpen className="w-4 h-4 text-white/80" strokeWidth={2} />
         </FloatingCard>
 
-        <FloatingCard className="bottom-[14%] right-[20%] p-2" delay={3}>
+        <FloatingCard className="hidden md:block bottom-[14%] right-[20%] p-2" delay={3}>
           <Mail className="w-4 h-4 text-white/80" strokeWidth={2} />
         </FloatingCard>
 

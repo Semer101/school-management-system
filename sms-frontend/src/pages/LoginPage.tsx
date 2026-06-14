@@ -42,7 +42,7 @@ export default function LoginPage() {
         >
           <div className="text-center md:text-left mb-8">
             {/* School logo on mobile only */}
-            <div className="flex md:hidden items-center justify-center gap-2 mb-4 select-none">
+            <div className="hidden items-center justify-center gap-2 mb-4 select-none">
               <div className="w-10 h-10 rounded-lg bg-accent/10 border border-accent/30 flex items-center justify-center">
                 <span className="text-accent font-mono text-base font-bold">S</span>
               </div>
