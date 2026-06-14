@@ -56,19 +56,18 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        'fixed lg:sticky top-0 bottom-0 left-0 shrink-0 border-r border-surface-border bg-surface/90 lg:bg-surface/80 backdrop-blur-xl flex flex-col min-h-screen transition-all duration-300 ease-in-out z-50',
+        'fixed lg:sticky top-0 bottom-0 left-0 shrink-0 border-r border-slate-800/50 bg-slate-900/95 lg:bg-slate-900/85 backdrop-blur-xl flex flex-col min-h-screen transition-all duration-300 ease-in-out z-50 dark:bg-surface/90 dark:lg:bg-surface/80 dark:border-surface-border',
         sidebarCollapsed ? 'w-60 lg:w-16 -translate-x-full lg:translate-x-0' : 'w-60 translate-x-0'
       )}
     >
-      {/* Sidebar Header / Logo */}
-      <div className="px-4 py-5 border-b border-surface-border flex items-center justify-between min-h-[60px]">
+      <div className="px-4 py-5 border-b border-slate-800/50 dark:border-surface-border flex items-center justify-between min-h-[60px]">
         <div className={cn('flex items-center gap-2', sidebarCollapsed && 'lg:justify-center lg:w-full')}>
           <div className="w-8 h-8 shrink-0 rounded-lg bg-accent/20 border border-accent/40 flex items-center justify-center">
             <span className="text-accent font-mono text-xs font-bold">S</span>
           </div>
           <div className={cn('transition-all duration-300', sidebarCollapsed ? 'lg:opacity-0 lg:w-0 overflow-hidden' : 'opacity-100 w-auto')}>
-            <p className="text-sm font-semibold text-foreground tracking-wide whitespace-nowrap">SMS</p>
-            <p className="text-[10px] uppercase tracking-widest text-muted whitespace-nowrap">Ethiopia G9–12</p>
+            <p className="text-sm font-semibold text-white dark:text-foreground tracking-wide whitespace-nowrap">SMS</p>
+            <p className="text-[10px] uppercase tracking-widest text-slate-400 dark:text-muted whitespace-nowrap">Ethiopia G9–12</p>
           </div>
         </div>
       </div>
@@ -90,8 +89,8 @@ export function Sidebar() {
                     ? 'lg:justify-center lg:px-2 py-2.5' 
                     : 'px-3 py-2.5 gap-3',
                   isActive
-                    ? 'bg-accent/10 text-accent border-accent/30 shadow-glow-sm'
-                    : 'text-muted hover:text-foreground hover:bg-surface-elevated/60'
+                    ? 'bg-accent/20 text-accent border-accent/40 shadow-glow-sm'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60 dark:text-muted dark:hover:text-foreground dark:hover:bg-surface-elevated/60'
                 )
               }
             >
@@ -105,11 +104,11 @@ export function Sidebar() {
       </nav>
 
       {/* Desktop Collapse Toggle Handle */}
-      <div className="hidden lg:flex p-3 border-t border-surface-border justify-center">
+      <div className="hidden lg:flex p-3 border-t border-slate-800/50 dark:border-surface-border justify-center">
         <button
           type="button"
           onClick={() => dispatch(toggleSidebar())}
-          className="p-1.5 rounded-lg border border-surface-border text-muted hover:text-foreground hover:bg-surface-elevated/60 transition-colors"
+          className="p-1.5 rounded-lg border border-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-800/60 dark:border-surface-border dark:text-muted dark:hover:text-foreground dark:hover:bg-surface-elevated/60 transition-colors"
           aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
           {sidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}

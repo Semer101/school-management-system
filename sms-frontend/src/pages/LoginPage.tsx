@@ -30,10 +30,10 @@ export default function LoginPage() {
       <div className="absolute inset-0 app-grid-bg pointer-events-none opacity-40 z-0" />
 
       {/* Left side: Illustration Banner */}
-      <LoginIllustrationBanner className="w-1/2 order-1 md:order-1" />
+      <LoginIllustrationBanner className="w-full md:w-1/2 order-1 md:order-1" />
 
       {/* Right side: Login Form */}
-      <div className="w-1/2 flex items-center justify-center p-6 sm:p-12 relative z-10 order-2 md:order-2">
+      <div className="w-full md:w-1/2 flex items-center justify-center p-6 sm:p-12 relative z-10 order-2 md:order-2">
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
