@@ -19,22 +19,29 @@ func cookieSecure() bool {
 	return os.Getenv("ENV") == "production"
 }
 
-// SetAccessCookie stores the JWT in an HttpOnly cookie (browser clients).
-func SetAccessCookie(c *gin.Context, accessToken string) {
-	c.SetSameSite(http.SameSiteStrictMode)
-	c.SetCookie(AccessCookieName, accessToken, accessMaxAge, "/", "", cookieSecure(), true)
+func cookieSameSite() http.SameSite {
+	if os.Getenv("ENV") == "production" && os.Getenv("FRONTEND_URL") != "" {
+		return http.SameSiteNoneMode
+	}
+	return http.SameSiteStrictMode
 }
 
-// SetRefreshCookie stores the refresh token (scoped to refresh path).
+func SetAccessCookie(c *gin.Context, accessToken string) {
+	sameSite := cookieSameSite()
+	secure := cookieSecure()
+	c.SetSameSite(sameSite)
+	c.SetCookie(AccessCookieName, accessToken, accessMaxAge, "/", "", secure, true)
+}
+
 func SetRefreshCookie(c *gin.Context, refreshToken string) {
-	c.SetSameSite(http.SameSiteStrictMode)
+	c.SetSameSite(cookieSameSite())
 	c.SetCookie(RefreshCookieName, refreshToken, refreshMaxAge, "/api/token", "", cookieSecure(), true)
 }
 
 // ClearAuthCookies removes session cookies on logout.
 func ClearAuthCookies(c *gin.Context) {
 	secure := cookieSecure()
-	c.SetSameSite(http.SameSiteStrictMode)
+	c.SetSameSite(cookieSameSite())
 	c.SetCookie(AccessCookieName, "", -1, "/", "", secure, true)
 	c.SetCookie(RefreshCookieName, "", -1, "/api/token", "", secure, true)
 }

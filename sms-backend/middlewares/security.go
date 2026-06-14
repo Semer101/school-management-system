@@ -43,6 +43,10 @@ func SecurityHeaders() gin.HandlerFunc {
 			if connectSrc == "" {
 				connectSrc = "'self'"
 			}
+			frontendURL := os.Getenv("FRONTEND_URL")
+			if frontendURL != "" {
+				connectSrc = connectSrc + " " + frontendURL
+			}
 			csp := fmt.Sprintf(
 				"default-src 'self'; "+
 					"script-src 'self' 'unsafe-inline'; "+
@@ -61,21 +65,22 @@ func SecurityHeaders() gin.HandlerFunc {
 // CORSMiddleware controls which origins can call your API (OWASP A05)
 // CORS = Cross-Origin Resource Sharing
 func CORSMiddleware() gin.HandlerFunc {
+	frontendURL := os.Getenv("FRONTEND_URL")
 	corsOrigins := os.Getenv("CORS_ORIGINS")
 
 	var allowedOrigins []string
 
-	if corsOrigins != "" {
+	if frontendURL != "" {
+		allowedOrigins = []string{frontendURL}
+	} else if corsOrigins != "" {
 		allowedOrigins = strings.Split(corsOrigins, ",")
 	} else {
-		// fallback only if env variable missing
 		allowedOrigins = []string{
 			"http://localhost:3000",
 			"http://localhost:8080",
 			"http://127.0.0.1:5500",
 			"https://school-management-system-70z3.onrender.com",
 		}
-		// Vite may use 5173+ when ports are busy; allow the usual dev range
 		for port := 5173; port <= 5190; port++ {
 			allowedOrigins = append(allowedOrigins,
 				fmt.Sprintf("http://localhost:%d", port),

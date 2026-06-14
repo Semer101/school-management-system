@@ -71,3 +71,7 @@ export default defineConfig([
   },
 ])
 ```
+
+## Deployment
+
+See [DEPLOY_VERCEL.md](./DEPLOY_VERCEL.md)

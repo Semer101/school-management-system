@@ -93,3 +93,11 @@ http://localhost:8080/api
 | Locker      | /api/locker            | Student/Teacher  |
 | Finance     | /api/finance           | Student/Admin/Parent |
 | Broadcast   | /api/admin/notify      | Admin            |
+
+## Deployment
+
+### Backend (Render)
+See [DEPLOY_RENDER.md](DEPLOY_RENDER.md)
+
+### Frontend (Vercel)
+See [../sms-frontend/DEPLOY_VERCEL.md](../sms-frontend/DEPLOY_VERCEL.md)

@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Backend already deployed (e.g. Render): `https://school-management-system-70z3.onrender.com`
+- Backend deployed (e.g. Render): `https://your-backend.onrender.com`
 - GitHub repo connected to Vercel
 
 ## Steps
@@ -35,19 +35,30 @@
 Ensure your Go API allows your Vercel origin. Set on Render (or `.env`):
 
 ```
-FRONTEND_URL=https://your-app.vercel.app
+CORS_ORIGINS=https://your-app.vercel.app
 ```
 
 The backend CORS middleware should include this origin for cookies and API calls.
 
 ## Cookies / auth
 
-The app uses **HttpOnly cookies** (`sms_access`, `sms_refresh`). The browser must call the API on a host that:
+The app uses **HttpOnly cookies** (`sms_access`, `sms_refresh`). For cross-origin deployment (frontend on Vercel, backend on Render):
 
-- Shares the same site policy, **or**
-- Uses correct `SameSite=None; Secure` on the backend when frontend and API are on different domains.
+1. Update `helpers/auth_cookies.go` for cross-origin production:
+```go
+func cookieSecure() bool {
+    return true
+}
 
-If login works locally but not on Vercel, update cookie settings in `sms-backend/helpers/auth_cookies.go` for cross-origin production.
+func SetAccessCookie(c *gin.Context, accessToken string) {
+    c.SetSameSite(http.SameSiteNoneMode)
+    c.SetCookie(AccessCookieName, accessToken, accessMaxAge, "/", "", cookieSecure(), true)
+}
+```
+
+2. Set `ENV=production` on Render.
+
+3. Ensure `FRONTEND_URL` and `CORS_ORIGINS` are set correctly.
 
 ## Custom domain
 
