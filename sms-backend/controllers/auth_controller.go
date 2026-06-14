@@ -171,6 +171,10 @@ func Login(c *gin.Context) {
 		return
 	}
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
+	// ⚠️ Delete the previous token to keep the production DB happy until the
+	// startup migration (main.go) drops the UNIQUE constraint on user_id.
+	// TODO: Remove this delete once the constraint is confirmed dropped.
+	config.DB.Where("user_id = ?", user.ID).Delete(&models.RefreshToken{})
 	rt := models.RefreshToken{
 		UserID:    user.ID,
 		TokenHash: string(hashedRT),
