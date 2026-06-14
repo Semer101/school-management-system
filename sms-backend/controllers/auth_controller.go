@@ -176,8 +176,6 @@ func Login(c *gin.Context) {
 		TokenHash: string(hashedRT),
 		ExpiresAt: expiresAt,
 	}
-	// Delete any old refresh tokens for this user (single-session enforcement).
-	config.DB.Where("user_id = ?", user.ID).Delete(&models.RefreshToken{})
 	if err := config.DB.Create(&rt).Error; err != nil {
 		helpers.Error(c, http.StatusInternalServerError, "failed to persist refresh token")
 		return
@@ -261,14 +259,25 @@ func RefreshToken(c *gin.Context) {
 	}
 
 	// validate against the stored hash (prevents replay of a previously used token).
-	var stored models.RefreshToken
+	// Search all active tokens for this user to find the one matching this hash
+	// (supports multiple concurrent sessions, e.g. multiple browser tabs).
+	tokenSum := sha256.Sum256([]byte(tokenStr))
+	var allActive []models.RefreshToken
 	if err := config.DB.Where("user_id = ? AND expires_at > ?", userID, time.Now()).
-		First(&stored).Error; err != nil {
+		Find(&allActive).Error; err != nil {
 		helpers.Error(c, http.StatusUnauthorized, "refresh token not found or expired — please log in again")
 		return
 	}
-	tokenSum := sha256.Sum256([]byte(tokenStr))
-	if err := bcrypt.CompareHashAndPassword([]byte(stored.TokenHash), tokenSum[:]); err != nil {
+	var stored models.RefreshToken
+	var matched bool
+	for _, rt := range allActive {
+		if bcrypt.CompareHashAndPassword([]byte(rt.TokenHash), tokenSum[:]) == nil {
+			stored = rt
+			matched = true
+			break
+		}
+	}
+	if !matched {
 		helpers.Error(c, http.StatusUnauthorized, "refresh token mismatch — please log in again")
 		return
 	}
