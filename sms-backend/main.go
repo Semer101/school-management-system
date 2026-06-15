@@ -134,6 +134,9 @@ func main() {
 	config.DB.Exec(`CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens (user_id)`)
 	log.Println("[migrate] RefreshToken migration complete")
 
+	// ── Seed: create a default admin if the users table is empty ──────────
+	config.EnsureDefaultAdmin()
+
 	// FIX #15: Respect UPLOAD_DIR env var — same default as locker_ctrl.go's getUploadDir().
 	uploadDir := os.Getenv("UPLOAD_DIR")
 	if uploadDir == "" {
