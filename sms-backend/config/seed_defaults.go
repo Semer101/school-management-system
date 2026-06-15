@@ -29,42 +29,16 @@ func EnsureDefaultUsers() {
 
 	log.Println("[seed] Checking for default users...")
 
-	// Always ensure admin user exists with correct password
-	adminEmail := envOrDefault("DEFAULT_ADMIN_EMAIL", "admin@school.et")
-	adminPassword := envOrDefault("DEFAULT_ADMIN_PASSWORD", "Admin@1234")
-
-	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(adminPassword), 12)
-
-	var adminUser models.User
-	result := DB.Where("email = ?", adminEmail).First(&adminUser)
-	if result.Error != nil {
-		// Admin doesn't exist, create it
-		adminUser = models.User{
-			Name:     "System Administrator",
-			Email:    adminEmail,
-			Password: string(hashedPassword),
-			Role:     models.RoleAdmin,
-			IsActive: true,
-		}
-		if err := DB.Create(&adminUser).Error; err != nil {
-			log.Printf("[seed] Failed to create admin: %v", err)
-		} else {
-			log.Printf("[seed] Created admin: %s / %s", adminEmail, adminPassword)
-		}
-	} else {
-		// Admin exists - update password to ensure it matches
-		if err := DB.Model(&adminUser).UpdateColumns(map[string]any{
-			"password": string(hashedPassword),
-			"is_active": true,
-		}).Error; err != nil {
-			log.Printf("[seed] Failed to update admin password: %v", err)
-		} else {
-			log.Printf("[seed] Ensured admin password is correct")
-		}
-	}
-
-	// Check other default users
+	// Always ensure default users exist with correct passwords
+	// This handles both fresh deployments and password resets
 	defaults := []defaultUser{
+		{
+			Name:     "System Administrator",
+			Email:    envOrDefault("DEFAULT_ADMIN_EMAIL", "admin@school.et"),
+			Password: envOrDefault("DEFAULT_ADMIN_PASSWORD", "Admin@1234"),
+			Phone:    "0911234567",
+			Role:     models.RoleAdmin,
+		},
 		{
 			Name:     "Default Teacher",
 			Email:    "teacher1@school.et",
@@ -107,12 +81,17 @@ func EnsureDefaultUsers() {
 				log.Printf("[seed] Created %s: %s", u.Role, u.Email)
 			}
 		} else {
-			// Update password to ensure it matches
-			DB.Model(&existing).UpdateColumns(map[string]any{
-				"password":  string(hashedPwd),
-				"is_active": true,
-			})
-			log.Printf("[seed] Ensured %s password is correct", u.Email)
+			// Always update password to ensure it matches expected value
+			if err := DB.Model(&existing).Updates(map[string]any{
+				"password":   string(hashedPwd),
+				"is_active":  true,
+				"name":       u.Name,
+				"phone":      u.Phone,
+			}).Error; err != nil {
+				log.Printf("[seed] Failed to update %s: %v", u.Email, err)
+			} else {
+				log.Printf("[seed] Ensured %s password is correct", u.Email)
+			}
 		}
 	}
 

@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -136,9 +137,12 @@ func Login(c *gin.Context) {
 
 	var user models.User
 	if err := config.DB.Where("email = ?", input.Email).First(&user).Error; err != nil {
+		log.Printf("[login] User not found: %s (error: %v)", input.Email, err)
 		helpers.Error(c, http.StatusUnauthorized, "invalid email or password")
 		return
 	}
+
+	log.Printf("[login] Found user: %s, active: %v", user.Email, user.IsActive)
 
 	if !user.IsActive {
 		helpers.Error(c, http.StatusUnauthorized, "invalid email or password")
@@ -146,6 +150,7 @@ func Login(c *gin.Context) {
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(input.Password)); err != nil {
+		log.Printf("[login] Password mismatch for: %s", input.Email)
 		helpers.Error(c, http.StatusUnauthorized, "invalid email or password")
 		return
 	}

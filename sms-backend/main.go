@@ -59,13 +59,25 @@ func main() {
 	// Log JWT secret status (don't log the actual secret)
 	if os.Getenv("JWT_SECRET") == "" {
 		log.Println("[WARN] JWT_SECRET is not set - tokens will be invalid")
+	} else {
+		log.Println("[INFO] JWT_SECRET is set")
 	}
 	if os.Getenv("JWT_REFRESH_SECRET") == "" {
 		log.Println("[WARN] JWT_REFRESH_SECRET is not set - tokens will be invalid")
+	} else {
+		log.Println("[INFO] JWT_REFRESH_SECRET is set")
 	}
 
 	if config.DB == nil {
 		log.Fatal("Database not initialized")
+	}
+
+	// Test database connection
+	var dbResult struct{}
+	if err := config.DB.Raw("SELECT 1").Scan(&dbResult).Error; err != nil {
+		log.Printf("[ERROR] Database connection test failed: %v", err)
+	} else {
+		log.Println("[INFO] Database connection OK")
 	}
 
 	// 🚨 RUN MIGRATIONS ONLY IN DEVELOPMENT
