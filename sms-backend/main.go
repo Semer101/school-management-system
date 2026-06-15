@@ -75,8 +75,8 @@ func main() {
 	}
 
 	// Test database connection
-	var dbResult struct{}
-	if err := config.DB.Raw("SELECT 1").Scan(&dbResult).Error; err != nil {
+	var ping int
+	if err := config.DB.Raw("SELECT 1").Scan(&ping).Error; err != nil {
 		log.Printf("[ERROR] Database connection test failed: %v", err)
 	} else {
 		log.Println("[INFO] Database connection OK")

@@ -12,6 +12,10 @@ import (
 	"gorm.io/gorm/logger"
 )
 
+// slowQueryThreshold is the minimum query duration before GORM logs a warning.
+// Set to 2s because Supabase pooler round-trips add ~200-300ms of baseline latency.
+const slowQueryThreshold = 2 * time.Second
+
 var DB *gorm.DB
 
 func ConnectDB() {
@@ -43,7 +47,15 @@ func ConnectDB() {
 
 	for retries := 0; retries < 5; retries++ {
 		db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-			Logger:      logger.Default.LogMode(logger.Warn),
+			Logger: logger.New(
+				log.New(os.Stdout, "\r\n", log.LstdFlags),
+				logger.Config{
+					SlowThreshold:             slowQueryThreshold,
+					LogLevel:                  logger.Warn,
+					IgnoreRecordNotFoundError: true,
+					Colorful:                  false,
+				},
+			),
 			PrepareStmt: false, // required for PgBouncer / Supabase pooler
 		})
 
