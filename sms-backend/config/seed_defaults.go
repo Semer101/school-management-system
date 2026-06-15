@@ -9,59 +9,93 @@ import (
 	"sms-backend/models"
 )
 
-// EnsureDefaultAdmin creates a default admin user if no users exist in the database.
+// defaultUser defines credentials for a bootstrap user account.
+type defaultUser struct {
+	Name     string
+	Email    string
+	Password string
+	Phone    string
+	Role     string
+}
+
+// EnsureDefaultUsers creates default users for all 4 roles if the users table is empty.
 // This is a bootstrap mechanism so the first login on a fresh deployment works.
 // Run it after ConnectDB() and AutoMigrate.
-func EnsureDefaultAdmin() {
+func EnsureDefaultUsers() {
 	if DB == nil {
-		log.Println("[seed] DB not initialized, skipping default admin")
+		log.Println("[seed] DB not initialized, skipping default users")
 		return
 	}
 
 	var count int64
 	DB.Model(&models.User{}).Count(&count)
 	if count > 0 {
-		log.Printf("[seed] %d users already exist, skipping default admin", count)
+		log.Printf("[seed] %d users already exist, skipping default users", count)
 		return
 	}
 
-	email := os.Getenv("DEFAULT_ADMIN_EMAIL")
-	if email == "" {
-		email = "admin@school.et"
-	}
-	password := os.Getenv("DEFAULT_ADMIN_PASSWORD")
-	if password == "" {
-		password = "Admin@1234"
-	}
-	name := os.Getenv("DEFAULT_ADMIN_NAME")
-	if name == "" {
-		name = "System Administrator"
-	}
-	phone := os.Getenv("DEFAULT_ADMIN_PHONE")
-	if phone == "" {
-		phone = "0911234567"
-	}
-
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), 12)
-	if err != nil {
-		log.Printf("[seed] Failed to hash default admin password: %v", err)
-		return
-	}
-
-	admin := models.User{
-		Name:     name,
-		Email:    email,
-		Password: string(hashedPassword),
-		Role:     models.RoleAdmin,
-		Phone:    phone,
-		IsActive: true,
-	}
-
-	if err := DB.Create(&admin).Error; err != nil {
-		log.Printf("[seed] Failed to create default admin: %v", err)
-		return
+	defaults := []defaultUser{
+		{
+			Name:     "System Administrator",
+			Email:    envOrDefault("DEFAULT_ADMIN_EMAIL", "admin@school.et"),
+			Password: envOrDefault("DEFAULT_ADMIN_PASSWORD", "Admin@1234"),
+			Phone:    "0911234567",
+			Role:     models.RoleAdmin,
+		},
+		{
+			Name:     "Default Teacher",
+			Email:    "teacher1@school.et",
+			Password: "Teacher@1234",
+			Phone:    "0911100001",
+			Role:     models.RoleTeacher,
+		},
+		{
+			Name:     "Default Student",
+			Email:    "student1@school.et",
+			Password: "Student@1234",
+			Phone:    "0911500001",
+			Role:     models.RoleStudent,
+		},
+		{
+			Name:     "Default Parent",
+			Email:    "parent1@school.et",
+			Password: "Parent@1234",
+			Phone:    "0944100001",
+			Role:     models.RoleParent,
+		},
 	}
 
-	log.Printf("[seed] Created default admin user: %s / %s", email, password)
-	log.Printf("[seed] CHANGE THIS PASSWORD AFTER FIRST LOGIN")
+	for _, u := range defaults {
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(u.Password), 12)
+		if err != nil {
+			log.Printf("[seed] Failed to hash password for %s: %v", u.Email, err)
+			continue
+		}
+
+		user := models.User{
+			Name:     u.Name,
+			Email:    u.Email,
+			Password: string(hashedPassword),
+			Role:     u.Role,
+			Phone:    u.Phone,
+			IsActive: true,
+		}
+
+		if err := DB.Create(&user).Error; err != nil {
+			log.Printf("[seed] Failed to create user %s: %v", u.Email, err)
+			continue
+		}
+
+		log.Printf("[seed] Created %s: %s / %s", u.Role, u.Email, u.Password)
+	}
+
+	log.Println("[seed] CHANGE DEFAULT PASSWORDS AFTER FIRST LOGIN")
+}
+
+// envOrDefault returns the env var value or a fallback default.
+func envOrDefault(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
 }

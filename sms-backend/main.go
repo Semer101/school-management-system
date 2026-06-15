@@ -135,7 +135,7 @@ func main() {
 	log.Println("[migrate] RefreshToken migration complete")
 
 	// ── Seed: create a default admin if the users table is empty ──────────
-	config.EnsureDefaultAdmin()
+	config.EnsureDefaultUsers()
 
 	// FIX #15: Respect UPLOAD_DIR env var — same default as locker_ctrl.go's getUploadDir().
 	uploadDir := os.Getenv("UPLOAD_DIR")
