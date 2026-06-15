@@ -56,6 +56,8 @@ func main() {
 	// ── Connect DB ───────────────────────────────────────────────────────────
 	config.ConnectDB()
 
+	log.Println("[INFO] Database connection established, running seed...")
+
 	// Log JWT secret status (don't log the actual secret)
 	if os.Getenv("JWT_SECRET") == "" {
 		log.Println("[WARN] JWT_SECRET is not set - tokens will be invalid")
@@ -79,6 +81,9 @@ func main() {
 	} else {
 		log.Println("[INFO] Database connection OK")
 	}
+
+	// Run seed
+	config.EnsureDefaultUsers()
 
 	// 🚨 RUN MIGRATIONS ONLY IN DEVELOPMENT
 	if os.Getenv("ENV") != "production" && os.Getenv("SKIP_MIGRATE") != "true" {
@@ -165,9 +170,6 @@ func main() {
 	} else {
 		log.Println("[migrate] RefreshToken migration complete")
 	}
-
-	// ── Seed: create a default admin if the users table is empty ──────────
-	config.EnsureDefaultUsers()
 
 	// FIX #15: Respect UPLOAD_DIR env var — same default as locker_ctrl.go's getUploadDir().
 	uploadDir := os.Getenv("UPLOAD_DIR")

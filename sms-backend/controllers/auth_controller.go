@@ -135,25 +135,30 @@ func Login(c *gin.Context) {
 
 	input.Email = strings.ToLower(strings.TrimSpace(input.Email))
 
+	log.Printf("[login] Attempt for email: %s", input.Email)
+
 	var user models.User
 	if err := config.DB.Where("email = ?", input.Email).First(&user).Error; err != nil {
-		log.Printf("[login] User not found: %s (error: %v)", input.Email, err)
+		log.Printf("[login] User NOT found: %s (error: %v)", input.Email, err)
 		helpers.Error(c, http.StatusUnauthorized, "invalid email or password")
 		return
 	}
 
-	log.Printf("[login] Found user: %s, active: %v", user.Email, user.IsActive)
+	log.Printf("[login] Found user: %s, active: %v, has_password: %v", user.Email, user.IsActive, user.Password != "")
 
 	if !user.IsActive {
+		log.Printf("[login] User inactive: %s", input.Email)
 		helpers.Error(c, http.StatusUnauthorized, "invalid email or password")
 		return
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(input.Password)); err != nil {
-		log.Printf("[login] Password mismatch for: %s", input.Email)
+		log.Printf("[login] Password mismatch for: %s (expected hash prefix: %s)", input.Email, user.Password[:20])
 		helpers.Error(c, http.StatusUnauthorized, "invalid email or password")
 		return
 	}
+
+	log.Printf("[login] SUCCESS for: %s", input.Email)
 
 	accessToken, err := config.GenerateAccessToken(user.ID, user.Role, user.Email)
 	if err != nil {
