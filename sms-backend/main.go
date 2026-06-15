@@ -56,6 +56,14 @@ func main() {
 	// ── Connect DB ───────────────────────────────────────────────────────────
 	config.ConnectDB()
 
+	// Log JWT secret status (don't log the actual secret)
+	if os.Getenv("JWT_SECRET") == "" {
+		log.Println("[WARN] JWT_SECRET is not set - tokens will be invalid")
+	}
+	if os.Getenv("JWT_REFRESH_SECRET") == "" {
+		log.Println("[WARN] JWT_REFRESH_SECRET is not set - tokens will be invalid")
+	}
+
 	if config.DB == nil {
 		log.Fatal("Database not initialized")
 	}
@@ -93,18 +101,23 @@ func main() {
 
 	log.Println("Database ready")
 
-	// 🚧 Drop the UNIQUE constraint on refresh_tokens.user_id so multiple sessions can coexist.
+	// 🚧 Ensure refresh_tokens table exists and drop unique constraint
 	// This runs in ALL environments (including production on Render).
-	log.Println("[migrate] Dropping unique constraint/index on refresh_tokens.user_id...")
+	log.Println("[migrate] Ensuring refresh_tokens table and dropping unique constraint...")
 
-	// Execute the migration SQL (outside transaction because DROP INDEX CONCURRENTLY cannot run in transaction)
+	// First, ensure the table exists by trying to create it (GORM will skip if exists)
+	if err := config.DB.AutoMigrate(&models.RefreshToken{}); err != nil {
+		log.Printf("[migrate] Failed to ensure refresh_tokens table: %v", err)
+	}
+
+	// Execute the migration SQL to drop unique constraints
 	migrationSQL := `
 	DO $$
 	DECLARE
 		idx_name TEXT;
 		constraint_name TEXT;
 	BEGIN
-		-- Drop unique index (using non-concurrent method for reliability in migrations)
+		-- Drop unique index
 		SELECT i.relname INTO idx_name
 		FROM pg_index ix
 		JOIN pg_class i ON i.oid = ix.indexrelid

@@ -28,6 +28,7 @@ type SSEClaims struct {
 
 // GenerateAccessToken creates a 1-hour JWT — used after login
 func GenerateAccessToken(userID uint, role string, email string) (string, error) {
+	secret := os.Getenv("JWT_SECRET")
 	claims := Claims{
 		UserID: userID,
 		Role:   role,
@@ -39,7 +40,7 @@ func GenerateAccessToken(userID uint, role string, email string) (string, error)
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(os.Getenv("JWT_SECRET")))
+	return token.SignedString([]byte(secret))
 }
 
 // GenerateRefreshToken creates a 7-day token for refreshing access.

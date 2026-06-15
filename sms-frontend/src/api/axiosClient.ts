@@ -12,6 +12,15 @@ const api = axios.create({
 let isRefreshing = false
 let refreshQueue: Array<() => void> = []
 
+// Add access token from localStorage to requests
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('sms_access_token')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
 api.interceptors.response.use(
   (res) => res,
   async (error) => {
@@ -36,11 +45,18 @@ api.interceptors.response.use(
     try {
       const base = import.meta.env.VITE_API_BASE_URL ?? ''
       const refreshUrl = base ? `${base}/api/token/refresh` : '/api/token/refresh'
-      await axios.post(refreshUrl, {}, { withCredentials: true })
+      const res = await axios.post(refreshUrl, {}, { withCredentials: true })
+      
+      // Store new access token
+      if (res.data?.data?.access_token) {
+        localStorage.setItem('sms_access_token', res.data.data.access_token)
+      }
+      
       refreshQueue.forEach((cb) => cb())
       refreshQueue = []
       return api(original)
     } catch {
+      localStorage.removeItem('sms_access_token')
       if (!window.location.pathname.startsWith('/login')) {
         window.location.href = '/login'
       }

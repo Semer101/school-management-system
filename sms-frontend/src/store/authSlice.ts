@@ -43,6 +43,10 @@ export const login = createAsyncThunk(
       const res = await apiLogin(email, password)
       const payload = res.data.data
       if (!payload?.user) return rejectWithValue('Login failed')
+      // Store access token for Authorization header
+      if (payload.access_token) {
+        localStorage.setItem('sms_access_token', payload.access_token)
+      }
       return payload.user
     } catch (err: unknown) {
       const msg =
@@ -57,7 +61,7 @@ export const logout = createAsyncThunk('auth/logout', async () => {
   try {
     await apiLogout()
   } finally {
-    /* cookies cleared by server */
+    localStorage.removeItem('sms_access_token')
   }
 })
 
