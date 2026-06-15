@@ -80,6 +80,7 @@ func CORSMiddleware() gin.HandlerFunc {
 			"http://localhost:8080",
 			"http://127.0.0.1:5500",
 			"https://school-management-system-70z3.onrender.com",
+			"https://school-management-system-jade-xi.vercel.app",
 		}
 		for port := 5173; port <= 5190; port++ {
 			allowedOrigins = append(allowedOrigins,
