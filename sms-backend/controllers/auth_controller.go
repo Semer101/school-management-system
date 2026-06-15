@@ -138,13 +138,14 @@ func Login(c *gin.Context) {
 	log.Printf("[login] Attempt for email: %s", input.Email)
 
 	var user models.User
-	if err := config.DB.Where("email = ?", input.Email).First(&user).Error; err != nil {
-		log.Printf("[login] User NOT found: %s (error: %v)", input.Email, err)
+	result := config.DB.Where("email = ?", input.Email).First(&user)
+	if result.Error != nil {
+		log.Printf("[login] User NOT found: %s (error: %v)", input.Email, result.Error)
 		helpers.Error(c, http.StatusUnauthorized, "invalid email or password")
 		return
 	}
 
-	log.Printf("[login] Found user: %s, active: %v, has_password: %v", user.Email, user.IsActive, user.Password != "")
+	log.Printf("[login] Found user: %s, active: %v, password_len: %d", user.Email, user.IsActive, len(user.Password))
 
 	if !user.IsActive {
 		log.Printf("[login] User inactive: %s", input.Email)
@@ -152,8 +153,9 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(input.Password)); err != nil {
-		log.Printf("[login] Password mismatch for: %s (expected hash prefix: %s)", input.Email, user.Password[:20])
+	compareErr := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(input.Password))
+	if compareErr != nil {
+		log.Printf("[login] Password mismatch for: %s (compare error: %v)", input.Email, compareErr)
 		helpers.Error(c, http.StatusUnauthorized, "invalid email or password")
 		return
 	}
