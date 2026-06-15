@@ -3,6 +3,7 @@ package config
 import (
 	"log"
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
@@ -20,18 +21,23 @@ func ConnectDB() {
 		log.Fatal("DATABASE_URL is not set")
 	}
 
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-		// safer for production debugging
-		Logger: logger.Default.LogMode(logger.Warn),
+	for retries := 0; retries < 5; retries++ {
+		db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+			Logger: logger.Default.LogMode(logger.Warn),
+			PrepareStmt: false,
+		})
 
-		// IMPORTANT: avoids prepared statement issues on Supabase/Render
-		PrepareStmt: false,
-	})
+		if err == nil {
+			DB = db
+			log.Println("Database connection established")
+			return
+		}
 
-	if err != nil {
-		log.Fatal("Failed to connect to database: ", err)
+		log.Printf("Failed to connect to database (attempt %d/5): %v", retries+1, err)
+		if retries < 4 {
+			time.Sleep(3 * time.Second)
+		}
 	}
 
-	log.Println("Database connection established")
-	DB = db
+	log.Fatal("Failed to connect to database after 5 attempts")
 }

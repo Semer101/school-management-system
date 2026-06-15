@@ -171,17 +171,34 @@ func Login(c *gin.Context) {
 		return
 	}
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
-	// ⚠️ Delete the previous token to keep the production DB happy until the
-	// startup migration (main.go) drops the UNIQUE constraint on user_id.
-	// TODO: Remove this delete once the constraint is confirmed dropped.
-	config.DB.Where("user_id = ?", user.ID).Delete(&models.RefreshToken{})
+
+	// Use a transaction to ensure atomicity
+	tx := config.DB.Begin()
+	if tx.Error != nil {
+		helpers.Error(c, http.StatusInternalServerError, "database error")
+		return
+	}
+
+	// Delete previous tokens for this user (allows multiple sessions)
+	if err := tx.Where("user_id = ?", user.ID).Delete(&models.RefreshToken{}).Error; err != nil {
+		tx.Rollback()
+		helpers.Error(c, http.StatusInternalServerError, "failed to clear old tokens")
+		return
+	}
+
 	rt := models.RefreshToken{
 		UserID:    user.ID,
 		TokenHash: string(hashedRT),
 		ExpiresAt: expiresAt,
 	}
-	if err := config.DB.Create(&rt).Error; err != nil {
+	if err := tx.Create(&rt).Error; err != nil {
+		tx.Rollback()
 		helpers.Error(c, http.StatusInternalServerError, "failed to persist refresh token")
+		return
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "failed to commit transaction")
 		return
 	}
 

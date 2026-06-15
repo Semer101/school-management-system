@@ -216,7 +216,7 @@ func RateLimitAPI() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ip := c.ClientIP()
 		if !apiLimiter.allow(ip) {
-			helpers.Error(c, http.StatusTooManyRequests, "rate limit exceeded")
+			helpers.Error(c, http.StatusTooManyRequests, "rate limit exceeded, try again later")
 			c.Abort()
 			return
 		}

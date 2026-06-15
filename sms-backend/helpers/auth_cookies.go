@@ -33,6 +33,8 @@ func SetAccessCookie(c *gin.Context, accessToken string) {
 
 func SetRefreshCookie(c *gin.Context, refreshToken string) {
 	c.SetSameSite(cookieSameSite())
+	// Path must be "/api/token" so the cookie is sent to /api/token/refresh
+	// and other paths under /api/ will not send it (security best practice)
 	c.SetCookie(RefreshCookieName, refreshToken, refreshMaxAge, "/api/token", "", cookieSecure(), true)
 }
 

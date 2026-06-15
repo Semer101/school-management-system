@@ -48,6 +48,11 @@ func main() {
 		docs.SwaggerInfo.Schemes = []string{"http"}
 	}
 
+	// Ensure ENV is set to production if running on Render
+	if os.Getenv("RENDER_EXTERNAL_HOSTNAME") != "" {
+		os.Setenv("ENV", "production")
+	}
+
 	// ── Connect DB ───────────────────────────────────────────────────────────
 	config.ConnectDB()
 
@@ -89,50 +94,52 @@ func main() {
 	log.Println("Database ready")
 
 	// 🚧 Drop the UNIQUE constraint on refresh_tokens.user_id so multiple sessions can coexist.
-	// GORM creates the constraint with an auto-generated name based on its internal conventions.
-	// We query pg_catalog to find the exact index/constraint name, then drop it.
 	// This runs in ALL environments (including production on Render).
-	log.Println("[migrate] Dropping unique constraint on refresh_tokens.user_id...")
+	log.Println("[migrate] Dropping unique constraint/index on refresh_tokens.user_id...")
 
-	var constraintNames []string
-	config.DB.Raw(`
-		SELECT con.conname
-		FROM pg_constraint con
-		JOIN pg_class cls ON cls.oid = con.conrelid
-		WHERE cls.relname = 'refresh_tokens'
-		  AND con.contype = 'u'
-		  AND con.conkey::int[] @> ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = cls.oid AND attname = 'user_id')::int]
-	`).Scan(&constraintNames)
-	for _, name := range constraintNames {
-		if err := config.DB.Exec("ALTER TABLE refresh_tokens DROP CONSTRAINT " + name).Error; err != nil {
-			log.Printf("[migrate] Failed to drop constraint %s: %v", name, err)
-		} else {
-			log.Printf("[migrate] Dropped constraint: %s", name)
-		}
-	}
-
-	var indexNames []string
-	config.DB.Raw(`
-		SELECT i.relname
+	// Execute the migration SQL (outside transaction because DROP INDEX CONCURRENTLY cannot run in transaction)
+	migrationSQL := `
+	DO $$
+	DECLARE
+		idx_name TEXT;
+		constraint_name TEXT;
+	BEGIN
+		-- Drop unique index (using non-concurrent method for reliability in migrations)
+		SELECT i.relname INTO idx_name
 		FROM pg_index ix
 		JOIN pg_class i ON i.oid = ix.indexrelid
 		JOIN pg_class t ON t.oid = ix.indrelid
 		JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(ix.indkey)
 		WHERE t.relname = 'refresh_tokens'
 		  AND a.attname = 'user_id'
-		  AND ix.indisunique = true
-	`).Scan(&indexNames)
-	for _, name := range indexNames {
-		if err := config.DB.Exec("DROP INDEX IF EXISTS " + name + " CASCADE").Error; err != nil {
-			log.Printf("[migrate] Failed to drop index %s: %v", name, err)
-		} else {
-			log.Printf("[migrate] Dropped unique index: %s", name)
-		}
-	}
+		  AND ix.indisunique = true;
 
-	// Ensure a plain (non-unique) index exists for query performance
-	config.DB.Exec(`CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens (user_id)`)
-	log.Println("[migrate] RefreshToken migration complete")
+		IF idx_name IS NOT NULL THEN
+			EXECUTE 'DROP INDEX IF EXISTS ' || quote_ident(idx_name) || ' CASCADE';
+			RAISE NOTICE 'Dropped unique index: %', idx_name;
+		END IF;
+
+		-- Drop any unique constraint
+		SELECT con.conname INTO constraint_name
+		FROM pg_constraint con
+		JOIN pg_class cls ON cls.oid = con.conrelid
+		WHERE cls.relname = 'refresh_tokens'
+		  AND con.contype = 'u';
+
+		IF constraint_name IS NOT NULL THEN
+			EXECUTE 'ALTER TABLE refresh_tokens DROP CONSTRAINT IF EXISTS ' || quote_ident(constraint_name);
+			RAISE NOTICE 'Dropped unique constraint: %', constraint_name;
+		END IF;
+	END $$;
+
+	CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens (user_id);
+	`
+
+	if err := config.DB.Exec(migrationSQL).Error; err != nil {
+		log.Printf("[migrate] Migration warning: %v", err)
+	} else {
+		log.Println("[migrate] RefreshToken migration complete")
+	}
 
 	// ── Seed: create a default admin if the users table is empty ──────────
 	config.EnsureDefaultUsers()
