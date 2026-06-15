@@ -33,9 +33,8 @@ func SetAccessCookie(c *gin.Context, accessToken string) {
 
 func SetRefreshCookie(c *gin.Context, refreshToken string) {
 	c.SetSameSite(cookieSameSite())
-	// Path must be "/api/token" so the cookie is sent to /api/token/refresh
-	// and other paths under /api/ will not send it (security best practice)
-	c.SetCookie(RefreshCookieName, refreshToken, refreshMaxAge, "/api/token", "", cookieSecure(), true)
+	// Path must be "/api" so the cookie is sent to /api/token/refresh and all /api/ endpoints
+	c.SetCookie(RefreshCookieName, refreshToken, refreshMaxAge, "/api", "", cookieSecure(), true)
 }
 
 // ClearAuthCookies removes session cookies on logout.
@@ -43,7 +42,7 @@ func ClearAuthCookies(c *gin.Context) {
 	secure := cookieSecure()
 	c.SetSameSite(cookieSameSite())
 	c.SetCookie(AccessCookieName, "", -1, "/", "", secure, true)
-	c.SetCookie(RefreshCookieName, "", -1, "/api/token", "", secure, true)
+	c.SetCookie(RefreshCookieName, "", -1, "/api", "", secure, true)
 }
 
 // ExtractAccessToken reads JWT from Authorization header or sms_access cookie.

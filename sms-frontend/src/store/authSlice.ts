@@ -21,17 +21,29 @@ const initialState: AuthState = {
 export const initializeAuth = createAsyncThunk(
   'auth/initialize',
   async (_, { rejectWithValue }) => {
+    // First, try to get user info with existing token
     try {
       const res = await getMe()
       return res.data.data ?? null
-    } catch {
-      try {
-        await api.post('/api/token/refresh', {})
-        const res = await getMe()
-        return res.data.data ?? null
-      } catch {
-        return rejectWithValue('session expired')
+    } catch (err: unknown) {
+      const status = (err as { response?: { status?: number } })?.response?.status
+      // If 401, try to refresh token
+      if (status === 401) {
+        try {
+          const refreshRes = await api.post('/api/token/refresh', {}, { withCredentials: true })
+          // Store new access token
+          if (refreshRes.data?.data?.access_token) {
+            localStorage.setItem('sms_access_token', refreshRes.data.data.access_token)
+          }
+          // Try getMe again
+          const res = await getMe()
+          return res.data.data ?? null
+        } catch {
+          localStorage.removeItem('sms_access_token')
+          return rejectWithValue('session expired')
+        }
       }
+      return rejectWithValue('session expired')
     }
   }
 )
