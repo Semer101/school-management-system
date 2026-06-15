@@ -194,8 +194,8 @@ func (rl *rateLimiter) cleanup() {
 
 // Global rate limiters for different endpoint types
 var (
-	loginLimiter = newRateLimiter(5, time.Minute)   // 5 login attempts/minute
-	apiLimiter   = newRateLimiter(100, time.Minute) // 100 API calls/minute
+	loginLimiter = newRateLimiter(10, time.Minute)   // 10 login attempts/minute
+	apiLimiter   = newRateLimiter(200, time.Minute) // 200 API calls/minute
 )
 
 // RateLimitLogin restricts login attempts to prevent brute force (OWASP A07)

@@ -58,6 +58,9 @@ func main() {
 
 	log.Println("[INFO] Database connection established, running seed...")
 
+	// Run seed immediately after connection
+	config.EnsureDefaultUsers()
+
 	// Log JWT secret status (don't log the actual secret)
 	if os.Getenv("JWT_SECRET") == "" {
 		log.Println("[WARN] JWT_SECRET is not set - tokens will be invalid")
@@ -81,9 +84,6 @@ func main() {
 	} else {
 		log.Println("[INFO] Database connection OK")
 	}
-
-	// Run seed
-	config.EnsureDefaultUsers()
 
 	// 🚨 RUN MIGRATIONS ONLY IN DEVELOPMENT
 	if os.Getenv("ENV") != "production" && os.Getenv("SKIP_MIGRATE") != "true" {

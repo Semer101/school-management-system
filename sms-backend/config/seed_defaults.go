@@ -22,8 +22,10 @@ type defaultUser struct {
 // This is a bootstrap mechanism so the first login on a fresh deployment works.
 // Run it after ConnectDB() and AutoMigrate.
 func EnsureDefaultUsers() {
+	log.Println("[seed] Starting EnsureDefaultUsers...")
+	
 	if DB == nil {
-		log.Println("[seed] DB not initialized, skipping default users")
+		log.Println("[seed] ERROR: DB is nil, cannot seed users")
 		return
 	}
 
