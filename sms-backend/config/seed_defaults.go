@@ -30,7 +30,6 @@ func EnsureDefaultUsers() {
 	log.Println("[seed] Checking for default users...")
 
 	// Always ensure default users exist with correct passwords
-	// This handles both fresh deployments and password resets
 	defaults := []defaultUser{
 		{
 			Name:     "System Administrator",
@@ -90,7 +89,7 @@ func EnsureDefaultUsers() {
 			}).Error; err != nil {
 				log.Printf("[seed] Failed to update %s: %v", u.Email, err)
 			} else {
-				log.Printf("[seed] Ensured %s password is correct", u.Email)
+				log.Printf("[seed] Updated %s password", u.Email)
 			}
 		}
 	}

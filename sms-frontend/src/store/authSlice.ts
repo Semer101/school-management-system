@@ -21,7 +21,13 @@ const initialState: AuthState = {
 export const initializeAuth = createAsyncThunk(
   'auth/initialize',
   async (_, { rejectWithValue }) => {
-    // First, try to get user info with existing token
+    // Check if there's an access token first
+    const accessToken = localStorage.getItem('sms_access_token')
+    if (!accessToken) {
+      return rejectWithValue('no session')
+    }
+
+    // Try to get user info with existing token
     try {
       const res = await getMe()
       return res.data.data ?? null
