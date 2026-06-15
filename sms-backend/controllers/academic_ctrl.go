@@ -2182,6 +2182,7 @@ func GetParents(c *gin.Context) {
 		Name          string     `json:"name"`
 		Email         string     `json:"email"`
 		Phone         string     `json:"phone"`
+		AvatarURL     string     `json:"avatar_url"`
 		IsActive      bool       `json:"is_active"`
 		Status        string     `json:"status"`
 		ChildrenCount int        `json:"children_count"`
@@ -2223,7 +2224,8 @@ func GetParents(c *gin.Context) {
 
 		rows = append(rows, parentRow{
 			ID: p.ID, Name: p.Name, Email: p.Email, Phone: p.Phone,
-			IsActive: p.IsActive, Status: st, ChildrenCount: len(children),
+			AvatarURL: p.AvatarURL,
+			IsActive:  p.IsActive, Status: st, ChildrenCount: len(children),
 			Children: children, StudentNames: strings.Join(studentNamesList, ", "),
 			CreatedAt: p.CreatedAt.Format(time.RFC3339),
 		})
@@ -2247,6 +2249,7 @@ func GetAdmins(c *gin.Context) {
 		Name      string `json:"name"`
 		Email     string `json:"email"`
 		Phone     string `json:"phone"`
+		AvatarURL string `json:"avatar_url"`
 		IsActive  bool   `json:"is_active"`
 		Status    string `json:"status"`
 		CreatedAt string `json:"created_at"`
@@ -2259,7 +2262,8 @@ func GetAdmins(c *gin.Context) {
 		}
 		out = append(out, row{
 			ID: a.ID, Name: a.Name, Email: a.Email, Phone: a.Phone,
-			IsActive: a.IsActive, Status: st, CreatedAt: a.CreatedAt.Format(time.RFC3339),
+			AvatarURL: a.AvatarURL,
+			IsActive:  a.IsActive, Status: st, CreatedAt: a.CreatedAt.Format(time.RFC3339),
 		})
 	}
 	helpers.Success(c, http.StatusOK, "admins fetched", gin.H{"total": total, "data": out})
@@ -2480,11 +2484,11 @@ func GetTeacherSubjects(c *gin.Context) {
 	config.DB.Where("teacher_id = ?", teacher.ID).Order("name ASC").Find(&subjects)
 
 	type subjectResp struct {
-		ID       uint   `json:"id"`
-		Name     string `json:"name"`
-		Code     string `json:"code"`
-		Grade    int    `json:"grade_level"`
-		Stream   string `json:"stream"`
+		ID     uint   `json:"id"`
+		Name   string `json:"name"`
+		Code   string `json:"code"`
+		Grade  int    `json:"grade_level"`
+		Stream string `json:"stream"`
 	}
 
 	var out []subjectResp

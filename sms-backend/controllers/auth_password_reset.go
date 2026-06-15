@@ -103,12 +103,20 @@ func ResetPasswordWithOTP(c *gin.Context) {
 	helpers.Success(c, http.StatusOK, "password reset successfully", nil)
 }
 
+// MaxAvatarSize is the maximum allowed profile picture upload size (2 MB).
+const MaxAvatarSize = 2 * 1024 * 1024 // 2 MB
+
 // UploadAvatar handles profile picture upload
 func UploadAvatar(c *gin.Context) {
 	userID := c.GetUint("userID")
 	file, err := c.FormFile("avatar")
 	if err != nil {
 		helpers.Error(c, http.StatusBadRequest, "avatar file required")
+		return
+	}
+
+	if file.Size > MaxAvatarSize {
+		helpers.Error(c, http.StatusBadRequest, "image exceeds 2 MB limit")
 		return
 	}
 
@@ -135,4 +143,55 @@ func UploadAvatar(c *gin.Context) {
 	config.DB.Model(&models.User{}).Where("id = ?", userID).Update("avatar_url", url)
 
 	helpers.Success(c, http.StatusOK, "avatar updated", gin.H{"avatar_url": url})
+}
+
+// AdminUploadUserAvatar allows an Admin to upload/replace a profile photo for any user.
+func AdminUploadUserAvatar(c *gin.Context) {
+	idStr := c.Param("id")
+	var targetID uint
+	if _, err := fmt.Sscanf(idStr, "%d", &targetID); err != nil || targetID == 0 {
+		helpers.Error(c, http.StatusBadRequest, "invalid user ID")
+		return
+	}
+
+	var user models.User
+	if err := config.DB.First(&user, targetID).Error; err != nil {
+		helpers.Error(c, http.StatusNotFound, "user not found")
+		return
+	}
+
+	file, err := c.FormFile("avatar")
+	if err != nil {
+		helpers.Error(c, http.StatusBadRequest, "avatar file required")
+		return
+	}
+
+	if file.Size > MaxAvatarSize {
+		helpers.Error(c, http.StatusBadRequest, "image exceeds 2 MB limit")
+		return
+	}
+
+	avatarDir := os.Getenv("AVATAR_DIR")
+	if avatarDir == "" {
+		avatarDir = "./uploads/avatars"
+	}
+	os.MkdirAll(avatarDir, 0750)
+
+	ext := strings.ToLower(filepath.Ext(file.Filename))
+	if ext != ".jpg" && ext != ".jpeg" && ext != ".png" && ext != ".webp" {
+		helpers.Error(c, http.StatusBadRequest, "only jpg, png, webp allowed")
+		return
+	}
+
+	filename := fmt.Sprintf("user_%d%s", targetID, ext)
+	dest := filepath.Join(avatarDir, filename)
+	if err := c.SaveUploadedFile(file, dest); err != nil {
+		helpers.Error(c, http.StatusInternalServerError, "upload failed")
+		return
+	}
+
+	avatarURL := "/uploads/avatars/" + filename
+	config.DB.Model(&models.User{}).Where("id = ?", targetID).Update("avatar_url", avatarURL)
+
+	helpers.Success(c, http.StatusOK, "avatar updated", gin.H{"avatar_url": avatarURL})
 }

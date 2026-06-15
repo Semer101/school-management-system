@@ -58,6 +58,7 @@ func SetupRoutes(r *gin.Engine) {
 			admin.GET("/admins", controllers.GetAdmins)
 			admin.PUT("/admins/:id", controllers.UpdateAdmin)
 			admin.DELETE("/admins/:id", controllers.ArchiveAdmin)
+			admin.POST("/users/:id/avatar", controllers.AdminUploadUserAvatar)
 			admin.GET("/parents", controllers.GetParents)
 			admin.PUT("/parents/:id", controllers.UpdateParent)
 			admin.DELETE("/parents/:id", controllers.ArchiveParent)
