@@ -56,10 +56,7 @@ func main() {
 	// ── Connect DB ───────────────────────────────────────────────────────────
 	config.ConnectDB()
 
-	log.Println("[INFO] Database connection established, running seed...")
-
-	// Run seed immediately after connection
-	config.EnsureDefaultUsers()
+	log.Println("[INFO] Database connection established")
 
 	// Log JWT secret status (don't log the actual secret)
 	if os.Getenv("JWT_SECRET") == "" {
@@ -85,11 +82,11 @@ func main() {
 		log.Println("[INFO] Database connection OK")
 	}
 
-	// 🚨 RUN MIGRATIONS ONLY IN DEVELOPMENT
-	if os.Getenv("ENV") != "production" && os.Getenv("SKIP_MIGRATE") != "true" {
-		// Safe local development only
-		// NEVER runs on Render
-		log.Println("Running AutoMigrate (dev mode only)")
+	// 🔄 RUN MIGRATIONS — controlled by SKIP_MIGRATE env var
+	// Set SKIP_MIGRATE=true to skip (e.g. when running manual SQL migrations).
+	// Defaults to running in ALL environments so fresh databases are always bootstrapped.
+	if os.Getenv("SKIP_MIGRATE") != "true" {
+		log.Println("Running AutoMigrate...")
 
 		err := config.DB.AutoMigrate(
 			&models.User{},
@@ -112,11 +109,15 @@ func main() {
 		if err != nil {
 			log.Fatal("Migration failed: ", err)
 		}
-	} else if os.Getenv("SKIP_MIGRATE") == "true" {
+	} else {
 		log.Println("Skipping AutoMigrate (SKIP_MIGRATE=true)")
 	}
 
 	log.Println("Database ready")
+
+	// Seed default users AFTER schema is guaranteed to exist
+	log.Println("[INFO] Running seed...")
+	config.EnsureDefaultUsers()
 
 	// 🚧 Ensure refresh_tokens table exists and drop unique constraint
 	// This runs in ALL environments (including production on Render).
@@ -195,7 +196,6 @@ func main() {
 	if err := os.MkdirAll(receiptDir, 0750); err != nil {
 		log.Fatal("Failed to create receipts directory: ", err)
 	}
-
 
 	r := gin.Default()
 	r.Static("/uploads", "./uploads")

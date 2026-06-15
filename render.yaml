@@ -19,6 +19,8 @@ services:
         generateValue: true
       - key: JWT_SSE_SECRET
         generateValue: true
+      - key: FRONTEND_URL
+        value: https://school-management-system-jade-xi.vercel.app
       - key: PORT
         value: 8080
     healthCheck:
