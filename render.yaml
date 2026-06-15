@@ -9,10 +9,11 @@ services:
         value: production
       - key: SKIP_MIGRATE
         value: "false"
+      # DATABASE_URL is managed manually in the Render dashboard.
+      # Set it to your Supabase SESSION-pooler URL (port 5432), e.g.:
+      # postgresql://postgres.YOURREF:PASSWORD@aws-0-eu-west-1.pooler.supabase.com:5432/postgres
       - key: DATABASE_URL
-        fromDatabase:
-          name: sms-db
-          property: connectionString
+        sync: false
       - key: JWT_SECRET
         generateValue: true
       - key: JWT_REFRESH_SECRET
@@ -28,7 +29,3 @@ services:
       interval: 30s
       timeout: 10s
       restartDelay: 5s
-
-databases:
-  - name: sms-db
-    plan: free
